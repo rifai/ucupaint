@@ -18,7 +18,7 @@ class ExportShader(Operator):
 
     filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
 
-    use_shortcut = True
+    use_shortcut = False
     shader_generation_test = False
 
     godot_directory = "/home/bocilmania/Documents/projects/godot/witch/"
@@ -332,7 +332,7 @@ uniform vec2 {1} = vec2({2},{3});
 
         print(content_shader)
 
-        script_location = os.path.join(addon_dir, "godot4", "blender_import.gd")
+        script_location = os.path.join(addon_dir, "blender_import.gd")
         print("addon dir ", script_location)
 
         name_asset = bpy.path.display_name_from_filepath(self.filepath)
