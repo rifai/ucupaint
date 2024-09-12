@@ -85,12 +85,11 @@ uniform float {0}_normal_depth = 1.0;
     script_mask_vars = "uniform sampler2D {0};"
     
     script_fragment_base_uv_heightmap = '''
-    base_uv_{0} = setHeight(UV, view_dir, {1}_heightmap, {1}_heightmap_scale);'''
+    scaled_uv_{0} = setHeight(scaled_uv_{0}, view_dir, {1}_heightmap, {1}_heightmap_scale);'''
 
     script_fragment_var = '''
 
-    vec2 base_uv_{0} = UV;{3}
-    vec2 scaled_uv_{0} = base_uv_{0} * {1};
+    vec2 scaled_uv_{0} = UV * {1};{3}
     vec4 albedo_{0} = texture({2}, scaled_uv_{0});'''
 
     script_fragment_roughness_var = '''
@@ -100,7 +99,7 @@ uniform float {0}_normal_depth = 1.0;
     vec4 normal_depth_{0} = vec4({1}_depth, 0, 0, 1);'''
 
     script_mask_fragment_var = '''
-    vec4 mask_{0} = texture({1}, base_uv_{0});
+    vec4 mask_{0} = texture({1}, scaled_uv_{0});
     albedo_{0}.a = mask_{0}.r;''' 
     script_mask_normal_var = '''
     normal_{0}.a = mask_{0}.r;
