@@ -100,7 +100,7 @@ uniform float {0}_normal_depth = 1.0;
     '''
 
     script_mask_fragment_var = '''
-    vec4 mask_{0} = texture({1}, scaled_uv_{0});
+    vec4 mask_{0} = texture({1}, UV);
     albedo_{0}.a = mask_{0}.r;''' 
     script_mask_normal_var = '''
     normal_{0}.a = mask_{0}.r;
