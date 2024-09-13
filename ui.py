@@ -1,4 +1,4 @@
-import bpy, re, time
+import bpy, re, time, os
 from bpy.props import *
 from bpy.app.handlers import persistent
 from bpy.app.translations import pgettext_iface
@@ -544,7 +544,7 @@ def draw_edge_detect_props(layer, source, layout):
     col = layout.column()
     row = col.row()
     row.label(text='Radius:')
-    row.prop(layer, 'edge_detect_radius', text='')
+    draw_input_prop(row, layer, 'edge_detect_radius')
 
 def draw_inbetween_modifier_mask_props(layer, source, layout):
     col = layout.column()
@@ -1439,23 +1439,27 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
                         else: boxcol.operator('node.y_select_decal_object', icon='EMPTY_DATA')
 
                     if layer.texcoord_type != 'Decal':
-                        rrow = boxcol.row()
                         mapping = get_layer_mapping(layer)
 
-                        rrow.label(text='Offset:')
+                        rrow = boxcol.row()
+                        rrow.label(text='Transform:')
                         rrow.prop(mapping, 'vector_type', text='')
-                        if is_greater_than_281():
-                            boxcol.prop(mapping.inputs[1], 'default_value', text='')
-                            boxcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
-                            boxcol.prop(mapping.inputs[3], 'default_value', text='Scale')
-                        else:
-                            boxcol.prop(mapping, 'translation', text='')
-                            boxcol.prop(mapping, 'rotation')
-                            boxcol.prop(mapping, 'scale')
 
-                        #boxcol.prop(layer, 'translation', text='')
-                        #boxcol.prop(layer, 'rotation')
-                        #boxcol.prop(layer, 'scale')
+                        rrow = boxcol.row()
+                        if is_greater_than_281():
+                            mcol = rrow.column()
+                            mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
+                            mcol = rrow.column()
+                            mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
+                            mcol = rrow.column()
+                            mcol.prop(mapping.inputs[3], 'default_value', text='Scale')
+                        else:
+                            mcol = rrow.column()
+                            mcol.prop(mapping, 'translation')
+                            mcol = rrow.column()
+                            mcol.prop(mapping, 'rotation')
+                            mcol = rrow.column()
+                            mcol.prop(mapping, 'scale')
 
                         if yp.need_temp_uv_refresh:
                             rrow = boxcol.row(align=True)
@@ -2404,22 +2408,27 @@ def draw_layer_masks(context, layout, layer):
                         else: boxcol.operator('node.y_select_decal_object', icon='EMPTY_DATA')
 
                     if mask.texcoord_type != 'Decal':
-                        rrow = boxcol.row()
                         mapping = get_mask_mapping(mask)
-                        rrow.label(text='Offset:')
-                        rrow.prop(mapping, 'vector_type', text='')
-                        if is_greater_than_281():
-                            boxcol.prop(mapping.inputs[1], 'default_value', text='')
-                            boxcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
-                            boxcol.prop(mapping.inputs[3], 'default_value', text='Scale')
-                        else:
-                            boxcol.prop(mapping, 'translation', text='')
-                            boxcol.prop(mapping, 'rotation')
-                            boxcol.prop(mapping, 'scale')
 
-                        #boxcol.prop(mask, 'translation', text='Offset')
-                        #boxcol.prop(mask, 'rotation')
-                        #boxcol.prop(mask, 'scale')
+                        rrow = boxcol.row()
+                        rrow.label(text='Transform:')
+                        rrow.prop(mapping, 'vector_type', text='')
+
+                        rrow = boxcol.row()
+                        if is_greater_than_281():
+                            mcol = rrow.column()
+                            mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
+                            mcol = rrow.column()
+                            mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
+                            mcol = rrow.column()
+                            mcol.prop(mapping.inputs[3], 'default_value', text='Scale')
+                        else:
+                            mcol = rrow.column()
+                            mcol.prop(mapping, 'translation')
+                            mcol = rrow.column()
+                            mcol.prop(mapping, 'rotation')
+                            mcol = rrow.column()
+                            mcol.prop(mapping, 'scale')
 
                         if mask.type == 'IMAGE' and mask.active_edit and (
                                 yp.need_temp_uv_refresh
@@ -2893,7 +2902,7 @@ def draw_layers_ui(context, layout, node):
 
     if layer:
 
-        if has_childrens(layer):
+        if has_childrens(layer): # or (image and not image.packed_file):
 
             if is_greater_than_280():
                 rcol.operator("node.y_remove_layer_menu", icon='REMOVE', text='')
@@ -2963,12 +2972,7 @@ def draw_layers_ui(context, layout, node):
         else: active_vcol = None
 
         # Check if any images aren't using proper linear pipelines
-        if (
-            #(image and image.colorspace_settings.name != 'Linear') or 
-            #(override_image and override_image.colorspace_settings.name != 'Linear') or 
-            #(mask_image and mask_image.colorspace_settings.name != 'Linear')
-            any_linear_images_problem(yp)
-            ):
+        if any_linear_images_problem(yp):
             col.alert = True
             col.operator('node.y_use_linear_color_space', text='Refresh Linear Color Space', icon='ERROR')
             col.alert = False
@@ -3053,14 +3057,20 @@ def draw_layers_ui(context, layout, node):
                 row = bbox.row(align=True)
                 row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
 
-        if obj.type == 'MESH' and obj.mode == 'TEXTURE_PAINT' and ((layer.type == 'IMAGE' and not mask_image) or (mask_image and mask.source_input == 'ALPHA')) and not override_image:
+        in_texture_paint_mode = obj.mode == 'TEXTURE_PAINT' or (
+                is_greater_than_430() and obj.mode == 'SCULPT' and 
+                # Assuming sculpt texture paint is already stable or enabled in experimental feature
+                (not hasattr(context.preferences.experimental, 'use_sculpt_texture_paint') or context.preferences.experimental.use_sculpt_texture_paint)
+                )
+
+        if obj.type == 'MESH' and in_texture_paint_mode and ((layer.type == 'IMAGE' and not mask_image) or (mask_image and mask.source_input == 'ALPHA')) and not override_image:
             bbox = col.box()
             row = bbox.row(align=True)
             row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
 
         ve = context.scene.ve_edit
-        if obj.mode == 'TEXTURE_PAINT':
-            brush = context.tool_settings.image_paint.brush
+        if in_texture_paint_mode:
+            brush = context.tool_settings.image_paint.brush if obj.mode == 'TEXTURE_PAINT' else context.tool_settings.sculpt.brush
             if ((mask_image and mask.source_input == 'RGB') or override_image) and brush.name == eraser_names[obj.mode]:
                 bbox = col.box()
                 row = bbox.row(align=True)
@@ -4008,6 +4018,28 @@ class NODE_UL_YPaint_layers(bpy.types.UIList):
             else: eye_icon = 'HIDE_ON'
         row.prop(layer, 'enable', emboss=False, text='', icon=eye_icon)
 
+class YPAssetBrowserMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_ypaint_asset_browser_menu"
+    bl_label = get_addon_title() + " Asset Browser Menu"
+    bl_description = get_addon_title() + " asset browser menu"
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def draw(self, context):
+        obj = context.object
+        op = self.layout.operator("node.y_open_images_from_material_to_single_layer", icon_value=lib.get_icon('image'), text='Open Material Images to Layer')
+        op.from_asset_browser = True
+        op.mat_name = context.mat_asset.name if hasattr(context, 'mat_asset') else ''
+
+        if obj.type == 'MESH':
+            op.texcoord_type = 'UV'
+            active_uv_name = get_active_render_uv(obj)
+            op.uv_map = active_uv_name
+        else:
+            op.texcoord_type = 'Generated'
+
 def draw_yp_asset_browser_menu(self, context):
 
     assets = context.selected_assets if is_greater_than_400() else context.selected_asset_files
@@ -4022,15 +4054,49 @@ def draw_yp_asset_browser_menu(self, context):
 
     if mat_asset and obj:
         self.layout.separator()
-        op = self.layout.operator("node.y_open_images_from_material_to_single_layer", icon_value=lib.get_icon('image'), text='Open Images from Material to ' + get_addon_title() + ' layer')
-        op.mat_name = mat_asset.name
+        self.layout.context_pointer_set('mat_asset', mat_asset)
+        self.layout.menu("NODE_MT_ypaint_asset_browser_menu", text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
 
-        if obj.type == 'MESH':
-            op.texcoord_type = 'UV'
-            active_uv_name = get_active_render_uv(obj)
-            op.uv_map = active_uv_name
+class YPFileBrowserMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_ypaint_file_browser_menu"
+    bl_label = get_addon_title() + " File Browser Menu"
+    bl_description = get_addon_title() + " file browser menu"
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def draw(self, context):
+        node = get_active_ypaint_node()
+        if not node:
+            self.layout.label(text="You need to select object that uses "+get_addon_title()+" node!", icon='ERROR')
         else:
-            op.texcoord_type = 'Generated'
+            params = context.params
+            filename = params.filename
+            directory = params.directory.decode('utf-8')
+
+            filepath = os.path.join(directory, filename)
+
+            self.layout.label(text='Image: ' + filename)
+            op = self.layout.operator("node.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Layer")
+            op.file_browser_filepath = filepath
+            op = self.layout.operator("node.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Mask")
+            op.file_browser_filepath = filepath
+
+
+def draw_yp_file_browser_menu(self, context):
+    params = context.space_data.params
+    extension = os.path.splitext(params.filename)[1]
+    if extension in valid_image_extensions:
+
+        filename = params.filename
+        directory = params.directory.decode('utf-8')
+        filepath = os.path.join(directory, filename)
+
+        if os.path.isfile(filepath):
+            self.layout.separator()
+            self.layout.context_pointer_set('params', params)
+            self.layout.menu("NODE_MT_ypaint_file_browser_menu", text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
 
 def draw_ypaint_about(self, context):
     col = self.layout.column(align=True)
@@ -4233,11 +4299,11 @@ class YNewLayerMenu(bpy.types.Menu):
 
         #col.separator()
 
-        col.operator("node.y_open_image_to_layer", text='Open Image')
+        col.operator("node.y_open_image_to_layer", text='Open Image').file_browser_filepath = ''
         col.operator("node.y_open_available_data_to_layer", text='Open Available Image').type = 'IMAGE'
 
         col.operator("node.y_open_images_to_single_layer", text='Open Images to Single Layer')
-        col.operator("node.y_open_images_from_material_to_single_layer", text='Open Images from Material')
+        col.operator("node.y_open_images_from_material_to_single_layer", text='Open Images from Material').from_asset_browser = False
 
         # NOTE: Dedicated menu for opening images to single layer is kinda hard to see, so it's probably better be hidden for now
         #col.menu("NODE_MT_y_open_images_to_single_layer_menu", text='Open Images to Single Layer')
@@ -4253,10 +4319,10 @@ class YNewLayerMenu(bpy.types.Menu):
         col.operator("node.y_open_available_data_to_layer", text='Open Available Vertex Color').type = 'VCOL'
         col.separator()
 
-        #col.label(text='Solid Color:')
+        #col.menu("NODE_MT_y_new_solid_color_layer_menu", text='Solid Color', icon_value=lib.custom_icons['color'].icon_id)
+
         icon_value = lib.custom_icons["color"].icon_id
         c = col.operator("node.y_new_layer", icon_value=icon_value, text='Solid Color')
-        #c = col.operator("node.y_new_layer", icon='COLOR', text='Solid Color')
         c.type = 'COLOR'
         c.add_mask = False
 
@@ -4265,9 +4331,6 @@ class YNewLayerMenu(bpy.types.Menu):
         c.add_mask = True
         c.mask_type = 'IMAGE'
 
-        #if is_greater_than_280():
-        #    c = col.operator("node.y_new_layer", text='Solid Color w/ Vertex Color Mask')
-        #else: c = col.operator("node.y_new_layer", text='Solid Color w/ Vertex Color Mask')
         c = col.operator("node.y_new_layer", text='Solid Color w/ Vertex Color Mask')
         c.type = 'COLOR'
         c.add_mask = True
@@ -4277,6 +4340,12 @@ class YNewLayerMenu(bpy.types.Menu):
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'COLOR_ID'
+
+        if is_greater_than_293():
+            c = col.operator("node.y_new_layer", text='Solid Color w/ Edge Detect Mask')
+            c.type = 'COLOR'
+            c.add_mask = True
+            c.mask_type = 'EDGE_DETECT'
 
         col.separator()
 
@@ -4460,9 +4529,8 @@ class YLayerListSpecialMenu(bpy.types.Menu):
 
         col.separator()
 
-        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Layer').mode = 'COPY_DATA'
-        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Layer (Blank)').mode = 'BLANK_DATA'
-        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Layer (Link)').mode = 'LINK_DATA'
+        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Layer').duplicate_blank = False
+        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Blank Layer').duplicate_blank = True
 
         col.separator()
 
@@ -4538,7 +4606,45 @@ class YOpenImagesToSingleLayerMenu(bpy.types.Menu):
         col = self.layout.column()
 
         col.operator("node.y_open_images_to_single_layer", icon='FILE_FOLDER', text='From Directory')
-        col.operator("node.y_open_images_from_material_to_single_layer", icon='MATERIAL_DATA', text='From Material')
+        col.operator("node.y_open_images_from_material_to_single_layer", icon='MATERIAL_DATA', text='From Material').from_asset_browser = False
+
+class YNewSolidColorLayerMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_y_new_solid_color_layer_menu"
+    bl_label = "New Solid Color Layer Menu"
+    bl_description = "New Solid Color layer menu"
+
+    @classmethod
+    def poll(cls, context):
+        return get_active_ypaint_node()
+
+    def draw(self, context):
+        col = self.layout.column()
+
+        icon_value = lib.custom_icons["color"].icon_id
+        c = col.operator("node.y_new_layer", icon_value=icon_value, text='Solid Color')
+        c.type = 'COLOR'
+        c.add_mask = False
+
+        c = col.operator("node.y_new_layer", text='Solid Color w/ Image Mask')
+        c.type = 'COLOR'
+        c.add_mask = True
+        c.mask_type = 'IMAGE'
+
+        c = col.operator("node.y_new_layer", text='Solid Color w/ Vertex Color Mask')
+        c.type = 'COLOR'
+        c.add_mask = True
+        c.mask_type = 'VCOL'
+
+        c = col.operator("node.y_new_layer", text='Solid Color w/ Color ID Mask')
+        c.type = 'COLOR'
+        c.add_mask = True
+        c.mask_type = 'COLOR_ID'
+
+        if is_greater_than_293():
+            c = col.operator("node.y_new_layer", text='Solid Color w/ Edge Detect Mask')
+            c.type = 'COLOR'
+            c.add_mask = True
+            c.mask_type = 'EDGE_DETECT'
 
 class YImageConvertToMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_image_convert_menu"
@@ -4767,6 +4873,8 @@ def new_mask_button(layout, operator, text, lib_icon='', otype='', target_type='
     if overwrite_current != None: op.overwrite_current = overwrite_current
     if modifier_type != '': op.modifier_type = modifier_type
 
+    return op
+
 class YAddLayerMaskMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_add_layer_mask_menu"
     bl_description = 'Add Layer Mask'
@@ -4791,7 +4899,7 @@ class YAddLayerMaskMenu(bpy.types.Menu):
 
         col.label(text='Image Mask:')
         new_mask_button(col, 'node.y_new_layer_mask', 'New Image Mask', lib_icon='image', otype='IMAGE')
-        new_mask_button(col, 'node.y_open_image_as_mask', 'Open Image as Mask', lib_icon='open_image')
+        new_mask_button(col, 'node.y_open_image_as_mask', 'Open Image as Mask', lib_icon='open_image').file_browser_filepath = ''
         new_mask_button(col, 'node.y_open_available_data_as_mask', 'Open Available Image as Mask', lib_icon='open_image', otype='IMAGE')
         col.separator()
 
@@ -5779,6 +5887,7 @@ def register():
     bpy.utils.register_class(YLayerListSpecialMenu)
     bpy.utils.register_class(YImageConvertToMenu)
     bpy.utils.register_class(YOpenImagesToSingleLayerMenu)
+    bpy.utils.register_class(YNewSolidColorLayerMenu)
     bpy.utils.register_class(YUVSpecialMenu)
     bpy.utils.register_class(YModifierMenu)
     bpy.utils.register_class(YModifier1Menu)
@@ -5804,6 +5913,8 @@ def register():
     bpy.utils.register_class(NODE_UL_YPaint_bake_targets)
     bpy.utils.register_class(NODE_UL_YPaint_channels)
     bpy.utils.register_class(NODE_UL_YPaint_layers)
+    bpy.utils.register_class(YPAssetBrowserMenu)
+    bpy.utils.register_class(YPFileBrowserMenu)
 
     if not is_greater_than_280():
         bpy.utils.register_class(VIEW3D_PT_YPaint_tools)
@@ -5823,6 +5934,9 @@ def register():
     if is_greater_than_300():
         bpy.types.ASSETBROWSER_MT_context_menu.append(draw_yp_asset_browser_menu)
 
+    if is_greater_than_281():
+        bpy.types.FILEBROWSER_MT_context_menu.append(draw_yp_file_browser_menu)
+
     # Handlers
     bpy.app.handlers.load_post.append(yp_load_ui_settings)
     bpy.app.handlers.save_pre.append(yp_save_ui_settings)
@@ -5841,6 +5955,7 @@ def unregister():
     bpy.utils.unregister_class(YLayerListSpecialMenu)
     bpy.utils.unregister_class(YImageConvertToMenu)
     bpy.utils.unregister_class(YOpenImagesToSingleLayerMenu)
+    bpy.utils.unregister_class(YNewSolidColorLayerMenu)
     bpy.utils.unregister_class(YUVSpecialMenu)
     bpy.utils.unregister_class(YModifierMenu)
     bpy.utils.unregister_class(YModifier1Menu)
@@ -5866,6 +5981,8 @@ def unregister():
     bpy.utils.unregister_class(NODE_UL_YPaint_bake_targets)
     bpy.utils.unregister_class(NODE_UL_YPaint_channels)
     bpy.utils.unregister_class(NODE_UL_YPaint_layers)
+    bpy.utils.unregister_class(YPAssetBrowserMenu)
+    bpy.utils.unregister_class(YPFileBrowserMenu)
 
     if not is_greater_than_280():
         bpy.utils.unregister_class(VIEW3D_PT_YPaint_tools)

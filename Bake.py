@@ -112,7 +112,6 @@ def transfer_uv(objs, mat, entity, uv_map, is_entity_baked=False):
         temp_image = bpy.data.images.new(name='__TEMP',
                 width=width, height=height, alpha=True, float_buffer=image.is_float)
 
-    #temp_image.colorspace_settings.name = 'Non-Color'
     temp_image.colorspace_settings.name = image.colorspace_settings.name
     temp_image.generated_color = col
 
@@ -184,7 +183,7 @@ def transfer_uv(objs, mat, entity, uv_map, is_entity_baked=False):
     mat.node_tree.links.new(emit.outputs[0], output.inputs[0])
 
     # Bake!
-    bpy.ops.object.bake()
+    bake_object_op()
 
     # Bake alpha if using alpha
     if use_alpha:
@@ -200,10 +199,10 @@ def transfer_uv(objs, mat, entity, uv_map, is_entity_baked=False):
         mat.node_tree.links.new(src.outputs[1], emit.inputs[0])
 
         # Temp image should use linear to properly bake alpha
-        temp_image1.colorspace_settings.name = 'Non-Color'
+        temp_image1.colorspace_settings.name = get_noncolor_name()
 
         # Bake again!
-        bpy.ops.object.bake()
+        bake_object_op()
 
         # Set tile pixels
         for tilenum in tilenums:
@@ -495,7 +494,7 @@ class YTransferSomeLayerUV(bpy.types.Operator):
         # Prepare bake settings
         book = remember_before_bake(yp)
         prepare_bake_settings(book, objs, yp, samples=self.samples, margin=self.margin, 
-                uv_map=self.uv_map, bake_type='EMIT', bake_device='CPU', margin_type=self.margin_type
+                uv_map=self.uv_map, bake_type='EMIT', bake_device='GPU', margin_type=self.margin_type
                 )
         
         # Get entites to transfer
@@ -644,7 +643,7 @@ class YTransferLayerUV(bpy.types.Operator):
         # Prepare bake settings
         book = remember_before_bake(yp)
         prepare_bake_settings(book, objs, yp, samples=self.samples, margin=self.margin, 
-                uv_map=self.uv_map, bake_type='EMIT', bake_device='CPU', margin_type=self.margin_type
+                uv_map=self.uv_map, bake_type='EMIT', bake_device='GPU', margin_type=self.margin_type
                 )
 
         if self.entity.type == 'IMAGE':
@@ -707,7 +706,7 @@ class YResizeImage(bpy.types.Operator):
             default=1, min=1)
 
     all_tiles : BoolProperty(name='Resize All Tiles',
-            description='Resize all tiles',
+            description='Resize all tiles (when using UDIM atlas, only segment tiles will be resized)',
             default=False)
 
     tile_number : EnumProperty(name='Tile Number',
@@ -768,7 +767,9 @@ class YResizeImage(bpy.types.Operator):
                 col.prop(self, 'samples', text='')
 
             if image.source == 'TILED':
-                col.prop(self, 'all_tiles')
+                if image.yua.is_udim_atlas:
+                    col.prop(self, 'all_tiles', text='Resize All Atlas Segment Tiles')
+                else: col.prop(self, 'all_tiles')
                 if not self.all_tiles:
                     col.prop(self, 'tile_number', text='')
 
@@ -828,7 +829,7 @@ class YResizeImage(bpy.types.Operator):
             bpy.context.area.ui_type = ori_ui_type
 
         else:
-            scaled_img, new_segment = resize_image(image, self.width, self.height, image.colorspace_settings.name, self.samples, 0, segment, bake_device='CPU', yp=yp)
+            scaled_img, new_segment = resize_image(image, self.width, self.height, image.colorspace_settings.name, self.samples, 0, segment, bake_device='GPU', yp=yp)
 
             if new_segment:
                 entity.segment_name = new_segment.name
@@ -1036,7 +1037,7 @@ class YBakeChannelToVcol(bpy.types.Operator):
                             p.material_index = active_mat_id
 
                 # Prepare bake settings
-                prepare_bake_settings(book, objs, yp, disable_problematic_modifiers=True, bake_device='CPU', bake_target='VERTEX_COLORS')
+                prepare_bake_settings(book, objs, yp, disable_problematic_modifiers=True, bake_device='GPU', bake_target='VERTEX_COLORS')
 
                 # Get extra channel
                 extra_channel = None
@@ -1224,7 +1225,7 @@ class YBakeChannels(bpy.types.Operator):
             description='Device to use for baking',
             items = (('GPU', 'GPU Compute', ''),
                      ('CPU', 'CPU', '')),
-            default='CPU'
+            default='GPU'
             )
     
     enable_bake_as_vcol : BoolProperty(name='Enable Bake As VCol',
@@ -1679,7 +1680,7 @@ class YBakeChannels(bpy.types.Operator):
                     if len(tilenums) > 1:
                         btimg = bpy.data.images.new(name=bt.name, width=self.width, height=self.height, 
                                 alpha=True, tiled=True) #float_buffer=hdr)
-                        btimg.colorspace_settings.name = 'Non-Color'
+                        btimg.colorspace_settings.name = get_noncolor_name()
                         btimg.filepath = filepath
 
                         # Fill tiles
@@ -1690,7 +1691,7 @@ class YBakeChannels(bpy.types.Operator):
                     else:
                         btimg = bpy.data.images.new(name=bt.name,
                             width=self.width, height=self.height, alpha=True, float_buffer=False)
-                        btimg.colorspace_settings.name = 'Non-Color'
+                        btimg.colorspace_settings.name = get_noncolor_name()
                         btimg.filepath = filepath
                         btimg.generated_color = color
                 else:
@@ -2442,7 +2443,7 @@ class YMergeMask(bpy.types.Operator):
                 img.generated_color = (0.0, 0.0, 0.0, 1.0)
             else: img.generated_color = (0.0, 0.0, 0.0, 0.0)
 
-            img.colorspace_settings.name = 'Non-Color'
+            img.colorspace_settings.name = get_noncolor_name()
         else:
             img = source.image.copy()
             width = img.size[0]
@@ -2506,7 +2507,7 @@ class YMergeMask(bpy.types.Operator):
         #return {'FINISHED'}
 
         # Bake
-        bpy.ops.object.bake()
+        bake_object_op()
 
         # Copy results to original image
         copy_image_pixels(img, source.image, segment)
@@ -2814,7 +2815,7 @@ def update_enable_baked_outside(self, context):
                     max_x = loc_x
                     loc_x -= 280
 
-                if not is_greater_than_280() and baked.image.colorspace_settings.name != 'sRGB':
+                if not is_greater_than_280() and baked.image.colorspace_settings.name != get_srgb_name():
                     tex.color_space = 'NONE'
 
                 if outp_alpha:
@@ -2860,7 +2861,7 @@ def update_enable_baked_outside(self, context):
                             tex_normal_overlay.parent = frame
                             mtree.links.new(uv.outputs[0], tex_normal_overlay.inputs[0])
 
-                            if not is_greater_than_280() and baked_normal_overlay.image.colorspace_settings.name != 'sRGB':
+                            if not is_greater_than_280() and baked_normal_overlay.image.colorspace_settings.name != get_srgb_name():
                                 tex_normal_overlay.color_space = 'NONE'
 
                             if ch.enable_subdiv_setup:
@@ -2897,7 +2898,7 @@ def update_enable_baked_outside(self, context):
                         tex_disp.interpolation = 'Cubic'
                         mtree.links.new(uv.outputs[0], tex_disp.inputs[0])
 
-                        if not is_greater_than_280() and baked_disp.image.colorspace_settings.name != 'sRGB':
+                        if not is_greater_than_280() and baked_disp.image.colorspace_settings.name != get_srgb_name():
                             tex_disp.color_space = 'NONE'
 
                         loc_x += 280
@@ -2946,7 +2947,7 @@ def update_enable_baked_outside(self, context):
                         tex_vdisp.interpolation = 'Cubic'
                         mtree.links.new(uv.outputs[0], tex_vdisp.inputs[0])
 
-                        if not is_greater_than_280() and baked_vdisp.image.colorspace_settings.name != 'sRGB':
+                        if not is_greater_than_280() and baked_vdisp.image.colorspace_settings.name != get_srgb_name():
                             tex_vdisp.color_space = 'NONE'
 
                         loc_x += 280
@@ -2974,6 +2975,34 @@ def update_enable_baked_outside(self, context):
                     if ch.enable_bake_to_vcol:
                         mtree.links.new(vcol.outputs['Color'], l.to_socket)
                 loc_y -= 300
+
+                # Create GLTF material output node so AO can be included in Blender's automated ORM texture
+                if ch.name in {'Ambient Occlusion', 'Occlusion', 'AO', 'Specular', 'Specular Color', 'Thickness'}:
+                    node_name = lib.GLTF_MATERIAL_OUTPUT if is_greater_than_340() else lib.GLTF_SETTINGS
+                    gltf_outp = mtree.nodes.get(node_name)
+                    if not gltf_outp:
+                        gltf_outp = mtree.nodes.new('ShaderNodeGroup')
+                        gltf_outp.node_tree = get_node_tree_lib(node_name)
+                        gltf_outp.name = node_name
+                        gltf_outp.label = node_name
+                        gltf_outp.location.x = output_mat.location.x
+                        gltf_outp.location.y = output_mat.location.y + 200
+                        shift_nodes.append(gltf_outp)
+
+                    if ch.name in {'Ambient Occlusion', 'Occlusion', 'AO'} and 'Occlusion' in gltf_outp.inputs:
+                        mtree.links.new(tex.outputs[0], gltf_outp.inputs['Occlusion'])
+                    elif ch.name == 'Thickness' and 'Thickness' in gltf_outp.inputs:
+                        mtree.links.new(tex.outputs[0], gltf_outp.inputs['Thickness'])
+                    elif ch.name == 'Specular':
+                        if 'Specular' in gltf_outp.inputs:
+                            mtree.links.new(tex.outputs[0], gltf_outp.inputs['Specular'])
+                        elif 'specular glTF' in gltf_outp.inputs:
+                            mtree.links.new(tex.outputs[0], gltf_outp.inputs['specular glTF'])
+                    elif ch.name == 'Specular Color':
+                        if 'Specular Color' in gltf_outp.inputs:
+                            mtree.links.new(tex.outputs[0], gltf_outp.inputs['Specular Color'])
+                        elif 'specularColor glTF' in gltf_outp.inputs:
+                            mtree.links.new(tex.outputs[0], gltf_outp.inputs['specularColor glTF'])
 
             else:
 

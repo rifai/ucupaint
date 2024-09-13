@@ -78,6 +78,19 @@ def is_join_objects_problematic(yp, mat=None):
 
     return False
 
+def bake_object_op():
+    try:
+        bpy.ops.object.bake()
+    except Exception as e:
+        scene = bpy.context.scene
+        if scene.cycles.device == 'GPU':
+            print('EXCEPTIION: GPU baking failed! Trying to use CPU...')
+            scene.cycles.device = 'CPU'
+
+            bpy.ops.object.bake()
+        else:
+            print('EXCEPTIION:', e)
+
 def remember_before_bake(yp=None, mat=None):
     book = {}
     book['scene'] = scene = bpy.context.scene
@@ -862,7 +875,7 @@ def denoise_image(image):
     image_node.image = image
 
     gamma = None
-    if image.colorspace_settings.name != 'sRGB' and not image.is_float:
+    if image.colorspace_settings.name != get_srgb_name() and not image.is_float:
         gamma = tree.nodes.new('CompositorNodeGamma')
         gamma.inputs[1].default_value = 2.2
 
@@ -985,7 +998,7 @@ def blur_image(image, alpha_aware=True, factor=1.0, samples=512, bake_device='GP
 
         # Blender 2.79 need to set these parameter to correct the gamma
         if not is_greater_than_280() :
-            if image.colorspace_settings.name == 'sRGB':
+            if image.colorspace_settings.name == get_srgb_name():
                 source_tex.color_space = 'COLOR'
             else: source_tex.color_space = 'NONE' 
 
@@ -994,7 +1007,7 @@ def blur_image(image, alpha_aware=True, factor=1.0, samples=512, bake_device='GP
         mat.node_tree.links.new(emi.outputs[0], output.inputs[0])
 
         print('BLUR: Baking blur on', image.name + '...')
-        bpy.ops.object.bake()
+        bake_object_op()
 
         # Run alpha pass
         if alpha_aware:
@@ -1129,7 +1142,7 @@ def fxaa_image(image, alpha_aware=True, bake_device='GPU', first_tile_only=False
 
             # Bake
             print('FXAA: Baking straight over on', image.name + '...')
-            bpy.ops.object.bake()
+            bake_object_op()
 
             pixels_1 = list(image.pixels)
             image_copy.pixels = pixels_1
@@ -1145,7 +1158,7 @@ def fxaa_image(image, alpha_aware=True, bake_device='GPU', first_tile_only=False
         res_y.outputs[0].default_value = height
         tex.image = image_copy
         if not is_greater_than_280() :
-            if image.colorspace_settings.name == 'sRGB':
+            if image.colorspace_settings.name == get_srgb_name():
                 tex.color_space = 'COLOR'
             else: tex.color_space = 'NONE'
 
@@ -1154,7 +1167,7 @@ def fxaa_image(image, alpha_aware=True, bake_device='GPU', first_tile_only=False
         mat.node_tree.links.new(emi.outputs[0], output.inputs[0])
 
         print('FXAA: Baking FXAA on', image.name + '...')
-        bpy.ops.object.bake()
+        bake_object_op()
 
         # Copy original alpha to baked image
         if alpha_aware:
@@ -1247,7 +1260,7 @@ def bake_to_vcol(mat, node, root_ch, objs, extra_channel=None, extra_multiplier=
             # Creates temp vertex color for baking alpha
             temp_vcol = new_vertex_color(obj, temp_vcol_alpha_name)
             set_active_vertex_color(obj, temp_vcol)
-        bpy.ops.object.bake()
+        bake_object_op()
         for obj in objs:
             vcols = get_vertex_colors(obj)
             temp_vcol = vcols.get(temp_vcol_alpha_name)
@@ -1277,7 +1290,7 @@ def bake_to_vcol(mat, node, root_ch, objs, extra_channel=None, extra_multiplier=
         bake_alpha_to_vcol()
     else:
         # Bake without alpha channel
-        bpy.ops.object.bake()
+        bake_object_op()
     
     # If bake_alpha is True and the channel type is 'RGB', Bake twice to merge Alpha channel
     if bake_alpha and root_ch.type == 'RGB' and root_ch.enable_alpha:
@@ -1327,18 +1340,18 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
         tilenums = UDIM.get_tile_numbers(objs, uv_map)
 
     # Check if temp bake is necessary
-    #temp_baked = []
-    #if root_ch.type == 'NORMAL':
-    #    for lay in yp.layers:
-    #        if lay.type in {'HEMI'} and not lay.use_temp_bake:
-    #            print('BAKE CHANNEL: Fake lighting layer found! Baking temporary image of ' + lay.name + ' layer...')
-    #            temp_bake(bpy.context, lay, width, height, True, 1, bpy.context.scene.render.bake.margin, uv_map)
-    #            temp_baked.append(lay)
-    #        for mask in lay.masks:
-    #            if mask.type in {'HEMI'} and not mask.use_temp_bake:
-    #                print('BAKE CHANNEL: Fake lighting mask found! Baking temporary image of ' + mask.name + ' mask...')
-    #                temp_bake(bpy.context, mask, width, height, True, 1, bpy.context.scene.render.bake.margin, uv_map)
-    #                temp_baked.append(mask)
+    temp_baked = []
+    if root_ch.type == 'NORMAL':
+        for lay in yp.layers:
+            if lay.type in {'HEMI'} and not lay.use_temp_bake:
+                print('BAKE CHANNEL: Fake lighting layer found! Baking temporary image of ' + lay.name + ' layer...')
+                temp_bake(bpy.context, lay, width, height, True, 1, bpy.context.scene.render.bake.margin, uv_map)
+                temp_baked.append(lay)
+            for mask in lay.masks:
+                if mask.type in {'HEMI'} and not mask.use_temp_bake:
+                    print('BAKE CHANNEL: Fake lighting mask found! Baking temporary image of ' + mask.name + ' mask...')
+                    temp_bake(bpy.context, mask, width, height, True, 1, bpy.context.scene.render.bake.margin, uv_map)
+                    temp_baked.append(mask)
 
     ch = None
     img = None
@@ -1536,12 +1549,11 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
         # Use hdr if not baking normal
         if root_ch.type != 'NORMAL' and use_hdr:
             img.use_generated_float = True
-            #img.colorspace_settings.name = 'Non-Color'
 
         # Set colorspace to linear
         if root_ch.colorspace == 'LINEAR' or root_ch.type == 'NORMAL' or (root_ch.type != 'NORMAL' and use_hdr):
-            img.colorspace_settings.name = 'Non-Color'
-        else: img.colorspace_settings.name = 'sRGB'
+            img.colorspace_settings.name = get_noncolor_name()
+        else: img.colorspace_settings.name = get_srgb_name()
 
     # Bake main image
     if (
@@ -1564,7 +1576,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
         # Bake!
         print('BAKE CHANNEL: Baking main image of ' + root_ch.name + ' channel...')
-        bpy.ops.object.bake()
+        bake_object_op()
 
     # Bake displacement
     if root_ch.type == 'NORMAL':
@@ -1610,7 +1622,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
                 # Create target image
                 norm_img = img.copy()
                 norm_img.name = norm_img_name
-                norm_img.colorspace_settings.name = 'Non-Color'
+                norm_img.colorspace_settings.name = get_noncolor_name()
                 color = (0.5, 0.5, 1.0, 1.0)
 
                 if img.source == 'TILED':
@@ -1637,7 +1649,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
                 # Bake
                 print('BAKE CHANNEL: Baking normal overlay image of ' + root_ch.name + ' channel...')
-                bpy.ops.object.bake()
+                bake_object_op()
 
                 #return
 
@@ -1690,7 +1702,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
                 vdisp_img = img.copy()
                 vdisp_img.name = vdisp_img_name
                 vdisp_img.use_generated_float = True
-                vdisp_img.colorspace_settings.name = 'Non-Color'
+                vdisp_img.colorspace_settings.name = get_noncolor_name()
                 color = (0.0, 0.0, 0.0, 1.0)
 
                 if img.source == 'TILED':
@@ -1712,7 +1724,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
                 # Bake
                 print('BAKE CHANNEL: Baking vector displacement image of ' + root_ch.name + ' channel...')
-                bpy.ops.object.bake()
+                bake_object_op()
 
                 # Set baked vector displacement image
                 if baked_vdisp.image:
@@ -1734,7 +1746,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
                 mh_img = bpy.data.images.new(name='____MAXHEIGHT_TEMP', width=100, height=100, 
                         alpha=False, float_buffer=True)
 
-            mh_img.colorspace_settings.name = 'Non-Color'
+            mh_img.colorspace_settings.name = get_noncolor_name()
             tex.image = mh_img
 
             # Bake setup (doing little bit doing hacky reconnection here)
@@ -1760,7 +1772,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
             # Bake
             print('BAKE CHANNEL: Baking max height of ' + root_ch.name + ' channel...')
-            bpy.ops.object.bake()
+            bake_object_op()
 
             # Recover margin
             bpy.context.scene.render.bake.margin = ori_margin
@@ -1800,7 +1812,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
             disp_img = img.copy()
             disp_img.name = disp_img_name
             disp_img.use_generated_float = use_float_for_displacement
-            disp_img.colorspace_settings.name = 'Non-Color'
+            disp_img.colorspace_settings.name = get_noncolor_name()
             color = (0.5, 0.5, 0.5, 1.0)
 
             if img.source == 'TILED':
@@ -1843,7 +1855,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
             # Bake
             print('BAKE CHANNEL: Baking displacement image of ' + root_ch.name + ' channel...')
-            bpy.ops.object.bake()
+            bake_object_op()
 
             if not target_layer:
 
@@ -1869,7 +1881,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
         # Create temp image
         alpha_img = img.copy()
-        alpha_img.colorspace_settings.name = 'Non-Color'
+        alpha_img.colorspace_settings.name = get_noncolor_name()
         create_link(mat.node_tree, node.outputs[root_ch.name + io_suffix['ALPHA']], emit.inputs[0])
         tex.image = alpha_img
 
@@ -1880,7 +1892,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
 
         # Bake
         print('BAKE CHANNEL: Baking alpha of ' + root_ch.name + ' channel...')
-        bpy.ops.object.bake()
+        bake_object_op()
 
         # Set tile pixels
         for tilenum in tilenums:
@@ -1923,9 +1935,9 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
     mat.node_tree.links.new(ori_bsdf, output.inputs[0])
 
     # Recover baked temp
-    #for ent in temp_baked:
-    #    print('BAKE CHANNEL: Removing temporary baked ' + ent.name + '...')
-    #    disable_temp_bake(ent)
+    for ent in temp_baked:
+        print('BAKE CHANNEL: Removing temporary baked ' + ent.name + '...')
+        disable_temp_bake(ent)
 
     # Set image to target layer
     if target_layer:
@@ -1966,7 +1978,7 @@ def temp_bake(context, entity, width, height, hdr, samples, margin, uv_map, bake
     # New target image
     image = bpy.data.images.new(name=name,
             width=width, height=height, alpha=True, float_buffer=hdr)
-    image.colorspace_settings.name = 'Non-Color'
+    image.colorspace_settings.name = get_noncolor_name()
 
     if entity.type == 'HEMI':
 
@@ -1979,19 +1991,21 @@ def temp_bake(context, entity, width, height, hdr, samples, margin, uv_map, bake
 
         tex = mat.node_tree.nodes.new('ShaderNodeTexImage')
         emit = mat.node_tree.nodes.new('ShaderNodeEmission')
+        geo = mat.node_tree.nodes.new('ShaderNodeNewGeometry')
         output = get_active_mat_output_node(mat.node_tree)
         ori_bsdf = output.inputs[0].links[0].from_socket
 
         # Connect emit to output material
         mat.node_tree.links.new(emit.outputs[0], output.inputs[0])
         mat.node_tree.links.new(source_copy.outputs[0], output.inputs[0])
+        mat.node_tree.links.new(geo.outputs['Normal'], source_copy.inputs['Normal'])
 
         # Set active texture
         tex.image = image
         mat.node_tree.nodes.active = tex
 
         # Bake
-        bpy.ops.object.bake()
+        bake_object_op()
 
         # Recover link
         mat.node_tree.links.new(ori_bsdf, output.inputs[0])
@@ -2000,6 +2014,7 @@ def temp_bake(context, entity, width, height, hdr, samples, margin, uv_map, bake
         mat.node_tree.nodes.remove(tex)
         simple_remove_node(mat.node_tree, emit)
         simple_remove_node(mat.node_tree, source_copy)
+        simple_remove_node(mat.node_tree, geo)
 
         # Set entity original type
         entity.original_type = 'HEMI'
@@ -2083,7 +2098,9 @@ def get_merged_mesh_objects(scene, objs, hide_original=False):
         if obj.data.shape_keys:
             # Set active shape to make sure context will be correct
             if not obj.active_shape_key: obj.active_shape_key_index = 0
-            bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+            if is_greater_than_330():
+                bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+            else: bpy.ops.object.shape_key_remove(all=True)
 
         # Apply modifiers
         mnames = [m.name for m in obj.modifiers]
@@ -2189,7 +2206,7 @@ def resize_image(image, width, height, colorspace='Non-Color', samples=1, margin
     source_tex.image = image
 
     if not is_greater_than_280() :
-        if image.colorspace_settings.name == 'sRGB':
+        if image.colorspace_settings.name == get_srgb_name():
             source_tex.color_space = 'COLOR'
         else: source_tex.color_space = 'NONE'
 
@@ -2273,14 +2290,14 @@ def resize_image(image, width, height, colorspace='Non-Color', samples=1, margin
 
         # Bake
         print('RESIZE IMAGE: Baking resized image on', image_name + '...')
-        bpy.ops.object.bake()
+        bake_object_op()
 
         if alpha_aware:
 
             # Create alpha image as bake target
             alpha_img = bpy.data.images.new(name='__TEMP_ALPHA__',
                     width=width, height=height, alpha=True, float_buffer=image.is_float)
-            alpha_img.colorspace_settings.name = 'Non-Color'
+            alpha_img.colorspace_settings.name = get_noncolor_name()
 
             # Retransform back uv
             if segment:
@@ -2304,7 +2321,7 @@ def resize_image(image, width, height, colorspace='Non-Color', samples=1, margin
 
             # Bake again!
             print('RESIZE IMAGE: Baking resized alpha on', image_name + '...')
-            bpy.ops.object.bake()
+            bake_object_op()
 
             if new_segment:
                 copy_image_channel_pixels(alpha_img, scaled_img, 0, 3, new_segment)

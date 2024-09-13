@@ -129,6 +129,7 @@ def create_new_group_tree(mat):
     group_tree = bpy.data.node_groups.new(group_name, 'ShaderNodeTree')
     group_tree.yp.is_ypaint_node = True
     group_tree.yp.version = get_current_version_str()
+    group_tree.yp.blender_version = get_current_blender_version_str()
 
     # Create IO nodes
     create_essential_nodes(group_tree, True, True, True)
@@ -524,11 +525,16 @@ class YQuickYPaintNodeSetup(bpy.types.Operator):
 
     def execute(self, context):
 
+        obj = context.object
+
         if not is_greater_than_279() and self.type == 'BSDF_PRINCIPLED':
             self.report({'ERROR'}, "There's no Principled BSDF in this blender version!")
             return {'CANCELLED'}
 
-        obj = context.object
+        if not obj.data or not hasattr(obj.data, 'materials'):
+            self.report({'ERROR'}, "Cannot use "+get_addon_title()+" with object '"+obj.name+"'!")
+            return {'CANCELLED'}
+
         mat = get_active_material()
 
         if not mat:
@@ -2318,13 +2324,18 @@ def set_srgb_view_transform():
 
     # Set view transform to srgb
     if scene.yp.ori_view_transform == '' and ypup.make_preview_mode_srgb:
+
         scene.yp.ori_view_transform = scene.view_settings.view_transform
         if is_greater_than_280():
-            scene.view_settings.view_transform = 'Standard'
-        else: scene.view_settings.view_transform = 'Default'
+            try: scene.view_settings.view_transform = 'Standard'
+            except Exception as e: print(e)
+        else: 
+            try: scene.view_settings.view_transform = 'Default'
+            except Exception as e: print(e)
 
         scene.yp.ori_display_device = scene.display_settings.display_device
-        scene.display_settings.display_device = 'sRGB'
+        try: scene.display_settings.display_device = 'sRGB'
+        except Exception as e: print(e)
 
         scene.yp.ori_look = scene.view_settings.look
         scene.view_settings.look = 'None'

@@ -303,7 +303,7 @@ class YBakeToLayer(bpy.types.Operator):
             description='Device to use for baking',
             items = (('GPU', 'GPU Compute', ''),
                      ('CPU', 'CPU', '')),
-            default='CPU'
+            default='GPU'
             )
 
     use_image_atlas : BoolProperty(
@@ -1143,7 +1143,9 @@ class YBakeToLayer(bpy.types.Operator):
                     # Apply shape keys and modifiers
                     if any(need_to_be_applied_modifiers):
                         if obj.data.shape_keys:
-                            bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+                            if is_greater_than_330():
+                                bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+                            else: bpy.ops.object.shape_key_remove(all=True)
 
                         for m in need_to_be_applied_modifiers:
                             bpy.ops.object.modifier_apply(modifier=m.name)
@@ -1432,7 +1434,7 @@ class YBakeToLayer(bpy.types.Operator):
 
             # Image name and colorspace
             image_name = self.name
-            colorspace = 'sRGB'
+            colorspace = get_srgb_name()
 
             if self.type == 'OTHER_OBJECT_CHANNELS':
 
@@ -1480,10 +1482,10 @@ class YBakeToLayer(bpy.types.Operator):
                         elif socket:
                             m.node_tree.links.new(socket, temp_emi.inputs[0])
 
-                colorspace = 'Non-Color' if root_ch.colorspace == 'LINEAR' else 'sRGB'
+                colorspace = get_noncolor_name() if root_ch.colorspace == 'LINEAR' else get_srgb_name()
 
             elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL'}:
-                colorspace = 'Non-Color'
+                colorspace = get_noncolor_name()
 
             # Base color of baked image
             if self.type == 'AO':
@@ -1548,12 +1550,29 @@ class YBakeToLayer(bpy.types.Operator):
             mat.node_tree.nodes.active = tex
 
             # Bake!
-            if self.type.startswith('MULTIRES_'):
-                bpy.ops.object.bake_image()
-            else:
-                if bake_type != 'EMIT':
-                    bpy.ops.object.bake(type=bake_type)
-                else: bpy.ops.object.bake()
+            try:
+                if self.type.startswith('MULTIRES_'):
+                    bpy.ops.object.bake_image()
+                else:
+                    if bake_type != 'EMIT':
+                        bpy.ops.object.bake(type=bake_type)
+                    else: bpy.ops.object.bake()
+            except Exception as e:
+
+                # Try to use CPU if GPU baking is failed
+                if self.bake_device == 'GPU':
+                    print('EXCEPTIION: GPU baking failed! Trying to use CPU...')
+                    self.bake_device = 'CPU'
+                    scene.cycles.device = 'CPU'
+
+                    if self.type.startswith('MULTIRES_'):
+                        bpy.ops.object.bake_image()
+                    else:
+                        if bake_type != 'EMIT':
+                            bpy.ops.object.bake(type=bake_type)
+                        else: bpy.ops.object.bake()
+                else:
+                    print('EXCEPTIION:', e)
 
             if use_fxaa: fxaa_image(image, False, bake_device=self.bake_device)
 
@@ -1561,7 +1580,7 @@ class YBakeToLayer(bpy.types.Operator):
             #if self.type.startswith('OTHER_OBJECT_'):
             if self.type == 'OTHER_OBJECT_NORMAL':
                 temp_img = image.copy()
-                temp_img.colorspace_settings.name = 'Non-Color'
+                temp_img.colorspace_settings.name = get_noncolor_name()
                 tex.image = temp_img
 
                 # Set temp filepath
@@ -1626,7 +1645,7 @@ class YBakeToLayer(bpy.types.Operator):
 
                     if self.use_udim:
                         segment = UDIM.get_set_udim_atlas_segment(tilenums, color=(0,0,0,0), 
-                                colorspace='sRGB', hdr=self.hdr, yp=yp)
+                                colorspace=get_srgb_name(), hdr=self.hdr, yp=yp)
                     else:
                         # Clearing unused image atlas segments
                         img_atlas = ImageAtlas.check_need_of_erasing_segments(yp, 'TRANSPARENT', self.width, self.height, self.hdr)
@@ -2091,11 +2110,11 @@ def bake_as_image(objs, mat, entity, name, width=1024, height=1024, hdr=False, s
     if mask:
         color = (0,0,0,1)
         color_str = 'BLACK'
-        colorspace = 'Non-Color'
+        colorspace = get_noncolor_name()
     else: 
         color = (0,0,0,0)
         color_str = 'TRANSPARENT'
-        colorspace = 'sRGB'
+        colorspace = get_srgb_name()
 
     # Create image
     if use_udim:
@@ -2453,7 +2472,7 @@ class YBakeEntityToImage(bpy.types.Operator):
 
             if self.use_udim:
                 segment = UDIM.get_set_udim_atlas_segment(self.tilenums, color=(0,0,0,1), 
-                        colorspace='Non-Color', hdr=self.hdr, yp=yp)
+                        colorspace=get_noncolor_name(), hdr=self.hdr, yp=yp)
             else:
                 # Clearing unused image atlas segments
                 img_atlas = ImageAtlas.check_need_of_erasing_segments(yp, 'BLACK', self.width, self.height, self.hdr)
