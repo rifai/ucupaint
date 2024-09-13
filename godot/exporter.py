@@ -96,7 +96,8 @@ uniform float {0}_normal_depth = 1.0;
     vec4 roughness_{0} = texture({1}, scaled_uv_{0});'''
     script_fragment_normal_var = '''
     vec4 normal_{0} = texture({1}, scaled_uv_{0});
-    vec4 normal_depth_{0} = vec4({1}_depth, 0, 0, 1);'''
+    vec4 normal_depth_{0} = vec4({1}_depth, 0, 0, 1);
+    '''
 
     script_mask_fragment_var = '''
     vec4 mask_{0} = texture({1}, scaled_uv_{0});
@@ -108,6 +109,9 @@ uniform float {0}_normal_depth = 1.0;
     roughness_{0}.a = mask_{0}.r;'''
 
 
+    script_albedo_1 = '''
+    vec4 albedo_all = albedo_0;
+'''
     script_albedo_combine_0 = '''
 
     vec4 albedo_all = layer(albedo_0, albedo_1);'''
@@ -232,9 +236,10 @@ uniform float {0}_normal_depth = 1.0;
         
         print(f"Relative path: {relative_path}")
 
-
+        albedo_overrides = []
         roughness_overrides = []
         normal_overrides = []
+        bump_overrides = []
         
         for layer_idx, layer in enumerate(yp.layers):
             if layer.enable:
@@ -262,6 +267,8 @@ uniform float {0}_normal_depth = 1.0;
                 shutil.copy(image_path, my_directory)
 
                 yp = layer.id_data.yp
+
+                albedo_overrides.append(layer_idx)
 
                 channel:Layer.YLayerChannel
                 for id_ch, channel in enumerate(layer.channels):
@@ -298,21 +305,24 @@ uniform float {0}_normal_depth = 1.0;
                             fragment_var += self.script_fragment_roughness_var.format(index, layer_roughness)
                             
                         elif ch_name == "Normal":
-                            global_vars += self.script_vars_normal.format(layer_var)
-                            global_vars += self.script_vars_heightmap.format(layer_var)
-                            normal_overrides.append(layer_idx)
+                            if ch_image_path != "":
+                                layer_heightmap = layer_var + "_heightmap"
+                                heightmap_uv_script = self.script_fragment_base_uv_heightmap.format(index, layer_var)
+                                asset_args.append(layer_heightmap)
+                                asset_args.append(bpy.path.basename(ch_image_path))
 
-                            layer_heightmap = layer_var + "_heightmap"
+                                global_vars += self.script_vars_heightmap.format(layer_var)
+                                bump_overrides.append(layer_idx)
 
-                            heightmap_uv_script = self.script_fragment_base_uv_heightmap.format(index, layer_var)
-                            asset_args.append(layer_heightmap)
-                            asset_args.append(bpy.path.basename(ch_image_path)) # todo : override 0 or override 1
-
-                            layer_normal = layer_var + "_normal"
-                            asset_args.append(layer_normal)
-                            asset_args.append(bpy.path.basename(ch_image_path_1)) # todo : override 0 or override 1
-                            fragment_var += self.script_fragment_normal_var.format(index, layer_normal)
+                            if ch_image_path_1 != "":
+                                layer_normal = layer_var + "_normal"
+                                fragment_var += self.script_fragment_normal_var.format(index, layer_normal)
+                                asset_args.append(layer_normal)
+                                asset_args.append(bpy.path.basename(ch_image_path_1)) 
                 
+                                global_vars += self.script_vars_normal.format(layer_var)
+                                normal_overrides.append(layer_idx)
+
                 fragment_var = self.script_fragment_var.format(index, scale_var, layer_var, heightmap_uv_script) + fragment_var
                 fragment_vars += fragment_var
 
@@ -350,12 +360,17 @@ uniform float {0}_normal_depth = 1.0;
                     print("copy ", mask_image_path, " to ", my_directory)
                 global_vars += "\n"
 
-                if index == 1:
-                    combine_content += self.script_albedo_combine_0
-                elif index > 1:
-                    combine_content += self.script_albedo_combine_next.format(index)
-                    
                 index += 1
+
+        if len(albedo_overrides) > 0:
+            if len(albedo_overrides) == 1:
+                combine_content += self.script_albedo_1
+            else:
+                for lyr_idx, lyr in enumerate(albedo_overrides):
+                    if lyr_idx == 1:
+                        combine_content += self.script_albedo_combine_0
+                    elif lyr_idx > 1:
+                        combine_content += self.script_albedo_combine_next.format(lyr)
 
         if len(roughness_overrides) > 0:
             if len(roughness_overrides) == 1:
