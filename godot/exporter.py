@@ -154,6 +154,15 @@ uniform float {0}_normal_depth = 1.0;
 '''
   #vec4 albedo = texture({1}, scaled_uv_{0});
 
+    # converter failed
+    def convert_exr_to_png(self, image, png_path:str):
+        override = bpy.context.copy()
+        override['edit_image'] = image
+        if is_greater_than_400():
+            with bpy.context.temp_override(**override):
+                bpy.ops.image.save_as(copy=True, filepath=png_path, relative_path=True, save_as_render=True)
+        else: bpy.ops.image.save_as(copy=True, filepath=png_path, relative_path=True, save_as_render=True)
+    
     def get_godot_directory(self, path:str):
 
         current_dir = os.path.dirname(path)
@@ -291,6 +300,10 @@ uniform float {0}_normal_depth = 1.0;
                             print("channel path 1", id_ch, " = ",ch_image_path_1)
 
                         if ch_image_path != "":
+                            # if "exr" in ch_image_path:
+                            #     png_path = os.path.join(my_directory, bpy.path.display_name_from_filepath(ch_image_path) + ".png")
+                            #     self.convert_exr_to_png(source_ch.image, png_path)
+                            #     ch_image_path = png_path
                             shutil.copy(ch_image_path, my_directory)
                         if ch_image_path_1 != "":
                             shutil.copy(ch_image_path_1, my_directory)
@@ -397,6 +410,12 @@ uniform float {0}_normal_depth = 1.0;
             combine_content += self.script_normal_fragment
         
         print("parameter ", asset_args)
+        for arg in asset_args:
+            if "exr" in arg:
+                self.report({'ERROR'}, "Godot does not support EXR format. Please convert {} to PNG or JPG".format(arg))
+                print("not support = ", arg)
+                return {'CANCELLED'}
+
         fragment_vars += combine_content
 
         content_shader = self.script_template.format(global_vars, fragment_vars)
