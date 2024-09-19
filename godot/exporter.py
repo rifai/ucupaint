@@ -28,6 +28,8 @@ shader_type spatial;
 
 uniform int heightmap_min_layers : hint_range(1, 64) = 32;
 uniform int heightmap_max_layers : hint_range(1, 64) = 32;
+uniform float tolerance = 0.01;
+
 {0}vec4 layer(vec4 foreground, vec4 background) {{
     return foreground * foreground.a + background * (1.0 - foreground.a);
 }}
@@ -96,12 +98,20 @@ uniform float {0}_normal_depth = 1.0;
     vec4 roughness_{0} = texture({1}, scaled_uv_{0});'''
     script_fragment_normal_var = '''
     vec4 normal_{0} = texture({1}, scaled_uv_{0});
-    vec4 normal_depth_{0} = vec4({1}_depth, 0, 0, 1);
+    vec4 normal_depth_{0} = vec4({1}_depth * {2}, 0, 0, 1);
     '''
 
     script_mask_fragment_var = '''
     vec4 mask_{0} = texture({1}, UV);
     albedo_{0}.a = mask_{0}.r;''' 
+    script_mask_vcol_fragment_var = '''
+    vec4 mask_{0} = vec4({1}, {2}, {3}, 1.0);
+    float dist_{0} = distance(COLOR.rgb, mask_{0}.rgb);
+    dist_{0} = dist_{0} <= tolerance ? 1.0 : 0.0;
+    mask_{0} = vec4(dist_{0});
+    
+    albedo_{0}.a = mask_{0}.r;''' 
+
     script_mask_normal_var = '''
     normal_{0}.a = mask_{0}.r;
     normal_depth_{0}.a = mask_{0}.r;'''
@@ -202,6 +212,7 @@ uniform float {0}_normal_depth = 1.0;
     def execute(self, context):
         node = get_active_ypaint_node()
         yp = node.node_tree.yp
+        obj = context.object
 
         print("====================================")
         index = 0
@@ -251,129 +262,142 @@ uniform float {0}_normal_depth = 1.0;
         bump_overrides = []
         
         for layer_idx, layer in enumerate(yp.layers):
+            print("layer type ", layer.type)
+            source = get_layer_source(layer)
+
             if layer.enable:
-                mapping = get_layer_mapping(layer)
+                if layer.type == "IMAGE":
+                    mapping = get_layer_mapping(layer)
 
-                layer_var = "layer_"+str(index)
+                    layer_var = "layer_"+str(index)
 
-                scale_var = layer_var + "_scale"
+                    scale_var = layer_var + "_scale"
 
-                skala = mapping.inputs[3].default_value
-                global_vars += self.script_vars.format(layer_var, scale_var, skala.x, skala.y)
+                    skala = mapping.inputs[3].default_value
+                    global_vars += self.script_vars.format(layer_var, scale_var, skala.x, skala.y)
 
-                heightmap_uv_script = ""
-                fragment_var = ""
+                    heightmap_uv_script = ""
+                    fragment_var = ""
 
-                source = get_layer_source(layer)
 
-                image_path = source.image.filepath_from_user()
+                    image_path = source.image.filepath_from_user()
 
-                asset_args.append(layer_var)
-                asset_args.append(bpy.path.basename(image_path))
+                    asset_args.append(layer_var)
+                    asset_args.append(bpy.path.basename(image_path))
 
-                # copy to directory 
-                print("copy ", image_path, " to ", my_directory)
-                shutil.copy(image_path, my_directory)
+                    # copy to directory 
+                    print("copy ", image_path, " to ", my_directory)
+                    shutil.copy(image_path, my_directory)
 
-                yp = layer.id_data.yp
+                    yp = layer.id_data.yp
 
-                albedo_overrides.append(layer_idx)
+                    albedo_overrides.append(layer_idx)
 
-                channel:Layer.YLayerChannel
-                for id_ch, channel in enumerate(layer.channels):
-                    ch_name = yp.channels[id_ch].name
-                    if channel.enable:
-                        print("channel ", channel.name, " name_", yp.channels[id_ch].name)
-                        ch_image_path = ""
-                        ch_image_path_1 = ""
+                    channel:Layer.YLayerChannel
+                    for id_ch, channel in enumerate(layer.channels):
+                        ch_name = yp.channels[id_ch].name
+                        if channel.enable:
+                            print("channel ", channel.name, " name_", yp.channels[id_ch].name)
+                            ch_image_path = ""
+                            ch_image_path_1 = ""
 
-                        if channel.override:
-                            source_ch = get_channel_source(channel, layer)
-                            ch_image_path = source_ch.image.filepath_from_user()
-                    
-                            print("channel path 0", id_ch, " = ",ch_image_path)
+                            if channel.override:
+                                source_ch = get_channel_source(channel, layer)
+                                ch_image_path = source_ch.image.filepath_from_user()
+                        
+                                print("channel path 0", id_ch, " = ",ch_image_path)
 
-                        if channel.override_1:
-                            source_ch_1 = get_channel_source_1(channel, layer)
-                            ch_image_path_1 = source_ch_1.image.filepath_from_user()
-                           
-                            print("channel path 1", id_ch, " = ",ch_image_path_1)
-
-                        if ch_image_path != "":
-                            # if "exr" in ch_image_path:
-                            #     png_path = os.path.join(my_directory, bpy.path.display_name_from_filepath(ch_image_path) + ".png")
-                            #     self.convert_exr_to_png(source_ch.image, png_path)
-                            #     ch_image_path = png_path
-                            shutil.copy(ch_image_path, my_directory)
-                        if ch_image_path_1 != "":
-                            shutil.copy(ch_image_path_1, my_directory)
-
-                        if ch_name == "Roughness":
-                            global_vars += self.script_vars_roughness.format(layer_var)
-                            roughness_overrides.append(layer_idx)
-
-                            layer_roughness = layer_var + "_roughness"
-                            asset_args.append(layer_roughness)
-                            asset_args.append(bpy.path.basename(ch_image_path))
-                            fragment_var += self.script_fragment_roughness_var.format(index, layer_roughness)
+                            if channel.override_1:
+                                source_ch_1 = get_channel_source_1(channel, layer)
+                                ch_image_path_1 = source_ch_1.image.filepath_from_user()
                             
-                        elif ch_name == "Normal":
+                                print("channel path 1", id_ch, " = ",ch_image_path_1)
+
                             if ch_image_path != "":
-                                layer_heightmap = layer_var + "_heightmap"
-                                heightmap_uv_script = self.script_fragment_base_uv_heightmap.format(index, layer_var)
-                                asset_args.append(layer_heightmap)
-                                asset_args.append(bpy.path.basename(ch_image_path))
-
-                                global_vars += self.script_vars_heightmap.format(layer_var)
-                                bump_overrides.append(layer_idx)
-
+                                # if "exr" in ch_image_path:
+                                #     png_path = os.path.join(my_directory, bpy.path.display_name_from_filepath(ch_image_path) + ".png")
+                                #     self.convert_exr_to_png(source_ch.image, png_path)
+                                #     ch_image_path = png_path
+                                shutil.copy(ch_image_path, my_directory)
                             if ch_image_path_1 != "":
-                                layer_normal = layer_var + "_normal"
-                                fragment_var += self.script_fragment_normal_var.format(index, layer_normal)
-                                asset_args.append(layer_normal)
-                                asset_args.append(bpy.path.basename(ch_image_path_1)) 
-                
-                                global_vars += self.script_vars_normal.format(layer_var)
-                                normal_overrides.append(layer_idx)
+                                shutil.copy(ch_image_path_1, my_directory)
 
-                fragment_var = self.script_fragment_var.format(index, scale_var, layer_var, heightmap_uv_script) + fragment_var
-                fragment_vars += fragment_var
+                            if ch_name == "Roughness":
+                                global_vars += self.script_vars_roughness.format(layer_var)
+                                roughness_overrides.append(layer_idx)
 
-                # print("filepath ", index, " = ",source.image.filepath_from_user())
-                # print("rawpath ", index, " = ",source.image.filepath)
-                # print("path user ", index, " = ",source.image.filepath_raw)
-                msk:Mask.YLayerMask
-                for idx, msk in enumerate(layer.masks):
-                    mask_var = layer_var + "_mask_" + str(idx)
-                    global_vars += self.script_mask_vars.format(mask_var)
-                    fragment_vars += self.script_mask_fragment_var.format(index, mask_var)
+                                layer_roughness = layer_var + "_roughness"
+                                asset_args.append(layer_roughness)
+                                asset_args.append(bpy.path.basename(ch_image_path))
+                                fragment_var += self.script_fragment_roughness_var.format(index, layer_roughness)
+                                
+                            elif ch_name == "Normal":
+                                if ch_image_path != "":
+                                    layer_heightmap = layer_var + "_heightmap"
+                                    heightmap_uv_script = self.script_fragment_base_uv_heightmap.format(index, layer_var)
+                                    asset_args.append(layer_heightmap)
+                                    asset_args.append(bpy.path.basename(ch_image_path))
 
-                    if layer_idx in roughness_overrides:
-                        fragment_vars += self.script_mask_roughness_var.format(index)
-                    if layer_idx in normal_overrides:
-                        fragment_vars += self.script_mask_normal_var.format(index)
+                                    global_vars += self.script_vars_heightmap.format(layer_var)
+                                    bump_overrides.append(layer_idx)
 
+                                if ch_image_path_1 != "":
+                                    layer_normal = layer_var + "_normal"
+                                    if ch_image_path != "":
+                                        fragment_var += self.script_fragment_normal_var.format(index, layer_normal, layer_heightmap+"_scale")
+                                    else:
+                                        fragment_var += self.script_fragment_normal_var.format(index, layer_normal, "1")
 
-                    mask_tree = get_mask_tree(msk)
-                    mask_source = mask_tree.nodes.get(msk.source)
+                                    asset_args.append(layer_normal)
+                                    asset_args.append(bpy.path.basename(ch_image_path_1)) 
+                    
+                                    global_vars += self.script_vars_normal.format(layer_var)
+                                    normal_overrides.append(layer_idx)
 
-                    mask_image_path = mask_source.image.filepath_from_user()
+                    fragment_var = self.script_fragment_var.format(index, scale_var, layer_var, heightmap_uv_script) + fragment_var
+                    fragment_vars += fragment_var
 
-                    if mask_image_path == "":
-                        print("unpack item ", msk.name)
-                        bpy.ops.file.unpack_item(id_name=msk.name, method='WRITE_ORIGINAL')
-                        mask_image_path = mask_source.image.filepath_from_user()
-                    else:
-                        print("mask path exist ", mask_image_path)
+                    # print("filepath ", index, " = ",source.image.filepath_from_user())
+                    # print("rawpath ", index, " = ",source.image.filepath)
+                    # print("path user ", index, " = ",source.image.filepath_raw)
+                    msk:Mask.YLayerMask
+                    for idx, msk in enumerate(layer.masks):
+                        mask_type = msk.type
+                        print("mask type ", mask_type)
+                        if mask_type == "IMAGE":
+                            mask_var = layer_var + "_mask_" + str(idx)
+                            global_vars += self.script_mask_vars.format(mask_var)
+                            fragment_vars += self.script_mask_fragment_var.format(index, mask_var)
 
-                    asset_args.append(mask_var)
-                    asset_args.append(bpy.path.basename(mask_image_path))
+                            mask_tree = get_mask_tree(msk)
+                            mask_source = mask_tree.nodes.get(msk.source)
 
-                    shutil.copy(mask_image_path, my_directory)
-                    print("copy ", mask_image_path, " to ", my_directory)
-                global_vars += "\n"
+                            mask_image_path = mask_source.image.filepath_from_user()
 
-                index += 1
+                            if mask_image_path == "":
+                                print("unpack item ", msk.name)
+                                bpy.ops.file.unpack_item(id_name=msk.name, method='WRITE_ORIGINAL')
+                                mask_image_path = mask_source.image.filepath_from_user()
+                            else:
+                                print("mask path exist ", mask_image_path)
+
+                            asset_args.append(mask_var)
+                            asset_args.append(bpy.path.basename(mask_image_path))
+
+                            shutil.copy(mask_image_path, my_directory)
+                            print("copy ", mask_image_path, " to ", my_directory)
+                        elif mask_type == "COLOR_ID":
+                            colorid_col = get_mask_color_id_color(msk)
+                            fragment_vars += self.script_mask_vcol_fragment_var.format(index, colorid_col[0], colorid_col[1], colorid_col[2])
+
+                        if layer_idx in roughness_overrides:
+                            fragment_vars += self.script_mask_roughness_var.format(index)
+                        if layer_idx in normal_overrides:
+                            fragment_vars += self.script_mask_normal_var.format(index)
+
+                    global_vars += "\n"
+
+                    index += 1
 
         if len(albedo_overrides) > 0:
             if len(albedo_overrides) == 1:
@@ -387,7 +411,7 @@ uniform float {0}_normal_depth = 1.0;
 
         if len(roughness_overrides) > 0:
             if len(roughness_overrides) == 1:
-                combine_content += self.script_roughness_1.format(roughness_overrides[0])
+                combine_content += self.script_roughness_1.format(0)
             else:
                 for lyr_idx, lyr in enumerate(roughness_overrides):
                     if lyr_idx == 1:
@@ -399,7 +423,7 @@ uniform float {0}_normal_depth = 1.0;
 
         if len(normal_overrides) > 0:
             if len(normal_overrides) == 1:
-                combine_content += self.script_normal_1.format(normal_overrides[0])
+                combine_content += self.script_normal_1.format(0)
             else:
                 for lyr_idx, lyr in enumerate(normal_overrides):
                     if lyr_idx == 1:
