@@ -59,6 +59,9 @@ class YPaintPreferences(AddonPreferences):
             description = 'Make it possible to use parallax without using baked textures (currently VERY SLOW)',
             default = False)
     
+    # godot exporter
+    godot_path: StringProperty(name="Godot Executable Path", subtype='FILE_PATH')
+    
     # Addon updater preferences.
     auto_check_update : BoolProperty(
         name="Auto-check for Update",
@@ -103,6 +106,7 @@ class YPaintPreferences(AddonPreferences):
         #if is_greater_than_420():
         #    self.layout.prop(self, 'eevee_next_displacement')
         self.layout.prop(self, 'developer_mode')
+        self.layout.prop(self, 'godot_path')
         #self.layout.prop(self, 'parallax_without_baked')
 
         if self.developer_mode:

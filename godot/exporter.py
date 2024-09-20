@@ -214,6 +214,11 @@ uniform float {0}_normal_depth = 1.0;
         node = get_active_ypaint_node()
         yp = node.node_tree.yp
         obj = context.object
+        ypup = get_user_preferences()
+
+        if ypup.godot_path == "":
+            self.report({'ERROR'}, "Godot path is not set")
+            return {'CANCELLED'}
 
         print("====================================")
         index = 0
@@ -249,7 +254,7 @@ uniform float {0}_normal_depth = 1.0;
 
         print("save to ", self.filepath, " in ", self.godot_directory)
 
-        base_arg = ["godot", "--headless", "--path", self.godot_directory]
+        base_arg = [ypup.godot_path, "--headless", "--path", self.godot_directory]
         asset_args = []
 
         relative_path = os.path.relpath(self.filepath, self.godot_directory)
@@ -473,6 +478,12 @@ uniform float {0}_normal_depth = 1.0;
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        ypup = get_user_preferences()
+
+        if ypup.godot_path == "":
+            self.report({'ERROR'}, "Godot path is not set in Preferences")
+            return {'CANCELLED'}
+        
         if self.use_shortcut:
             return self.execute(context)
         else:
