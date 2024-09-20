@@ -17,6 +17,7 @@ class ExportShader(Operator):
     bl_idname = "godot.export"
 
     filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
+    export_gltf: BoolProperty(name="Export GLTF", default=True)
 
     use_shortcut = False
     shader_generation_test = False
@@ -453,6 +454,9 @@ uniform float {0}_normal_depth = 1.0;
 
         print("file name", name_asset)
 
+        if self.export_gltf:
+            bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', filepath=os.path.join(my_directory, name_asset + ".gltf"), export_vertex_color="ACTIVE", export_tangents=True, use_selection=True)
+
         if not self.shader_generation_test:
             file = open(self.filepath, "w")
             file.write(content_shader)
@@ -474,7 +478,14 @@ uniform float {0}_normal_depth = 1.0;
         else:
             context.window_manager.fileselect_add(self)
             return {'RUNNING_MODAL'}
-    
+        
+    def draw(self, context):
+        node = get_active_ypaint_node()
+        yp = node.node_tree.yp
+        obj = context.object
+
+        col = self.layout.column()
+        col.prop(self, "export_gltf")
 
 classes = [ExportShader]
 
