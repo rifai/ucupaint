@@ -19,10 +19,9 @@ class ExportShader(Operator):
     filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
     export_gltf: BoolProperty(name="Export GLTF", default=True)
 
-    use_shortcut = False
     shader_generation_test = False
 
-    godot_directory = "/home/bocilmania/Documents/projects/godot/witch/"
+    godot_directory = ""
 
     script_template = '''
 shader_type spatial;
@@ -233,10 +232,8 @@ uniform float {0}_normal_depth = 1.0;
         # addon directory
         addon_dir = os.path.dirname(os.path.realpath(__file__))
 
-        if self.use_shortcut:
-            self.filepath = os.path.join(my_directory, "box.gdshader")
-        else:
-            my_directory = os.path.dirname(self.filepath)
+
+        my_directory = os.path.dirname(self.filepath)
 
         if not os.path.exists(my_directory):
             print("create directory ", my_directory)
@@ -266,6 +263,8 @@ uniform float {0}_normal_depth = 1.0;
         roughness_overrides = []
         normal_overrides = []
         bump_overrides = []
+
+        copying_files = []
         
         for layer_idx, layer in enumerate(yp.layers):
             print("layer type ", layer.type)
@@ -293,7 +292,8 @@ uniform float {0}_normal_depth = 1.0;
 
                     # copy to directory 
                     print("copy ", image_path, " to ", my_directory)
-                    shutil.copy(image_path, my_directory)
+                    # shutil.copy(image_path, my_directory)
+                    copying_files.append(image_path)
 
                     yp = layer.id_data.yp
 
@@ -324,9 +324,12 @@ uniform float {0}_normal_depth = 1.0;
                                 #     png_path = os.path.join(my_directory, bpy.path.display_name_from_filepath(ch_image_path) + ".png")
                                 #     self.convert_exr_to_png(source_ch.image, png_path)
                                 #     ch_image_path = png_path
-                                shutil.copy(ch_image_path, my_directory)
+                                # shutil.copy(ch_image_path, my_directory)
+                                copying_files.append(ch_image_path)
+
                             if ch_image_path_1 != "":
-                                shutil.copy(ch_image_path_1, my_directory)
+                                # shutil.copy(ch_image_path_1, my_directory)
+                                copying_files.append(ch_image_path_1)
 
                             if ch_name == "Roughness":
                                 global_vars += self.script_vars_roughness.format(layer_var)
@@ -390,7 +393,8 @@ uniform float {0}_normal_depth = 1.0;
                             asset_args.append(mask_var)
                             asset_args.append(bpy.path.basename(mask_image_path))
 
-                            shutil.copy(mask_image_path, my_directory)
+                            # shutil.copy(mask_image_path, my_directory)
+                            copying_files.append(mask_image_path)
                             print("copy ", mask_image_path, " to ", my_directory)
                         elif mask_type == "COLOR_ID":
                             colorid_col = get_mask_color_id_color(msk)
@@ -460,9 +464,15 @@ uniform float {0}_normal_depth = 1.0;
         print("file name", name_asset)
 
         if self.export_gltf:
-            bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', filepath=os.path.join(my_directory, name_asset + ".gltf"), export_vertex_color="ACTIVE", export_tangents=True, use_selection=True)
+            bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".gltf"), 
+                                      export_vertex_color="ACTIVE", export_tangents=True, use_selection=True)
 
         if not self.shader_generation_test:
+
+            # copying all textures
+            for file in copying_files:
+                shutil.copy(file, my_directory)
+
             file = open(self.filepath, "w")
             file.write(content_shader)
             file.close()
@@ -484,17 +494,10 @@ uniform float {0}_normal_depth = 1.0;
             self.report({'ERROR'}, "Godot path is not set in Preferences")
             return {'CANCELLED'}
         
-        if self.use_shortcut:
-            return self.execute(context)
-        else:
-            context.window_manager.fileselect_add(self)
-            return {'RUNNING_MODAL'}
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
         
     def draw(self, context):
-        node = get_active_ypaint_node()
-        yp = node.node_tree.yp
-        obj = context.object
-
         col = self.layout.column()
         col.prop(self, "export_gltf")
 
