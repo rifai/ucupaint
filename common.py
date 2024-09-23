@@ -682,8 +682,18 @@ def is_greater_than_430():
         return True
     return False
 
+def is_created_before_279():
+    if bpy.data.version[:2] < (2, 79):
+        return True
+    return False
+
 def is_created_using_279():
     if bpy.data.version[:2] == (2, 79):
+        return True
+    return False
+
+def is_created_before_280():
+    if bpy.data.version[:2] < (2, 80):
         return True
     return False
 
@@ -726,17 +736,43 @@ def get_bpytypes():
 def get_srgb_name():
     names = bpy.types.Image.bl_rna.properties['colorspace_settings'].fixed_type.properties['name'].enum_items.keys()
     if 'sRGB' not in names:
+
+        # Try 'srgb' prefix
         for name in names:
             if name.lower().startswith('srgb'):
                 return name
+
+        # Check srgb name by creating new 8-bit image
+        ypprops = bpy.context.window_manager.ypprops
+
+        if ypprops.custom_srgb_name == '':
+            temp_image = bpy.data.images.new('temmmmp', width=1, height=1, alpha=False, float_buffer=False)
+            ypprops.custom_srgb_name = temp_image.colorspace_settings.name
+            remove_datablock(bpy.data.images, temp_image)
+
+        return ypprops.custom_srgb_name
+
     return 'sRGB'
 
 def get_noncolor_name():
     names = bpy.types.Image.bl_rna.properties['colorspace_settings'].fixed_type.properties['name'].enum_items.keys()
     if 'Non-Color' not in names:
+
+        # Try 'raw' name
         for name in names:
             if name.lower() == 'raw':
                 return name
+
+        # Check non-color name by creating new float image
+        ypprops = bpy.context.window_manager.ypprops
+
+        if ypprops.custom_noncolor_name == '':
+            temp_image = bpy.data.images.new('temmmmp', width=1, height=1, alpha=False, float_buffer=True)
+            ypprops.custom_noncolor_name = temp_image.colorspace_settings.name
+            remove_datablock(bpy.data.images, temp_image)
+
+        return ypprops.custom_noncolor_name
+
     return 'Non-Color'
 
 def remove_datablock(blocks, block, user=None, user_prop=''):
@@ -1362,7 +1398,7 @@ def is_image_single_user(image):
         (scene.tool_settings.image_paint.canvas != image and image.users == 1) or
         image.users == 0)
 
-def safe_remove_image(image, remove_on_disk=False):
+def safe_remove_image(image, remove_on_disk=False, user=None, user_prop=''):
 
     if is_image_single_user(image):
 
@@ -1376,7 +1412,7 @@ def safe_remove_image(image, remove_on_disk=False):
                 try: os.remove(os.path.abspath(bpy.path.abspath(image.filepath)))
                 except Exception as e: print(e)
 
-        remove_datablock(bpy.data.images, image)
+        remove_datablock(bpy.data.images, image, user=user, user_prop=user_prop)
 
 def simple_remove_node(tree, node, remove_data=True, passthrough_links=False, remove_on_disk=False):
     #if not node: return
@@ -1394,7 +1430,7 @@ def simple_remove_node(tree, node, remove_data=True, passthrough_links=False, re
     if remove_data:
         if node.bl_idname == 'ShaderNodeTexImage':
             image = node.image
-            if image: safe_remove_image(image, remove_on_disk)
+            if image: safe_remove_image(image, remove_on_disk, user=node, user_prop='image')
 
         elif node.bl_idname == 'ShaderNodeGroup':
             if node.node_tree and node.node_tree.users == 1:
@@ -1448,7 +1484,7 @@ def remove_node(tree, entity, prop, remove_data=True, parent=None, remove_on_dis
             if node.bl_idname == 'ShaderNodeTexImage':
 
                 image = node.image
-                if image: safe_remove_image(image, remove_on_disk)
+                if image: safe_remove_image(image, remove_on_disk, user=node, user_prop='image')
 
             elif node.bl_idname == 'ShaderNodeGroup':
 
@@ -1893,7 +1929,7 @@ def check_duplicated_node_group(node_group, duplicated_trees = []):
             check_duplicated_node_group(node.node_tree, duplicated_trees)
 
     # Create info frame if not found
-    if not info_frame_found:
+    if not info_frame_found and node_group.name.startswith('~yPL '):
         create_info_nodes(node_group)
 
 def load_from_lib_blend(tree_name, filename):
@@ -1933,13 +1969,9 @@ def get_node_tree_lib(name):
         duplicated_trees = []
         check_duplicated_node_group(node_tree, duplicated_trees)
 
-        #print('dub', duplicated_trees)
-
         # Remove duplicated trees
         for t in duplicated_trees:
             remove_datablock(bpy.data.node_groups, t)
-        #print(duplicated_trees)
-        #print(node_tree.name + ' is loaded!')
 
     return node_tree
 
@@ -4960,9 +4992,9 @@ def is_tangent_process_needed(yp, uv_name):
     if height_root_ch:
 
         if height_root_ch.main_uv == uv_name and (
-                #(height_root_ch.enable_smooth_bump and any_layers_using_bump_map(height_root_ch)) or
+                (height_root_ch.enable_smooth_bump and any_layers_using_bump_map(height_root_ch)) or
                 #(not height_root_ch.enable_smooth_bump and any_layers_using_bump_map(height_root_ch) and any_layers_using_normal_map(height_root_ch))
-                any_layers_using_bump_map(height_root_ch) or
+                #any_layers_using_bump_map(height_root_ch) or
                 (is_normal_height_input_connected(height_root_ch) and height_root_ch.enable_smooth_bump)
                 ):
             return True
@@ -6542,9 +6574,12 @@ def duplicate_image(image):
 
     return new_image
 
+def is_first_socket_bsdf(node):
+    return len(node.outputs) > 0 and node.outputs[0].type == 'SHADER'
+
 def is_valid_bsdf_node(node, valid_types=[]):
     if not valid_types:
-        return node.type == 'EMISSION' or node.type.startswith('BSDF_') or node.type.endswith('_SHADER')
+        return node.type == 'EMISSION' or node.type.startswith('BSDF_') or node.type.endswith('_SHADER') or is_first_socket_bsdf(node)
     
     return node.type in valid_types
 

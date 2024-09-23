@@ -1,4 +1,5 @@
 import bpy, time, os, numpy, tempfile
+from bpy.props import *
 from .common import *
 from .input_outputs import *
 from .node_connections import *
@@ -369,7 +370,7 @@ def prepare_bake_settings(book, objs, yp=None, samples=1, margin=5, uv_map='', b
         disable_problematic_modifiers=False, hide_other_objs=True, bake_from_multires=False, 
         tile_x=64, tile_y=64, use_selected_to_active=False, max_ray_distance=0.0, cage_extrusion=0.0,
         bake_target = 'IMAGE_TEXTURES',
-        source_objs=[], bake_device='GPU', use_denoising=False, margin_type='ADJACENT_FACES', cage_object_name=''):
+        source_objs=[], bake_device='CPU', use_denoising=False, margin_type='ADJACENT_FACES', cage_object_name=''):
 
     scene = bpy.context.scene
     ypui = bpy.context.window_manager.ypui
@@ -831,8 +832,8 @@ def recover_composite_settings(book):
         cam_obj = bpy.data.objects.get(book['temp_camera_name'])
         if cam_obj:
             cam = cam_obj.data
-            bpy.data.objects.remove(cam_obj)
-            bpy.data.cameras.remove(cam)
+            remove_datablock(bpy.data.objects, cam_obj)
+            remove_datablock(bpy.data.cameras, cam)
 
     # Remove temp scene
     remove_datablock(bpy.data.scenes, scene)
@@ -930,7 +931,7 @@ def denoise_image(image):
     print('DENOISE:', image.name, 'denoise pass is done at', '{:0.2f}'.format(time.time() - T), 'seconds!')
     return image
 
-def blur_image(image, alpha_aware=True, factor=1.0, samples=512, bake_device='GPU'):
+def blur_image(image, alpha_aware=True, factor=1.0, samples=512, bake_device='CPU'):
     T = time.time()
     print('BLUR: Doing Blur pass on', image.name + '...')
     book = remember_before_bake()
@@ -1027,21 +1028,19 @@ def blur_image(image, alpha_aware=True, factor=1.0, samples=512, bake_device='GP
             UDIM.swap_tile(image, 1001, tilenum)
 
         # Remove temp images
-        remove_datablock(bpy.data.images, image_copy)
+        remove_datablock(bpy.data.images, image_copy, user=source_tex, user_prop='image')
 
     # Remove temp datas
     print('BLUR: Removing temporary data of blur pass')
     if alpha_aware:
         if straight_over.node_tree.users == 1:
-            remove_datablock(bpy.data.node_groups, straight_over.node_tree)
+            remove_datablock(bpy.data.node_groups, straight_over.node_tree, user=straight_over, user_prop='node_tree')
 
     if blur.node_tree.users == 1:
-        remove_datablock(bpy.data.node_groups, blur.node_tree)
+        remove_datablock(bpy.data.node_groups, blur.node_tree, user=blur, user_prop='node_tree')
 
     remove_datablock(bpy.data.materials, mat)
-    plane = plane_obj.data
-    bpy.ops.object.delete()
-    remove_datablock(bpy.data.meshes, plane)
+    remove_mesh_obj(plane_obj)
 
     # Recover settings
     recover_bake_settings(book)
@@ -1069,7 +1068,7 @@ def create_plane_on_object_mode():
 
     return bpy.context.view_layer.objects.active
 
-def fxaa_image(image, alpha_aware=True, bake_device='GPU', first_tile_only=False):
+def fxaa_image(image, alpha_aware=True, bake_device='CPU', first_tile_only=False):
     T = time.time()
     print('FXAA: Doing FXAA pass on', image.name + '...')
     book = remember_before_bake()
@@ -1179,7 +1178,7 @@ def fxaa_image(image, alpha_aware=True, bake_device='GPU', first_tile_only=False
             UDIM.swap_tile(image, 1001, tilenum)
 
         # Remove temp images
-        remove_datablock(bpy.data.images, image_copy)
+        remove_datablock(bpy.data.images, image_copy, user=tex, user_prop='image')
         if image_ori : 
             remove_datablock(bpy.data.images, image_ori)
 
@@ -1187,11 +1186,11 @@ def fxaa_image(image, alpha_aware=True, bake_device='GPU', first_tile_only=False
     print('FXAA: Removing temporary data of FXAA pass')
     if alpha_aware:
         if straight_over.node_tree.users == 1:
-            remove_datablock(bpy.data.node_groups, straight_over.node_tree)
+            remove_datablock(bpy.data.node_groups, straight_over.node_tree, user=straight_over, user_prop='node_tree')
 
     if fxaa.node_tree.users == 1:
-        remove_datablock(bpy.data.node_groups, tex_node.node_tree)
-        remove_datablock(bpy.data.node_groups, fxaa.node_tree)
+        remove_datablock(bpy.data.node_groups, tex_node.node_tree, user=tex_node, user_prop='node_tree')
+        remove_datablock(bpy.data.node_groups, fxaa.node_tree, user=fxaa, user_prop='node_tree')
 
     remove_datablock(bpy.data.materials, mat)
     plane = plane_obj.data
@@ -1324,7 +1323,8 @@ def get_valid_filepath(img, use_hdr):
     return img.filepath
 
 def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_layer=None, use_hdr=False, 
-                 aa_level=1, force_use_udim=False, tilenums=[], interpolation='Linear', use_float_for_displacement=False):
+                 aa_level=1, force_use_udim=False, tilenums=[], interpolation='Linear', 
+                 use_float_for_displacement=False, use_float_for_normal=False):
 
     print('BAKE CHANNEL: Baking', root_ch.name + ' channel...')
 
@@ -1455,8 +1455,6 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
                 filepath = baked.image.filepath
             else: filepath = get_valid_filepath(baked.image, use_hdr)
             baked.image.name = '____TEMP'
-            #if baked.image.users == 1:
-            #    bpy.data.images.remove(baked.image)
 
     if not img:
 
@@ -1546,8 +1544,8 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
             ):
             img.filepath = filepath
 
-        # Use hdr if not baking normal
-        if root_ch.type != 'NORMAL' and use_hdr:
+        # Use hdr
+        if (root_ch.type == 'NORMAL' and use_float_for_normal) or use_hdr:
             img.use_generated_float = True
 
         # Set colorspace to linear
@@ -1786,7 +1784,7 @@ def bake_channel(uv_map, mat, node, root_ch, width=1024, height=1024, target_lay
             end_max_height.outputs[0].default_value = max_height_value
 
             # Remove max height image
-            remove_datablock(bpy.data.images, mh_img)
+            remove_datablock(bpy.data.images, mh_img, user=tex, user_prop='image')
 
             ### Displacement
 
@@ -2157,7 +2155,7 @@ def get_merged_mesh_objects(scene, objs, hide_original=False):
     print('INFO: Merging mesh(es) is done at', '{:0.2f}'.format(time.time() - tt), 'seconds!')
     return merged_obj
 
-def resize_image(image, width, height, colorspace='Non-Color', samples=1, margin=0, segment=None, alpha_aware=True, yp=None, bake_device='GPU', specific_tile=0):
+def resize_image(image, width, height, colorspace='Non-Color', samples=1, margin=0, segment=None, alpha_aware=True, yp=None, bake_device='CPU', specific_tile=0):
 
     T = time.time()
     image_name = image.name
@@ -2350,7 +2348,7 @@ def resize_image(image, width, height, colorspace='Non-Color', samples=1, margin
 
     # Remove temp datas
     if straight_over.node_tree.users == 1:
-        remove_datablock(bpy.data.node_groups, straight_over.node_tree)
+        remove_datablock(bpy.data.node_groups, straight_over.node_tree, user=straight_over, user_prop='node_tree')
     remove_datablock(bpy.data.materials, mat)
     plane = plane_obj.data
     bpy.ops.object.delete()
@@ -2416,4 +2414,41 @@ def get_output_uv_names_from_geometry_nodes(obj):
                     if uv: uv_names.append(uv.name)
 
     return uv_names
+
+class BaseBakeOperator():
+    bake_device : EnumProperty(
+            name='Bake Device',
+            description='Device to use for baking',
+            items = (('GPU', 'GPU Compute', ''),
+                     ('CPU', 'CPU', '')),
+            default='CPU'
+            )
+    
+    samples : IntProperty(name='Bake Samples', 
+            description='Bake Samples, more means less jagged on generated textures', 
+            default=1, min=1)
+
+    margin : IntProperty(name='Bake Margin',
+            description = 'Bake margin in pixels',
+            default=5, subtype='PIXEL')
+
+    margin_type : EnumProperty(name = 'Margin Type',
+            description = '',
+            items = (('ADJACENT_FACES', 'Adjacent Faces', 'Use pixels from adjacent faces across UV seams.'),
+                     ('EXTEND', 'Extend', 'Extend border pixels outwards')),
+            default = 'ADJACENT_FACES')
+
+    width : IntProperty(name='Width', default = 1234, min=1, max=16384)
+    height : IntProperty(name='Height', default = 1234, min=1, max=16384)
+
+    def invoke_operator(self, context):
+        ypup = get_user_preferences()
+
+        # Set up default bake device
+        if ypup.default_bake_device != 'DEFAULT':
+            self.bake_device = ypup.default_bake_device
+
+        # Use user preference default image size if input uses default image size
+        if self.width == 1234 and self.height == 1234:
+            self.width = self.height = ypup.default_new_image_size
 

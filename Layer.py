@@ -1937,7 +1937,7 @@ class BaseMultipleImagesLayer():
 
         return True
 
-    def invoke_operator(self, context:bpy.context):
+    def invoke_operator(self, context):
         obj = context.object
         node = get_active_ypaint_node()
         yp = node.node_tree.yp if node else None
@@ -2058,8 +2058,7 @@ class YOpenImagesFromMaterialToLayer(bpy.types.Operator, BaseMultipleImagesLayer
 
     mat_name : StringProperty(default='')
     mat_coll : CollectionProperty(type=bpy.types.PropertyGroup)
-
-    from_asset_browser : BoolProperty(default=False)
+    asset_library_path: StringProperty(default='')
 
     @classmethod
     def poll(cls, context):
@@ -2084,7 +2083,7 @@ class YOpenImagesFromMaterialToLayer(bpy.types.Operator, BaseMultipleImagesLayer
                 if self.mat_name == mat.name: 
                     mat_found = True
 
-        if not self.from_asset_browser:
+        if self.asset_library_path == '':
             if not mat_found:
                 self.mat_name = ''
 
@@ -2096,7 +2095,7 @@ class YOpenImagesFromMaterialToLayer(bpy.types.Operator, BaseMultipleImagesLayer
     def draw(self, context):
         row = split_layout(self.layout, 0.325, align=True)
         row.label(text='Material')
-        if not self.from_asset_browser:
+        if self.asset_library_path == '':
             row.prop_search(self, "mat_name", self, "mat_coll", text='', icon='MATERIAL_DATA')
         else: row.label(text=self.mat_name, icon='MATERIAL_DATA')
         self.draw_operator(context, display_relative_toggle=False)
@@ -2115,26 +2114,14 @@ class YOpenImagesFromMaterialToLayer(bpy.types.Operator, BaseMultipleImagesLayer
         # Get material from local first
         mat = bpy.data.materials.get(self.mat_name)
 
-        # Get material from asset library if not found
-        from_asset_library = False
-        if not mat and is_greater_than_300():
-            prefs = bpy.context.preferences
-            filepaths = prefs.filepaths
-            asset_libraries = filepaths.asset_libraries
-            
-            for asset_library in asset_libraries:
-                library_name = asset_library.name
-                library_path = pathlib.Path(asset_library.path)
-                blend_files = [fp for fp in library_path.glob("**/*.blend") if fp.is_file()]
-                print("Checking the content of library '" + library_name + "'")
-                for blend_file in blend_files:
-                    with bpy.data.libraries.load(str(blend_file), assets_only=True) as (data_from, data_to):
-                        for mat in data_from.materials:
-                            if mat == self.mat_name:
-                                data_to.materials.append(mat)
-
+        # If not found get from the asset library
+        from_asset_library = self.asset_library_path != ''
+        if not mat and from_asset_library and is_greater_than_300():
+            with bpy.data.libraries.load(str(self.asset_library_path), assets_only=True) as (data_from, data_to):
+                for mat in data_from.materials:
+                    if mat == self.mat_name:
+                        data_to.materials.append(mat)
             mat = bpy.data.materials.get(self.mat_name)
-            from_asset_library = True
 
         if not mat:
             self.report({'ERROR'}, "Source material cannot be found!")
@@ -3361,7 +3348,8 @@ def remove_layer(yp, index, remove_on_disk=False):
 
     # Remove node group and layer tree
     if layer_tree: 
-        remove_datablock(bpy.data.node_groups, layer_tree)
+        layer_node = group_tree.nodes.get(layer.group_node)
+        remove_datablock(bpy.data.node_groups, layer_tree, user=layer_node, user_prop='node_tree')
     if layer.trash_group_node != '':
         trash = group_tree.nodes.get(yp.trash)
         if trash: trash.node_tree.nodes.remove(trash.node_tree.nodes.get(layer.trash_group_node))
@@ -3927,6 +3915,46 @@ class YReplaceLayerChannelOverride1(bpy.types.Operator):
         ch = context.parent
         ch.override_1_type = self.type
         ch.override_1 = True
+        return {'FINISHED'}
+
+class YRemoveLayerChannelOverrideSource(bpy.types.Operator):
+    bl_idname = "node.y_remove_channel_override_source"
+    bl_label = "Replace Layer Channel Override Source"
+    bl_description = "Replace Layer Channel Override Source"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return hasattr(context, 'channel') and hasattr(context, 'layer')
+
+    def execute(self, context):
+        layer = context.layer
+        ch = context.channel
+        tree = get_tree(layer)
+        if ch.override:
+            remove_node(tree, ch, 'source')
+        else: remove_node(tree, ch, 'cache_image')
+        ch.override_type = 'DEFAULT'
+        return {'FINISHED'}
+
+class YRemoveLayerChannelOverride1Source(bpy.types.Operator):
+    bl_idname = "node.y_remove_channel_override_1_source"
+    bl_label = "Replace Layer Channel Normal Override Source"
+    bl_description = "Replace Layer Channel Normal Override Source"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return hasattr(context, 'channel') and hasattr(context, 'layer')
+
+    def execute(self, context):
+        layer = context.layer
+        ch = context.channel
+        tree = get_tree(layer)
+        if ch.override_1:
+            remove_node(tree, ch, 'source_1')
+        else: remove_node(tree, ch, 'cache_1_image')
+        ch.override_1_type = 'DEFAULT'
         return {'FINISHED'}
 
 class YReplaceLayerType(bpy.types.Operator):
@@ -6076,6 +6104,8 @@ def register():
     bpy.utils.register_class(YReplaceLayerType)
     bpy.utils.register_class(YReplaceLayerChannelOverride)
     bpy.utils.register_class(YReplaceLayerChannelOverride1)
+    bpy.utils.register_class(YRemoveLayerChannelOverrideSource)
+    bpy.utils.register_class(YRemoveLayerChannelOverride1Source)
     bpy.utils.register_class(YDuplicateLayer)
     bpy.utils.register_class(YCopyLayer)
     bpy.utils.register_class(YPasteLayer)
@@ -6105,6 +6135,8 @@ def unregister():
     bpy.utils.unregister_class(YReplaceLayerType)
     bpy.utils.unregister_class(YReplaceLayerChannelOverride)
     bpy.utils.unregister_class(YReplaceLayerChannelOverride1)
+    bpy.utils.unregister_class(YRemoveLayerChannelOverrideSource)
+    bpy.utils.unregister_class(YRemoveLayerChannelOverride1Source)
     bpy.utils.unregister_class(YDuplicateLayer)
     bpy.utils.unregister_class(YCopyLayer)
     bpy.utils.unregister_class(YPasteLayer)

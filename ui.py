@@ -160,11 +160,29 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False):
 
     col = layout.column()
 
+    unlink_op = 'node.y_remove_layer'
+    if entity:
+        yp = entity.id_data.yp
+        m1 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', entity.path_from_id())
+        m2 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', entity.path_from_id())
+        if m1: 
+            layer = yp.layers[int(m1.group(1))]
+            col.context_pointer_set('layer', layer)
+            col.context_pointer_set('mask', entity)
+            unlink_op = 'node.y_remove_layer_mask'
+        elif m2: 
+            layer = yp.layers[int(m2.group(1))]
+            col.context_pointer_set('layer', layer)
+            col.context_pointer_set('channel', entity)
+            if show_flip_y:
+                unlink_op = 'node.y_remove_channel_override_1_source'
+            else: unlink_op = 'node.y_remove_channel_override_source'
+
     if image.y_bake_info.is_baked and not image.y_bake_info.is_baked_channel:
         bi = image.y_bake_info
         if image.yia.is_image_atlas or image.yua.is_udim_atlas:
             col.label(text=image.name + ' (Baked)', icon_value=lib.get_icon('image'))
-        else: col.template_ID(source, "image", unlink='node.y_remove_layer')
+        else: col.template_ID(source, "image", unlink=unlink_op)
         col.label(text='Type: ' + bake_type_labels[bi.bake_type], icon_value=lib.get_icon('bake'))
 
         draw_bake_info(bi, col, entity)
@@ -208,7 +226,7 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False):
 
         return
 
-    col.template_ID(source, "image", unlink='node.y_remove_layer')
+    col.template_ID(source, "image", unlink=unlink_op)
     if image.source == 'GENERATED':
         col.label(text='Generated image settings:')
         row = col.row()
@@ -799,8 +817,14 @@ def draw_bake_targets_ui(context, layout, node):
         row = col.row(align=True)
 
         row.prop(btui, 'expand_content', text='', emboss=False, icon_value=icon_value)
-        if image: row.label(text=image.name)
-        else: row.label(text=bt.name)
+        if image: 
+            bt_label = image.name
+            if image.is_float: bt_label += ' (Float)'
+        else: 
+            bt_label = bt.name
+            if bt.use_float: bt_label += ' (Float)'
+
+        row.label(text=bt_label)
 
         if btui.expand_content:
             row = col.row(align=True)
@@ -2724,14 +2748,18 @@ def draw_layers_ui(context, layout, node):
 
         for ch in layer.channels:
             if ch.override and ch.override_type in {'IMAGE', 'VCOL'}:
-                #layer_tree = get_tree(layer)
-                #src = layer_tree.nodes.get(ch.source)
                 src = get_channel_source(ch, layer)
                 if (
                     not src or
                     (ch.override_type == 'IMAGE' and not src.image) or 
                     (ch.override_type == 'VCOL' and obj.type == 'MESH' and not get_vcol_from_source(obj, src))
                     ):
+                    missing_data = True
+                    break
+
+            if ch.override_1 and ch.override_1_type == 'IMAGE':
+                src = get_channel_source_1(ch, layer)
+                if not src or not src.image:
                     missing_data = True
                     break
 
@@ -4030,8 +4058,8 @@ class YPAssetBrowserMenu(bpy.types.Menu):
     def draw(self, context):
         obj = context.object
         op = self.layout.operator("node.y_open_images_from_material_to_single_layer", icon_value=lib.get_icon('image'), text='Open Material Images to Layer')
-        op.from_asset_browser = True
         op.mat_name = context.mat_asset.name if hasattr(context, 'mat_asset') else ''
+        op.asset_library_path = context.mat_asset.full_library_path if hasattr(context, 'mat_asset') else ''
 
         if obj.type == 'MESH':
             op.texcoord_type = 'UV'
@@ -4107,6 +4135,7 @@ def draw_ypaint_about(self, context):
     col.operator('wm.url_open', text='rifai', icon='ARMATURE_DATA').url = 'https://github.com/rifai'
     col.operator('wm.url_open', text='morirain', icon='ARMATURE_DATA').url = 'https://github.com/morirain'
     col.operator('wm.url_open', text='kareemov03', icon='ARMATURE_DATA').url = 'https://www.artstation.com/kareem'
+    col.operator('wm.url_open', text='passivestar', icon='ARMATURE_DATA').url = 'https://github.com/passivestar'
     col.separator()
 
     col.label(text='Documentation:')
@@ -4119,7 +4148,7 @@ def draw_ypaint_about(self, context):
     row = col.row()            
     if updater.using_development_build:
         if addon_updater_ops.updater.legacy_blender:
-            row.label(text="Branch: Master (2.79)")
+            row.label(text="Branch: Master (Blender 2.7x)")
         else:
             row.label(text="Branch: "+updater.current_branch)
     else:
@@ -4251,7 +4280,7 @@ class YBakeTargetMenu(bpy.types.Menu):
         if context.image:
             if context.image.packed_file:
                 col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').unpack = True
-            else: col.operator('node.y_save_as_image', text='Save As Image')
+            else: col.operator('node.y_save_as_image', text='Save As Image').unpack = False
 
 class YNewChannelMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_new_channel_menu"
@@ -4303,7 +4332,7 @@ class YNewLayerMenu(bpy.types.Menu):
         col.operator("node.y_open_available_data_to_layer", text='Open Available Image').type = 'IMAGE'
 
         col.operator("node.y_open_images_to_single_layer", text='Open Images to Single Layer')
-        col.operator("node.y_open_images_from_material_to_single_layer", text='Open Images from Material').from_asset_browser = False
+        col.operator("node.y_open_images_from_material_to_single_layer", text='Open Images from Material').asset_library_path = ''
 
         # NOTE: Dedicated menu for opening images to single layer is kinda hard to see, so it's probably better be hidden for now
         #col.menu("NODE_MT_y_open_images_to_single_layer_menu", text='Open Images to Single Layer')
@@ -4494,7 +4523,7 @@ class YBakedImageMenu(bpy.types.Menu):
 
         if context.image.packed_file:
             col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').unpack = True
-        else: col.operator('node.y_save_as_image', text='Save As Image')
+        else: col.operator('node.y_save_as_image', text='Save As Image').unpack = False
 
         col.separator()
 
@@ -4572,10 +4601,10 @@ class YLayerListSpecialMenu(bpy.types.Menu):
             col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').unpack = True
         else:
             if is_greater_than_280():
-                col.operator('node.y_save_as_image', text='Save As Image')
+                col.operator('node.y_save_as_image', text='Save As Image').unpack = False
                 col.operator('node.y_save_pack_all', text='Save/Pack All')
             else: 
-                col.operator('node.y_save_as_image', text='Save As Image', icon='SAVE_AS')
+                col.operator('node.y_save_as_image', text='Save As Image', icon='SAVE_AS').unpack = False
                 col.operator('node.y_save_pack_all', text='Save/Pack All', icon='FILE_TICK')
 
         col.separator()
@@ -4606,7 +4635,7 @@ class YOpenImagesToSingleLayerMenu(bpy.types.Menu):
         col = self.layout.column()
 
         col.operator("node.y_open_images_to_single_layer", icon='FILE_FOLDER', text='From Directory')
-        col.operator("node.y_open_images_from_material_to_single_layer", icon='MATERIAL_DATA', text='From Material').from_asset_browser = False
+        col.operator("node.y_open_images_from_material_to_single_layer", icon='MATERIAL_DATA', text='From Material').asset_library_path = ''
 
 class YNewSolidColorLayerMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_new_solid_color_layer_menu"
