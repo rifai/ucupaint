@@ -417,7 +417,7 @@ uniform float {0}_normal_depth = 1.0;
                     if lyr_idx == 1:
                         combine_content += self.script_albedo_combine_0
                     elif lyr_idx > 1:
-                        combine_content += self.script_albedo_combine_next.format(lyr)
+                        combine_content += self.script_albedo_combine_next.format(lyr_idx)
 
         if len(roughness_overrides) > 0:
             if len(roughness_overrides) == 1:
@@ -427,7 +427,7 @@ uniform float {0}_normal_depth = 1.0;
                     if lyr_idx == 1:
                         combine_content += self.script_roughness_combine_0.format(roughness_overrides[lyr_idx - 1], roughness_overrides[lyr_idx])
                     elif lyr_idx > 1:
-                        combine_content += self.script_roughness_combine_next.format(lyr)
+                        combine_content += self.script_roughness_combine_next.format(lyr_idx)
 
             combine_content += self.script_roughness_fragment
 
@@ -439,7 +439,7 @@ uniform float {0}_normal_depth = 1.0;
                     if lyr_idx == 1:
                         combine_content += self.script_normal_combine_0.format(normal_overrides[lyr_idx - 1], normal_overrides[lyr_idx])
                     elif lyr_idx > 1:
-                        combine_content += self.script_normal_combine_next.format(lyr)
+                        combine_content += self.script_normal_combine_next.format(lyr_idx)
 
             combine_content += self.script_normal_fragment
         
@@ -463,12 +463,10 @@ uniform float {0}_normal_depth = 1.0;
 
         print("file name", name_asset)
 
-        if self.export_gltf:
-            bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".gltf"), 
-                                      export_vertex_color="ACTIVE", export_tangents=True, use_selection=True)
-
         if not self.shader_generation_test:
-
+            if self.export_gltf:
+                bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
+                                        export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
             # copying all textures
             for file in copying_files:
                 shutil.copy(file, my_directory)
