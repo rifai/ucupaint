@@ -180,7 +180,7 @@ uniform float decal_scale_{16} = 1.0;
 	// Sample the decal texture using screen space UV coordinates
 	vec4 albedo_{0} = texture(layer_{0}, screen_uv_{0});
 
-	albedo_{0}.a = -cam_pos_{0}.z < layer_{0}_decal_distance ? albedo_{0}.a : 0.0;
+	albedo_{0}.a = abs(-cam_pos_{0}.z) < layer_{0}_decal_distance ? albedo_{0}.a : 0.0;
 
 '''
 
