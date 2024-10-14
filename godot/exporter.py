@@ -97,8 +97,7 @@ const mat4 layer_{16}_decal_matrix = mat4(vec4({0}, {1}, {2}, {3}),
 							vec4({4}, {5}, {6}, {7}),
 							vec4({8}, {9}, {10}, {11}),
 							vec4({12}, {13}, {14}, {15}));
-uniform float decal_scale_{16} = 1.0;
- 
+uniform float layer_{16}_decal_distance = {17};
 
 '''
 
@@ -173,9 +172,8 @@ uniform float decal_scale_{16} = 1.0;
 	mat4 view_projection_matrix_{0} = projection_matrix * world_view_{0};
 	vec4 clip_pos_{0} = view_projection_matrix_{0} * world_pos_{0};
 	vec2 screen_uv_{0} = clip_pos_{0}.xy * 0.5 + 0.5;
-	screen_uv_{0} = (screen_uv_{0} - 0.5) * decal_scale_{0} + 0.5;
+	//screen_uv_{0} = (screen_uv_{0} - 0.5) * layer_{0}_decal_scale + 0.5;
 	screen_uv_{0}.y = 1.0 - screen_uv_{0}.y;
-	float layer_{0}_decal_distance = {1};
 
 	// Sample the decal texture using screen space UV coordinates
 	vec4 albedo_{0} = texture(layer_{0}, screen_uv_{0});
@@ -483,7 +481,7 @@ uniform float decal_scale_{16} = 1.0;
 							local_matrix[1][0], local_matrix[1][1], local_matrix[1][2], local_matrix[1][3], 
 							local_matrix[2][0], local_matrix[2][1], local_matrix[2][2], local_matrix[2][3], 
 							local_matrix[3][0], local_matrix[3][1], local_matrix[3][2], local_matrix[3][3],
-							index)
+							index, lyr_distance)
 						
 						image_path = source.image.filepath_from_user()
 
@@ -497,7 +495,7 @@ uniform float decal_scale_{16} = 1.0;
 
 						albedo_overrides.append(layer_idx)
 
-						fragment_var = self.script_decal_fragment.format(index, lyr_distance)
+						fragment_var = self.script_decal_fragment.format(index)
 						fragment_vars += fragment_var
 
 						index += 1
