@@ -1,7 +1,6 @@
 import bpy, re, time, random
 from bpy.props import *
 from bpy_extras.io_utils import ImportHelper
-from bpy_extras.image_utils import load_image  
 from . import lib, Modifier, transition, ImageAtlas, MaskModifier, UDIM
 from .common import *
 from .node_connections import *
@@ -64,7 +63,7 @@ def add_new_mask(layer, name, mask_type, texcoord_type, uv_name, image = None, v
         source.inputs[0].default_value = object_index
 
     if mask_type == 'COLOR_ID':
-        if is_greater_than_282():
+        if is_bl_newer_than(2, 82):
             source.node_tree = get_node_tree_lib(lib.COLOR_ID_EQUAL_282)
         else: source.node_tree = get_node_tree_lib(lib.COLOR_ID_EQUAL)
         mask.color_id = color_id
@@ -305,7 +304,7 @@ class YNewLayerMask(bpy.types.Operator):
 
     hemi_use_prev_normal : BoolProperty(
             name = 'Use previous Normal',
-            description = 'Take account previous Normal',
+            description = 'Take previous Normal into the account',
             default = True)
 
     # For object index
@@ -333,6 +332,10 @@ class YNewLayerMask(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return True
+
+    @classmethod
+    def description(self, context, properties):
+        return get_operator_description(self)
 
     def get_to_be_cleared_image_atlas(self, context, yp):
         if self.type == 'IMAGE' and self.use_image_atlas:
@@ -400,6 +403,9 @@ class YNewLayerMask(bpy.types.Operator):
         elif layer.type == 'IMAGE':
             source = get_layer_source(layer)
             if source and source.image: self.interpolation = source.interpolation
+        
+        if get_user_preferences().skip_property_popups and not event.shift:
+            return self.execute(context)
 
         return context.window_manager.invoke_props_dialog(self)
 
@@ -436,7 +442,7 @@ class YNewLayerMask(bpy.types.Operator):
         if self.type == 'COLOR_ID':
             col.label(text='Color ID:')
 
-        if is_greater_than_320() and self.type == 'VCOL':
+        if is_bl_newer_than(3, 2) and self.type == 'VCOL':
             col.label(text='Domain:')
             col.label(text='Data Type:')
 
@@ -483,7 +489,7 @@ class YNewLayerMask(bpy.types.Operator):
         if self.type == 'EDGE_DETECT':
             col.prop(self, 'edge_detect_radius', text='')
 
-        if is_greater_than_320() and self.type == 'VCOL':
+        if is_bl_newer_than(3, 2) and self.type == 'VCOL':
             crow = col.row(align=True)
             crow.prop(self, 'vcol_domain', expand=True)
             crow = col.row(align=True)
@@ -529,7 +535,7 @@ class YNewLayerMask(bpy.types.Operator):
             self.report({'ERROR'}, "Vertex color mask only works with mesh object!")
             return {'CANCELLED'}
 
-        if not is_greater_than_330() and self.type == 'VCOL' and len(get_vertex_color_names(obj)) >= 8:
+        if not is_bl_newer_than(3, 3) and self.type == 'VCOL' and len(get_vertex_color_names(obj)) >= 8:
             self.report({'ERROR'}, "Mesh can only use 8 vertex colors!")
             return {'CANCELLED'}
 
@@ -611,7 +617,7 @@ class YNewLayerMask(bpy.types.Operator):
 
                 for o in objs:
                     if self.name not in get_vertex_colors(o):
-                        if not is_greater_than_330() and len(get_vertex_colors(o)) >= 8: continue
+                        if not is_bl_newer_than(3, 3) and len(get_vertex_colors(o)) >= 8: continue
                         vcol = new_vertex_color(o, self.name, self.vcol_data_type, self.vcol_domain)
                         if self.color_option == 'WHITE':
                             set_obj_vertex_colors(o, vcol.name, (1.0, 1.0, 1.0, 1.0))
@@ -715,6 +721,10 @@ class YOpenImageAsMask(bpy.types.Operator, ImportHelper):
         node = get_active_ypaint_node()
         return node and len(node.node_tree.yp.layers) > 0
 
+    @classmethod
+    def description(self, context, properties):
+        return get_operator_description(self)
+
     def invoke(self, context, event):
         obj = context.object
         if hasattr(context, 'layer'):
@@ -755,6 +765,8 @@ class YOpenImageAsMask(bpy.types.Operator, ImportHelper):
             if source and source.image: self.interpolation = source.interpolation
 
         if self.file_browser_filepath != '':
+            if get_user_preferences().skip_property_popups and not event.shift:
+                return self.execute(context)
             return context.window_manager.invoke_props_dialog(self)
 
         context.window_manager.fileselect_add(self)
@@ -823,8 +835,8 @@ class YOpenImageAsMask(bpy.types.Operator, ImportHelper):
         if not UDIM.is_udim_supported():
             images = tuple(load_image(path, directory) for path in import_list)
         else:
-            ori_ui_type = bpy.context.area.ui_type
-            bpy.context.area.ui_type = 'IMAGE_EDITOR'
+            ori_ui_type = bpy.context.area.type
+            bpy.context.area.type = 'IMAGE_EDITOR'
             images = []
             for path in import_list:
                 bpy.ops.image.open(filepath=directory+os.sep+path, directory=directory, 
@@ -832,7 +844,7 @@ class YOpenImageAsMask(bpy.types.Operator, ImportHelper):
                 image = bpy.context.space_data.image
                 if image not in images:
                     images.append(image)
-            bpy.context.area.ui_type = ori_ui_type
+            bpy.context.area.type = ori_ui_type
 
         for image in images:
             if self.relative:
@@ -860,7 +872,7 @@ class YOpenImageAsMask(bpy.types.Operator, ImportHelper):
             mask.expand_content = True
             mask.expand_vector = True
 
-        print('INFO: Image(s) is opened as mask(s) at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        print('INFO: Image(s) opened as mask(s) in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
         wm.yptimer.time = str(time.time())
 
         return {'FINISHED'}
@@ -878,7 +890,7 @@ def update_available_data_name_as_mask(self, context):
                     self.source_input = 'ALPHA'
                     return
 
-    elif self.type == 'VCOL' and is_greater_than_292():
+    elif self.type == 'VCOL' and is_bl_newer_than(2, 92):
         for layer in yp.layers:
             if layer.type == 'VCOL':
                 source = get_layer_source(layer)
@@ -938,6 +950,10 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
     def poll(cls, context):
         return True
 
+    @classmethod
+    def description(self, context, properties):
+        return get_operator_description(self)
+
     def invoke(self, context, event):
         obj = context.object
         node = get_active_ypaint_node()
@@ -988,7 +1004,7 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
                 if not img.yia.is_image_atlas and img not in baked_channel_images and img != layer_image and img not in mask_images and img.name not in {'Render Result', 'Viewer Node'}:
                     self.image_coll.add().name = img.name
 
-            # Make sure default image is available on the collection and update the source input based on the default name
+            # Make sure default image is available in the collection and update the source input based on the default name
             if self.image_name not in self.image_coll:
                 self.image_name = ''
             else: self.image_name = self.image_name
@@ -1019,7 +1035,7 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
                 if vcol_name != layer_vcol_name and vcol_name not in mask_vcol_names:
                     self.vcol_coll.add().name = vcol_name
 
-            # Make sure default vcol is available on the collection and update the source input based on the default name
+            # Make sure default vcol is available in the collection and update the source input based on the default name
             if self.vcol_name not in self.vcol_coll:
                 self.vcol_name = ''
             else: self.vcol_name = self.vcol_name
@@ -1027,6 +1043,9 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
         # The default blend type for mask is multiply
         if len(layer.masks) == 0:
             self.blend_type = 'MULTIPLY'
+    
+        if self.image_name != '' and get_user_preferences().skip_property_popups and not event.shift:
+            return self.execute(context)
 
         return context.window_manager.invoke_props_dialog(self)
 
@@ -1056,7 +1075,7 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
 
         if self.type == 'IMAGE':
             col.label(text='Image Channel:')
-        elif self.type == 'VCOL' and is_greater_than_292():
+        elif self.type == 'VCOL' and is_bl_newer_than(2, 92):
             col.label(text='Vertex Color Data:')
 
         col = row.column()
@@ -1072,7 +1091,7 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
         if len(layer.masks) > 0:
             col.prop(self, 'blend_type', text='')
 
-        if is_greater_than_292() or self.type != 'VCOL':
+        if is_bl_newer_than(2, 92) or self.type != 'VCOL':
             crow = col.row(align=True)
             crow.prop(self, 'source_input', expand=True)
 
@@ -1114,7 +1133,7 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
 
             for o in objs:
                 if self.vcol_name not in get_vertex_colors(o):
-                    if not is_greater_than_330() and len(get_vertex_colors(o)) >= 8: continue
+                    if not is_bl_newer_than(3, 3) and len(get_vertex_colors(o)) >= 8: continue
                     data_type, domain = get_vcol_data_type_and_domain_by_name(o, self.vcol_name, objs)
                     other_v = new_vertex_color(o, self.vcol_name, data_type, domain)
                     set_obj_vertex_colors(o, other_v.name, (1.0, 1.0, 1.0, 1.0))
@@ -1879,7 +1898,7 @@ class YLayerMask(bpy.types.PropertyGroup):
     # For temporary bake
     use_temp_bake : BoolProperty(
             name = 'Use Temporary Bake',
-            description = 'Use temporary bake, it can be useful for prevent glitch on cycles',
+            description = 'Use temporary bake, it can be useful to prevent glitching with cycles',
             default = False,
             )
 

@@ -131,7 +131,7 @@ def draw_bake_info(bake_info, layout, entity):
             brow = bcol.row()
             brow.context_pointer_set('other_object', oo)
             brow.context_pointer_set('bake_info', bi)
-            if is_greater_than_279():
+            if is_bl_newer_than(2, 79):
                 brow.label(text=oo.object.name, icon_value=lib.get_icon('object_index'))
             else: brow.label(text=oo.object_name, icon_value=lib.get_icon('object_index'))
             brow.operator('node.y_remove_bake_info_other_object', text='', icon_value=lib.get_icon('close'))
@@ -315,10 +315,10 @@ def draw_vcol_props(layout, vcol=None, entity=None):
     if hasattr(entity, 'divide_rgb_by_alpha'):
         layout.prop(entity, 'divide_rgb_by_alpha')
     else:
-        layout.label(text='You can also edit vertex color on edit mode')
+        layout.label(text='You can also edit vertex color in edit mode')
 
 def is_input_skipped(inp):
-    if is_greater_than_281():
+    if is_bl_newer_than(2, 81):
         return inp.name == 'Vector' or not inp.enabled
 
     return inp.name == 'Vector'
@@ -414,7 +414,7 @@ def draw_tex_props(source, layout, entity=None):
 
         row = col.row()
         col = row.column(align=True)
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.label(text='Dimensions:')
         col.label(text='Type:')
         col.separator()
@@ -424,7 +424,7 @@ def draw_tex_props(source, layout, entity=None):
             col.label(text=inp.name + ':')
 
         col = row.column(align=True)
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.prop(source, 'musgrave_dimensions', text='')
         col.prop(source, 'musgrave_type', text='')
         col.separator()
@@ -437,11 +437,11 @@ def draw_tex_props(source, layout, entity=None):
 
         row = col.row()
         col = row.column(align=True)
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.label(text='Dimensions:')
             if hasattr(source, 'noise_type'):
                 col.label(text='Type:')
-            if is_greater_than_400():
+            if is_bl_newer_than(4):
                 col.label(text='Normalize:')
             else:
                 col.separator()
@@ -451,12 +451,12 @@ def draw_tex_props(source, layout, entity=None):
             col.label(text=inp.name + ':')
 
         col = row.column(align=True)
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.prop(source, 'noise_dimensions', text='')
 
             if hasattr(source, 'noise_type'):
                 col.prop(source, 'noise_type', text='')
-            if is_greater_than_400():
+            if is_bl_newer_than(4):
                 col.prop(source, 'normalize', text='')
             else:
                 col.separator()
@@ -470,16 +470,16 @@ def draw_tex_props(source, layout, entity=None):
         row = col.row()
 
         col = row.column(align=True)
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.label(text='Dimensions:')
         else: col.label(text='Coloring:')
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.label(text='Feature:')
             if source.feature not in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'}:
                 col.label(text='Distance:')
 
-        if is_greater_than_400():
+        if is_bl_newer_than(4):
             col.label(text='Normalize:')
         else:
             col.separator()
@@ -490,18 +490,18 @@ def draw_tex_props(source, layout, entity=None):
 
         col = row.column(align=True)
 
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.prop(source, 'voronoi_dimensions', text='')
         else: col.prop(source, 'coloring', text='')
 
-        if is_greater_than_280():
-            if entity and is_greater_than_281():
+        if is_bl_newer_than(2, 80):
+            if entity and is_bl_newer_than(2, 81):
                 col.prop(entity, 'voronoi_feature', text='')
             else: col.prop(source, 'feature', text='')
             if source.feature not in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'}:
                 col.prop(source, 'distance', text='')
 
-        if is_greater_than_400() and source.feature not in {'N_SPHERE_RADIUS'}:
+        if is_bl_newer_than(4) and source.feature not in {'N_SPHERE_RADIUS'}:
             col.prop(source, 'normalize', text='')
         else:
             col.separator()
@@ -597,8 +597,8 @@ def draw_mask_modifier_stack(layer, mask, layout, ui):
 
         if can_be_expanded:
             if modui.expand_content:
-                icon_value = lib.custom_icons["uncollapsed_modifier"].icon_id
-            else: icon_value = lib.custom_icons["collapsed_modifier"].icon_id
+                icon_value = lib.get_icon('uncollapsed_modifier')
+            else: icon_value = lib.get_icon('collapsed_modifier')
             row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         else:
             row.label(text='', icon_value=lib.get_icon('modifier'))
@@ -608,7 +608,7 @@ def draw_mask_modifier_stack(layer, mask, layout, ui):
         row.context_pointer_set('layer', layer)
         row.context_pointer_set('mask', mask)
         row.context_pointer_set('modifier', m)
-        icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
         row.menu("NODE_MT_y_mask_modifier_menu", text='', icon=icon)
 
         row.prop(m, 'enable', text='')
@@ -654,8 +654,8 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
 
         if can_be_expanded:
             if modui.expand_content:
-                icon_value = lib.custom_icons["uncollapsed_modifier"].icon_id
-            else: icon_value = lib.custom_icons["collapsed_modifier"].icon_id
+                icon_value = lib.get_icon('uncollapsed_modifier')
+            else: icon_value = lib.get_icon('collapsed_modifier')
             row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         else:
             row.label(text='', icon_value=lib.get_icon('modifier'))
@@ -712,10 +712,10 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
         row.context_pointer_set('parent', parent)
         row.context_pointer_set('modifier', m)
         if use_modifier_1:
-            icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+            icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
             row.menu("NODE_MT_y_modifier1_menu", text='', icon=icon)
         else:
-            icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+            icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
             row.menu("NODE_MT_y_modifier_menu", text='', icon=icon)
         row.prop(m, 'enable', text='')
 
@@ -744,7 +744,7 @@ def draw_bake_target_channel(context, layout, bt, letter='r'):
         if getattr(btui, 'expand_' + letter):
             icon_name = 'uncollapsed_' + icon_name
         else: icon_name = 'collapsed_' + icon_name
-        icon_value = lib.custom_icons[icon_name].icon_id
+        icon_value = lib.get_icon(icon_name)
         row.prop(btui, 'expand_' + letter, text='', emboss=False, icon_value=icon_value)
     else:
         row.label(text='', icon_value=lib.get_icon(letter))
@@ -796,7 +796,7 @@ def draw_bake_targets_ui(context, layout, node):
     rcol = row.column(align=True)
     #rcol.context_pointer_set('node', node)
 
-    if is_greater_than_280():
+    if is_bl_newer_than(2, 80):
         rcol.operator("node.y_new_bake_target", icon='ADD', text='')
         rcol.operator("node.y_remove_bake_target", icon='REMOVE', text='')
     else: 
@@ -812,7 +812,7 @@ def draw_bake_targets_ui(context, layout, node):
         if btui.expand_content:
             icon_name = 'uncollapsed_' + icon_name
         else: icon_name = 'collapsed_' + icon_name
-        icon_value = lib.custom_icons[icon_name].icon_id
+        icon_value = lib.get_icon(icon_name)
 
         row = col.row(align=True)
 
@@ -839,7 +839,7 @@ def draw_bake_targets_ui(context, layout, node):
 
         row.label(text='Image: ' + image_name, icon_value=lib.get_icon('image'))
 
-        icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
         row.context_pointer_set('image', image)
         row.menu("NODE_MT_y_bake_target_menu", text='', icon=icon)
         
@@ -866,7 +866,7 @@ def draw_root_channels_ui(context, layout, node):
     if len(yp.channels) > 0:
         pcol = rcol.column()
         if yp.preview_mode: pcol.alert = True
-        if not is_greater_than_280():
+        if not is_bl_newer_than(2, 80):
             pcol.prop(yp, 'preview_mode', text='Preview Mode', icon='RESTRICT_VIEW_OFF')
         else: pcol.prop(yp, 'preview_mode', text='Preview Mode', icon='HIDE_OFF')
 
@@ -876,7 +876,7 @@ def draw_root_channels_ui(context, layout, node):
     rcol = row.column(align=True)
     #rcol.context_pointer_set('node', node)
 
-    if is_greater_than_280():
+    if is_bl_newer_than(2, 80):
         rcol.menu("NODE_MT_y_new_channel_menu", text='', icon='ADD')
         #rcol.operator_menu_enum("node.y_add_new_ypaint_channel", 'type', icon='ADD', text='')
         rcol.operator("node.y_remove_ypaint_channel", icon='REMOVE', text='')
@@ -933,7 +933,7 @@ def draw_root_channels_ui(context, layout, node):
         if chui.expand_content:
             icon_name = 'uncollapsed_' + icon_name
         else: icon_name = 'collapsed_' + icon_name
-        icon_value = lib.custom_icons[icon_name].icon_id
+        icon_value = lib.get_icon(icon_name)
         row.prop(chui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         #else:
         #    row.prop(chui, 'expand_content', text='', emboss=True, icon=lib.channel_icon_dict[channel.type])
@@ -943,7 +943,7 @@ def draw_root_channels_ui(context, layout, node):
         #if channel.type != 'NORMAL':
         row.context_pointer_set('parent', channel)
         row.context_pointer_set('channel_ui', chui)
-        icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
         row.menu("NODE_MT_y_channel_special_menu", icon=icon, text='')
 
         if chui.expand_content:
@@ -974,7 +974,7 @@ def draw_root_channels_ui(context, layout, node):
                     brow.prop(inp,'default_value', text='')
 
                 if yp.use_baked and not channel.no_layer_using:
-                    brow.label(text='', icon_value=lib.custom_icons['texture'].icon_id)
+                    brow.label(text='', icon_value=lib.get_icon('texture'))
                 elif len(inp.links) > 0:
                     brow.label(text='', icon='LINKED')
 
@@ -988,8 +988,8 @@ def draw_root_channels_ui(context, layout, node):
                 brow = bcol.row(align=True)
                 #brow.label(text='', icon_value=lib.get_icon('input'))
                 if chui.expand_alpha_settings:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 brow.prop(chui, 'expand_alpha_settings', text='', emboss=False, icon_value=icon_value)
                 if channel.enable_alpha:
                     inp_alpha = node.inputs[channel.io_index+1]
@@ -1002,7 +1002,7 @@ def draw_root_channels_ui(context, layout, node):
                 if not yp.use_baked:
                     brow.prop(channel, 'enable_alpha', text='')
                 else:
-                    brow.label(text='', icon_value=lib.custom_icons['texture'].icon_id)
+                    brow.label(text='', icon_value=lib.get_icon('texture'))
 
                 if chui.expand_alpha_settings:
                     brow = bcol.row(align=True)
@@ -1011,9 +1011,9 @@ def draw_root_channels_ui(context, layout, node):
                     bbcol = bbox.column() #align=True)
                     bbcol.active = channel.enable_alpha
 
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
 
-                        if is_greater_than_420() and engine == 'BLENDER_EEVEE_NEXT':
+                        if is_bl_newer_than(4, 2) and engine == 'BLENDER_EEVEE_NEXT':
                             brow = bbcol.row(align=True)
                             brow.label(text='Transparent Shadows:')
                             brow.prop(mat, 'use_transparent_shadow', text='')
@@ -1056,19 +1056,19 @@ def draw_root_channels_ui(context, layout, node):
                 brow = bcol.row(align=True)
                 #if channel.enable_smooth_bump:
                 if chui.expand_smooth_bump_settings:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 brow.prop(chui, 'expand_smooth_bump_settings', text='', emboss=False, icon_value=icon_value)
                 #else:
                 #    brow.label(text='', icon_value=lib.get_icon('input'))
-                if is_greater_than_280():
+                if is_bl_newer_than(2, 80):
                     brow.label(text='Smoother Bump:')
                 else: brow.label(text='Smooth Bump:')
 
                 if not yp.use_baked:
                     brow.prop(channel, 'enable_smooth_bump', text='')
                 else:
-                    brow.label(text='', icon_value=lib.custom_icons['texture'].icon_id)
+                    brow.label(text='', icon_value=lib.get_icon('texture'))
 
                 if chui.expand_smooth_bump_settings: # and channel.enable_smooth_bump:
                     brow = bcol.row(align=True)
@@ -1101,7 +1101,7 @@ def draw_root_channels_ui(context, layout, node):
 
                         brow.prop(channel, 'enable_smooth_normal_tweak', text='')
                     else:
-                        brow.label(text='', icon_value=lib.custom_icons['texture'].icon_id)
+                        brow.label(text='', icon_value=lib.get_icon('texture'))
 
                 brow = bcol.row(align=True)
 
@@ -1117,7 +1117,7 @@ def draw_root_channels_ui(context, layout, node):
 
                     brow.prop(channel, 'enable_height_tweak', text='')
                 else:
-                    brow.label(text='', icon_value=lib.custom_icons['texture'].icon_id)
+                    brow.label(text='', icon_value=lib.get_icon('texture'))
 
                 # Put parallax settings to experimental since it's very imprescise
                 if ypup.show_experimental or channel.enable_parallax:
@@ -1125,8 +1125,8 @@ def draw_root_channels_ui(context, layout, node):
                     brow.active = yp.use_baked and not channel.enable_subdiv_setup and not yp.enable_baked_outside
 
                     if chui.expand_parallax_settings:
-                        icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                    else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                        icon_value = lib.get_icon('uncollapsed_input')
+                    else: icon_value = lib.get_icon('collapsed_input')
                     brow.prop(chui, 'expand_parallax_settings', text='', emboss=False, icon_value=icon_value)
 
                     brow.label(text='Parallax:')
@@ -1164,8 +1164,8 @@ def draw_root_channels_ui(context, layout, node):
                 brow = bcol.row(align=True)
 
                 if chui.expand_subdiv_settings:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 brow.prop(chui, 'expand_subdiv_settings', text='', emboss=False, icon_value=icon_value)
 
                 brow.label(text='Displacement Setup:')
@@ -1197,7 +1197,7 @@ def draw_root_channels_ui(context, layout, node):
                     brow.label(text='Max Polygons:')
                     brow.prop(channel, 'subdiv_on_max_polys', text='')
 
-                    if is_greater_than_278():
+                    if is_bl_newer_than(2, 78):
                         brow = bbcol.row(align=True)
                         brow.label(text='Adaptive (Cycles Only):')
                         brow.prop(channel, 'subdiv_adaptive', text='')
@@ -1225,11 +1225,11 @@ def draw_root_channels_ui(context, layout, node):
                 split.prop(channel, 'colorspace', text='')
 
                 # Bake to vertex color settings
-                if is_greater_than_292():
+                if is_bl_newer_than(2, 92):
                     brow = bcol.row(align=True)
                     if chui.expand_bake_to_vcol_settings:
-                        ch_icon = lib.custom_icons["uncollapsed_input"].icon_id
-                    else: ch_icon = lib.custom_icons["collapsed_input"].icon_id
+                        ch_icon = lib.get_icon('uncollapsed_input')
+                    else: ch_icon = lib.get_icon('collapsed_input')
                     brow.prop(chui, 'expand_bake_to_vcol_settings', text='', emboss=False, icon_value=ch_icon)
                     vcols = get_vertex_colors(context.object)
                     if yp.use_baked and channel.bake_to_vcol_name in vcols:
@@ -1262,8 +1262,8 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
     row = layout.row(align=True)
     if image:
         if lui.expand_content:
-            icon_value = lib.custom_icons["uncollapsed_image"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_image"].icon_id
+            icon_value = lib.get_icon('uncollapsed_image')
+        else: icon_value = lib.get_icon('collapsed_image')
         row.prop(lui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         if image.yia.is_image_atlas or image.yua.is_udim_atlas:
             row.label(text=layer.name)
@@ -1271,8 +1271,8 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
     elif vcol:
         #if len(layer.modifiers) > 0:
         if lui.expand_content:
-            icon_value = lib.custom_icons["uncollapsed_vertex_color"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_vertex_color"].icon_id
+            icon_value = lib.get_icon('uncollapsed_vertex_color')
+        else: icon_value = lib.get_icon('collapsed_vertex_color')
         row.prop(lui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         #else:
         #    row.label(text='', icon_value=lib.get_icon('vertex_color'))
@@ -1280,16 +1280,16 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
     elif layer.type == 'BACKGROUND':
         if len(layer.modifiers) > 0:
             if lui.expand_content:
-                icon_value = lib.custom_icons["uncollapsed_background"].icon_id
-            else: icon_value = lib.custom_icons["collapsed_background"].icon_id
+                icon_value = lib.get_icon('uncollapsed_background')
+            else: icon_value = lib.get_icon('collapsed_background')
             row.prop(lui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         else:
             row.label(text='', icon_value=lib.get_icon('background'))
         row.label(text=layer.name)
     elif layer.type == 'COLOR':
         if lui.expand_content:
-            icon_value = lib.custom_icons["uncollapsed_color"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_color"].icon_id
+            icon_value = lib.get_icon('uncollapsed_color')
+        else: icon_value = lib.get_icon('collapsed_color')
         row.prop(lui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         row.label(text=layer.name)
     elif layer.type == 'GROUP':
@@ -1297,15 +1297,15 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
         row.label(text=layer.name)
     elif layer.type == 'HEMI':
         if lui.expand_content:
-            icon_value = lib.custom_icons["uncollapsed_hemi"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_hemi"].icon_id
+            icon_value = lib.get_icon('uncollapsed_hemi')
+        else: icon_value = lib.get_icon('collapsed_hemi')
         row.prop(lui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         row.label(text=layer.name)
     else:
         title = source.bl_idname.replace('ShaderNodeTex', '')
         if lui.expand_content:
-            icon_value = lib.custom_icons["uncollapsed_texture"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_texture"].icon_id
+            icon_value = lib.get_icon('uncollapsed_texture')
+        else: icon_value = lib.get_icon('collapsed_texture')
         row.prop(lui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         row.label(text=title)
 
@@ -1318,7 +1318,7 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
         row.operator('node.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
 
     #if layer.type != 'GROUP':
-    icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+    icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
     row.menu("NODE_MT_y_layer_special_menu", icon=icon, text='')
 
     if layer.type == 'GROUP': return
@@ -1350,8 +1350,8 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
         else: suffix = 'texture'
 
         if lui.expand_source:
-            icon_value = lib.custom_icons["uncollapsed_" + suffix].icon_id
-        else: icon_value = lib.custom_icons["collapsed_" + suffix].icon_id
+            icon_value = lib.get_icon('uncollapsed_' + suffix)
+        else: icon_value = lib.get_icon('collapsed_' + suffix)
         row.prop(lui, 'expand_source', text='', emboss=False, icon_value=icon_value)
         #else:
         #    if layer.type == 'IMAGE':
@@ -1398,8 +1398,8 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
             row = rcol.row(align=True)
 
             if lui.expand_vector:
-                icon_value = lib.custom_icons["uncollapsed_uv"].icon_id
-            else: icon_value = lib.custom_icons["collapsed_uv"].icon_id
+                icon_value = lib.get_icon('uncollapsed_uv')
+            else: icon_value = lib.get_icon('collapsed_uv')
             row.prop(lui, 'expand_vector', text='', emboss=False, icon_value=icon_value)
             #else:
             #    row.prop(lui, 'expand_vector', text='', emboss=True, icon_value=lib.get_icon('uv'))
@@ -1429,7 +1429,7 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
                 split.prop(layer, 'texcoord_type', text='')
 
             if layer.texcoord_type == 'UV':
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 row.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
 
             if lui.expand_vector:
@@ -1458,9 +1458,10 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
                         draw_input_prop(splits, layer, 'decal_distance_value')
 
                         boxcol.context_pointer_set('entity', layer)
-                        if is_greater_than_280():
+                        if is_bl_newer_than(2, 80):
                             boxcol.operator('node.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
                         else: boxcol.operator('node.y_select_decal_object', icon='EMPTY_DATA')
+                        boxcol.operator('node.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
 
                     if layer.texcoord_type != 'Decal':
                         mapping = get_layer_mapping(layer)
@@ -1470,7 +1471,7 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
                         rrow.prop(mapping, 'vector_type', text='')
 
                         rrow = boxcol.row()
-                        if is_greater_than_281():
+                        if is_bl_newer_than(2, 81):
                             mcol = rrow.column()
                             mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
                             mcol = rrow.column()
@@ -1546,8 +1547,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
     
     row = layout.row(align=True)
     if lui.expand_channels:
-        icon_value = lib.custom_icons["uncollapsed_channels"].icon_id
-    else: icon_value = lib.custom_icons["collapsed_channels"].icon_id
+        icon_value = lib.get_icon('uncollapsed_channels')
+    else: icon_value = lib.get_icon('collapsed_channels')
     row.prop(lui, 'expand_channels', text='', emboss=False, icon_value=icon_value)
 
     row.label(text=label)
@@ -1573,7 +1574,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
     if not lui.expand_channels:
         return
 
-    row.prop(ypui, 'expand_channels', text='', emboss=True, icon_value = lib.custom_icons['channels'].icon_id)
+    row.prop(ypui, 'expand_channels', text='', emboss=True, icon_value = lib.get_icon('channels'))
 
     rrow = layout.row(align=True)
     rrow.label(text='', icon='BLANK1')
@@ -1622,7 +1623,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
             if chui.expand_content:
                 icon_name = 'uncollapsed_' + icon_name
             else: icon_name = 'collapsed_' + icon_name
-        icon_value = lib.custom_icons[icon_name].icon_id
+        icon_value = lib.get_icon(icon_name)
         if expandable:
             row.prop(chui, 'expand_content', text='', emboss=False, icon_value=icon_value)
         else: row.label(text='', icon_value=icon_value)
@@ -1641,7 +1642,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
         row.context_pointer_set('layer', layer)
         row.context_pointer_set('channel_ui', chui)
 
-        icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
         row.menu("NODE_MT_y_layer_channel_special_menu", icon=icon, text='')
 
         if ypui.expand_channels:
@@ -1675,8 +1676,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
 
                 brow = mcol.row(align=True)
                 if chui.expand_transition_bump_settings:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 brow.prop(chui, 'expand_transition_bump_settings', text='', emboss=False, icon_value=icon_value)
                 #else:
                 #    brow.prop(chui, 'expand_transition_bump_settings', text='', emboss=True, icon='MOD_MASK')
@@ -1686,7 +1687,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                     draw_input_prop(brow, ch, 'transition_bump_distance')
 
                 brow.context_pointer_set('parent', ch)
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 brow.menu("NODE_MT_y_transition_bump_menu", text='', icon=icon)
 
                 brow.prop(ch, 'enable_transition_bump', text='')
@@ -1784,8 +1785,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
             #row.active = not is_valid_to_remove_bump_nodes(layer, ch)
 
             if chui.expand_bump_settings:
-                icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-            else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                icon_value = lib.get_icon('uncollapsed_input')
+            else: icon_value = lib.get_icon('collapsed_input')
             row.prop(chui, 'expand_bump_settings', text='', emboss=False, icon_value=icon_value)
 
             if layer.type == 'GROUP':
@@ -1878,15 +1879,15 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                     row.label(text='', icon_value=lib.get_icon('input'))
                 else:
                     if chui.expand_transition_ramp_settings:
-                        icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                    else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                        icon_value = lib.get_icon('uncollapsed_input')
+                    else: icon_value = lib.get_icon('collapsed_input')
                     row.prop(chui, 'expand_transition_ramp_settings', text='', emboss=False, icon_value=icon_value)
                 row.label(text='Transition Ramp:')
                 if ch.enable_transition_ramp and not chui.expand_transition_ramp_settings:
                     draw_input_prop(row, ch, 'transition_ramp_intensity_value')
 
                 row.context_pointer_set('parent', ch)
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 row.menu("NODE_MT_y_transition_ramp_menu", text='', icon=icon)
 
                 row.prop(ch, 'enable_transition_ramp', text='')
@@ -1924,8 +1925,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                 row = mcol.row(align=True)
                 row.active = bump_ch_found #and layer.type != 'BACKGROUND'
                 if chui.expand_transition_ao_settings:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 row.prop(chui, 'expand_transition_ao_settings', text='', emboss=False, icon_value=icon_value)
                 row.label(text='Transition AO:')
                 if ch.enable_transition_ao and not chui.expand_transition_ao_settings:
@@ -1933,7 +1934,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
 
                 row.context_pointer_set('layer', layer)
                 row.context_pointer_set('parent', ch)
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 row.menu("NODE_MT_y_transition_ao_menu", text='', icon=icon)
 
                 row.prop(ch, 'enable_transition_ao', text='')
@@ -1994,8 +1995,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                     row.label(text='', icon_value=lib.get_icon('input'))
                 else:
                     if chui.expand_source:
-                        icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                    else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                        icon_value = lib.get_icon('uncollapsed_input')
+                    else: icon_value = lib.get_icon('collapsed_input')
                     row.prop(chui, 'expand_source', text='', emboss=False, icon_value=icon_value)
 
                 label_str = 'Override'
@@ -2025,7 +2026,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                     else: draw_input_prop(row, ch, 'override_color')
                 row.prop(ch, 'override', text='')
 
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 row.menu("NODE_MT_y_replace_channel_override_menu", icon=icon, text='')
 
                 ch_source = None
@@ -2060,8 +2061,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                 row.label(text='', icon_value=lib.get_icon('input'))
             else:
                 if chui.expand_source_1:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 row.prop(chui, 'expand_source_1', text='', emboss=False, icon_value=icon_value)
 
             label_str = 'Override Normal'
@@ -2086,7 +2087,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
 
             row.prop(ch, 'override_1', text='')
 
-            icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+            icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
             row.menu("NODE_MT_y_replace_channel_override_1_menu", icon=icon, text='')
 
             ch_source_1 = None
@@ -2105,7 +2106,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
 
         # Layer input
         if (layer.type not in {'IMAGE', 'VCOL', 'BACKGROUND', 'COLOR', 'GROUP', 'HEMI', 'MUSGRAVE'} and not 
-            (is_greater_than_281() and layer.type == 'VORONOI' and layer.voronoi_feature in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'})
+            (is_bl_newer_than(2, 81) and layer.type == 'VORONOI' and layer.voronoi_feature in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'})
             ):
             row = mcol.row(align=True)
 
@@ -2114,8 +2115,8 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
 
             if input_settings_available:
                 if chui.expand_input_settings:
-                    icon_value = lib.custom_icons["uncollapsed_input"].icon_id
-                else: icon_value = lib.custom_icons["collapsed_input"].icon_id
+                    icon_value = lib.get_icon('uncollapsed_input')
+                else: icon_value = lib.get_icon('collapsed_input')
                 row.prop(chui, 'expand_input_settings', text='', emboss=False, icon_value=icon_value)
             else:
                 row.label(text='', icon_value=lib.get_icon('input'))
@@ -2165,11 +2166,11 @@ def draw_layer_masks(context, layout, layer):
     row = col.row(align=True)
     if len(layer.masks) > 0:
         if lui.expand_masks:
-            icon_value = lib.custom_icons["uncollapsed_mask"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_mask"].icon_id
+            icon_value = lib.get_icon('uncollapsed_mask')
+        else: icon_value = lib.get_icon('collapsed_mask')
         row.prop(lui, 'expand_masks', text='', emboss=False, icon_value=icon_value)
     else: 
-        icon_value = lib.custom_icons["mask"].icon_id
+        icon_value = lib.get_icon('mask')
         row.label(text='', icon_value=icon_value)
         #row.label(text='', icon='MOD_MASK')
 
@@ -2195,7 +2196,7 @@ def draw_layer_masks(context, layout, layer):
 
     row.label(text=label)
 
-    if is_greater_than_280():
+    if is_bl_newer_than(2, 80):
         row.menu("NODE_MT_y_add_layer_mask_menu", text='', icon='ADD')
     else: row.menu('NODE_MT_y_add_layer_mask_menu', text='', icon='ZOOMIN')
 
@@ -2216,8 +2217,8 @@ def draw_layer_masks(context, layout, layer):
         row.active = mask.enable
 
         if maskui.expand_content:
-            icon_value = lib.custom_icons["uncollapsed_mask"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_mask"].icon_id
+            icon_value = lib.get_icon('uncollapsed_mask')
+        else: icon_value = lib.get_icon('collapsed_mask')
         row.prop(maskui, 'expand_content', text='', emboss=False, icon_value=icon_value)
 
         mask_image = None
@@ -2272,7 +2273,7 @@ def draw_layer_masks(context, layout, layer):
 
         row.context_pointer_set('mask', mask)
 
-        icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
         row.menu("NODE_MT_y_layer_mask_menu", text='', icon=icon)
 
         row = row.row(align=True)
@@ -2313,8 +2314,8 @@ def draw_layer_masks(context, layout, layer):
             else:
                 suffix = 'texture' 
             if maskui.expand_source:
-                icon_value = lib.custom_icons["uncollapsed_" + suffix].icon_id
-            else: icon_value = lib.custom_icons["collapsed_" + suffix].icon_id
+                icon_value = lib.get_icon('uncollapsed_' + suffix)
+            else: icon_value = lib.get_icon('collapsed_' + suffix)
             rrow.prop(maskui, 'expand_source', text='', emboss=False, icon_value=icon_value)
 
         text_source = pgettext_iface('Source: ')
@@ -2351,8 +2352,8 @@ def draw_layer_masks(context, layout, layer):
                 rbox.operator("node.y_bake_entity_to_image", text='Rebake', icon_value=lib.get_icon('bake'))
 
         # Input row
-        if (mask.type not in {'COLOR_ID', 'HEMI', 'OBJECT_INDEX', 'BACKFACE', 'EDGE_DETECT', 'MODIFIER'} and (is_greater_than_292() or mask.type != 'VCOL') and
-            not (is_greater_than_281() and mask.type == 'VORONOI' and mask.voronoi_feature in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'})
+        if (mask.type not in {'COLOR_ID', 'HEMI', 'OBJECT_INDEX', 'BACKFACE', 'EDGE_DETECT', 'MODIFIER'} and (is_bl_newer_than(2, 92) or mask.type != 'VCOL') and
+            not (is_bl_newer_than(2, 81) and mask.type == 'VORONOI' and mask.voronoi_feature in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'})
             ):
             rrow = rrcol.row(align=True)
             rrow.label(text='', icon_value=lib.get_icon('input'))
@@ -2366,8 +2367,8 @@ def draw_layer_masks(context, layout, layer):
             rrow = rrcol.row(align=True)
 
             if maskui.expand_vector:
-                icon_value = lib.custom_icons["uncollapsed_uv"].icon_id
-            else: icon_value = lib.custom_icons["collapsed_uv"].icon_id
+                icon_value = lib.get_icon('uncollapsed_uv')
+            else: icon_value = lib.get_icon('collapsed_uv')
             rrow.prop(maskui, 'expand_vector', text='', emboss=False, icon_value=icon_value)
 
             splits = split_layout(rrow, 0.3)
@@ -2384,7 +2385,7 @@ def draw_layer_masks(context, layout, layer):
                 rrrow.prop_search(mask, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
 
                 rrow.context_pointer_set('mask', mask)
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
             elif mask.type == 'IMAGE' and mask.texcoord_type in {'Generated', 'Object'} and not maskui.expand_vector:
                 rrrow = split_layout(splits, 0.5, align=True)
@@ -2427,9 +2428,10 @@ def draw_layer_masks(context, layout, layer):
                         draw_input_prop(splits, mask, 'decal_distance_value')
 
                         boxcol.context_pointer_set('entity', mask)
-                        if is_greater_than_280():
+                        if is_bl_newer_than(2, 80):
                             boxcol.operator('node.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
                         else: boxcol.operator('node.y_select_decal_object', icon='EMPTY_DATA')
+                        boxcol.operator('node.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
 
                     if mask.texcoord_type != 'Decal':
                         mapping = get_mask_mapping(mask)
@@ -2439,7 +2441,7 @@ def draw_layer_masks(context, layout, layer):
                         rrow.prop(mapping, 'vector_type', text='')
 
                         rrow = boxcol.row()
-                        if is_greater_than_281():
+                        if is_bl_newer_than(2, 81):
                             mcol = rrow.column()
                             mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
                             mcol = rrow.column()
@@ -2481,8 +2483,8 @@ def draw_layer_masks(context, layout, layer):
         # Mask Channels row
         rrow = rrcol.row(align=True)
         if maskui.expand_channels:
-            icon_value = lib.custom_icons["uncollapsed_channels"].icon_id
-        else: icon_value = lib.custom_icons["collapsed_channels"].icon_id
+            icon_value = lib.get_icon('uncollapsed_channels')
+        else: icon_value = lib.get_icon('collapsed_channels')
         rrow.prop(maskui, 'expand_channels', text='', emboss=False, icon_value=icon_value)
         rrow.label(text='Channels')
 
@@ -2499,7 +2501,7 @@ def draw_layer_masks(context, layout, layer):
                 rrow.active = layer.channels[k].enable
                 root_ch = yp.channels[k]
                 rrow.label(text='', 
-                        icon_value=lib.custom_icons[lib.channel_custom_icon_dict[root_ch.type]].icon_id)
+                        icon_value=lib.get_icon(lib.channel_custom_icon_dict[root_ch.type]))
                 rrow.label(text=root_ch.name, translate=False)
                 rrow.prop(c, 'enable', text='')
 
@@ -2534,7 +2536,7 @@ def draw_layers_ui(context, layout, node):
             baked_vcol_node = nodes.get(root_ch.baked_vcol)
 
             icon_name = lib.channel_custom_icon_dict[root_ch.type]
-            icon_value = lib.custom_icons[icon_name].icon_id
+            icon_value = lib.get_icon(icon_name)
 
             if not baked or not baked.image or root_ch.no_layer_using:
                 col.label(text=root_ch.name + " channel hasn't been baked yet!", icon_value=icon_value)
@@ -2546,7 +2548,7 @@ def draw_layers_ui(context, layout, node):
                 row.context_pointer_set('root_ch', root_ch)
                 row.context_pointer_set('image', baked.image)
 
-                icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
                 row.menu("NODE_MT_y_baked_image_menu", text='', icon=icon)
 
                 row = col.row(align=True)
@@ -2913,35 +2915,35 @@ def draw_layers_ui(context, layout, node):
         prow = split_layout(rcol, 0.667, align=True)
 
         if yp.layer_preview_mode: prow.alert = True
-        if not is_greater_than_280():
+        if not is_bl_newer_than(2, 80):
             prow.prop(yp, 'layer_preview_mode', text='Preview Mode', icon='RESTRICT_VIEW_OFF')
         else: prow.prop(yp, 'layer_preview_mode', text='Preview Mode', icon='HIDE_OFF')
         #prow.alert = yp.mask_preview_mode and yp.layer_preview_mode
-        #icon_value = lib.custom_icons["mask"].icon_id
+        #icon_value = lib.get_icon("mask)"
         prow.prop(yp, 'layer_preview_mode_type', text='') #, icon_only=True) #, expand=True)
 
     rcol.template_list("NODE_UL_YPaint_layers", "", yp,
             "layers", yp, "active_layer_index", rows=5, maxrows=5)  
 
     rcol = row.column(align=True)
-    if is_greater_than_280():
+    if is_bl_newer_than(2, 80):
         rcol.menu("NODE_MT_y_new_layer_menu", text='', icon='ADD')
     else: rcol.menu("NODE_MT_y_new_layer_menu", text='', icon='ZOOMIN')
 
     if layer:
 
-        if has_childrens(layer): # or (image and not image.packed_file):
+        if has_children(layer): # or (image and not image.packed_file):
 
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 rcol.operator("node.y_remove_layer_menu", icon='REMOVE', text='')
             else: rcol.operator("node.y_remove_layer_menu", icon='ZOOMOUT', text='')
 
         else: 
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 c = rcol.operator("node.y_remove_layer", icon='REMOVE', text='')
             else: c = rcol.operator("node.y_remove_layer", icon='ZOOMOUT', text='')
 
-            c.remove_childs = False
+            c.remove_children = False
 
         if is_top_member(layer):
             c = rcol.operator("node.y_move_in_out_layer_group_menu", text='', icon='TRIA_UP')
@@ -2975,7 +2977,7 @@ def draw_layers_ui(context, layout, node):
 
     else:
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             rcol.operator("node.y_remove_layer", icon='REMOVE', text='')
         else: rcol.operator("node.y_remove_layer", icon='ZOOMOUT', text='')
 
@@ -3007,7 +3009,7 @@ def draw_layers_ui(context, layout, node):
 
         # Check if AO is enabled or not
         scene = bpy.context.scene
-        if is_greater_than_293() and not scene.eevee.use_gtao and scene.render.engine != 'BLENDER_EEVEE_NEXT':
+        if is_bl_newer_than(2, 93) and not scene.eevee.use_gtao and scene.render.engine != 'BLENDER_EEVEE_NEXT':
             edge_detect_found = False
             for l in yp.layers:
                 for m in l.masks:
@@ -3067,26 +3069,26 @@ def draw_layers_ui(context, layout, node):
                 #row.separator()
                 row.operator('mesh.y_vcol_fill', text='White').color_option = 'WHITE'
                 row.operator('mesh.y_vcol_fill', text='Black').color_option = 'BLACK'
-                #if is_greater_than_280():
+                #if is_bl_newer_than(2, 80):
                 #    row.operator("mesh.y_vcol_fill", text='Transparent').color_option = 'TRANSPARENT'
                 row.separator()
                 row.operator('mesh.y_vcol_fill', text='Color').color_option = 'CUSTOM'
 
                 row.prop(ve, "color", text="", icon='COLOR')
 
-            elif obj.mode == 'VERTEX_PAINT' and is_greater_than_292() and ((layer.type == 'VCOL' and not mask_vcol) or (mask_vcol and mask.source_input == 'ALPHA')) and not override_vcol:
+            elif obj.mode == 'VERTEX_PAINT' and is_bl_newer_than(2, 92) and ((layer.type == 'VCOL' and not mask_vcol) or (mask_vcol and mask.source_input == 'ALPHA')) and not override_vcol:
                 bbox = col.box()
                 row = bbox.row(align=True)
                 row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
 
-            elif obj.mode == 'SCULPT' and is_greater_than_320() and ((layer.type == 'VCOL' and not mask_vcol) or (mask_vcol and mask.source_input == 'ALPHA')) and not override_vcol:
+            elif obj.mode == 'SCULPT' and is_bl_newer_than(3, 2) and ((layer.type == 'VCOL' and not mask_vcol) or (mask_vcol and mask.source_input == 'ALPHA')) and not override_vcol:
 
                 bbox = col.box()
                 row = bbox.row(align=True)
                 row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
 
         in_texture_paint_mode = obj.mode == 'TEXTURE_PAINT' or (
-                is_greater_than_430() and obj.mode == 'SCULPT' and 
+                is_bl_newer_than(4, 3) and obj.mode == 'SCULPT' and 
                 # Assuming sculpt texture paint is already stable or enabled in experimental feature
                 (not hasattr(context.preferences.experimental, 'use_sculpt_texture_paint') or context.preferences.experimental.use_sculpt_texture_paint)
                 )
@@ -3106,7 +3108,7 @@ def draw_layers_ui(context, layout, node):
                 row.operator('paint.y_toggle_eraser', text='Disable Eraser')
                 row.alert = False
 
-        elif obj.mode == 'VERTEX_PAINT' and is_greater_than_280(): 
+        elif obj.mode == 'VERTEX_PAINT' and is_bl_newer_than(2, 80): 
             brush = context.tool_settings.vertex_paint.brush
             if mask_vcol and mask.source_input == 'RGB' and brush.name == eraser_names[obj.mode]:
                 bbox = col.box()
@@ -3115,7 +3117,7 @@ def draw_layers_ui(context, layout, node):
                 row.operator('paint.y_toggle_eraser', text='Disable Eraser')
                 row.alert = False
 
-        elif obj.mode == 'SCULPT' and is_greater_than_320(): 
+        elif obj.mode == 'SCULPT' and is_bl_newer_than(3, 2): 
             brush = context.tool_settings.sculpt.brush
             if mask_vcol and mask.source_input == 'RGB' and brush.name == eraser_names[obj.mode]:
                 bbox = col.box()
@@ -3143,7 +3145,7 @@ def draw_layers_ui(context, layout, node):
                 row.alert = True
                 row.operator('node.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
 
-        if is_a_mesh and is_greater_than_320():
+        if is_a_mesh and is_bl_newer_than(3, 2):
             height_layer_ch = get_height_channel(layer)
             if height_layer_ch and height_layer_ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
                 bbox = col.box()
@@ -3182,7 +3184,7 @@ def main_draw(self, context):
 
     # Timer
     if wm.yptimer.time != '':
-        print('INFO: Scene is updated at', '{:0.2f}'.format((time.time() - float(wm.yptimer.time)) * 1000), 'ms!')
+        print('INFO: Scene is updated in', '{:0.2f}'.format((time.time() - float(wm.yptimer.time)) * 1000), 'ms!')
         wm.yptimer.time = ''
 
     # Update ui props first
@@ -3231,7 +3233,7 @@ def main_draw(self, context):
         row.label(text=text_object + obj.name)
     else: row.label(text=text_object + '-')
 
-    if not is_greater_than_280():
+    if not is_bl_newer_than(2, 80):
         row.menu("NODE_MT_ypaint_about_menu", text='', icon='INFO')
     else: row.popover("NODE_PT_ypaint_about_popover", text='', icon='INFO')
 
@@ -3242,7 +3244,7 @@ def main_draw(self, context):
         #row = box.row()
 
     # HACK: Create split layout to load all icons (Only for Blender 3.2+)
-    if is_greater_than_320() and not wm.ypprops.all_icons_loaded:
+    if is_bl_newer_than(3, 2) and not wm.ypprops.all_icons_loaded:
         split = split_layout(layout, 1.0)
         row = split.row(align=True)
     else:
@@ -3256,7 +3258,7 @@ def main_draw(self, context):
     else: row.label(text=text_material + '-')
 
     # HACK: Load all icons earlier so no missing icons possible (Only for Blender 3.2+)
-    if is_greater_than_320() and not wm.ypprops.all_icons_loaded:
+    if is_bl_newer_than(3, 2) and not wm.ypprops.all_icons_loaded:
         wm.ypprops.all_icons_loaded = True
         row.label(text='', icon='BLANK1')
         folder = get_addon_filepath() + 'icons' + os.sep
@@ -3268,8 +3270,9 @@ def main_draw(self, context):
         invisible_row = s2.row(align=False)
         # Load all icons on invisible area of the screen
         for i, f in enumerate(os.listdir(folder)):
-            icon_name = f.replace('_icon.png', '')
-            invisible_row.label(text='', icon_value=lib.get_icon(icon_name))
+            if f.endswith('.png'):
+                icon_name = f.replace('_icon.png', '')
+                invisible_row.label(text='', icon_value=lib.get_icon(icon_name))
 
     if ypui.show_materials:
         is_sortable = len(obj.material_slots) > 1
@@ -3280,7 +3283,7 @@ def main_draw(self, context):
         row = box.row()
         row.template_list("MATERIAL_UL_matslots", "", obj, "material_slots", obj, "active_material_index", rows=rows)
         col = row.column(align=True)
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.operator("object.material_slot_add", icon='ADD', text="")
             col.operator("object.material_slot_remove", icon='REMOVE', text="")
         else:
@@ -3327,7 +3330,7 @@ def main_draw(self, context):
     row.label(text=node.node_tree.name)
     #row.prop(node.node_tree, 'name', text='')
 
-    icon = 'PREFERENCES' if is_greater_than_280() else 'SCRIPTWIN'
+    icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
     row.menu("NODE_MT_ypaint_special_menu", text='', icon=icon)
 
     # Check for baked node
@@ -3580,7 +3583,7 @@ def is_output_unconnected(node, index, root_ch=None):
     yp = node.node_tree.yp
     unconnected = len(node.outputs[index].links) == 0 and not (yp.use_baked and yp.enable_baked_outside)
     if root_ch and root_ch.type == 'NORMAL':
-        unconnected &= not (not is_greater_than_280() and yp.use_baked and root_ch.subdiv_adaptive)
+        unconnected &= not (not is_bl_newer_than(2, 80) and yp.use_baked and root_ch.subdiv_adaptive)
     return unconnected
 
 def is_height_input_connected_but_has_no_start_process(node, root_ch):
@@ -3616,7 +3619,7 @@ class NODE_UL_YPaint_bake_targets(bpy.types.UIList):
 
             # Asterisk icon to indicate dirty image
             if image.is_dirty:
-                row.label(text='', icon_value=lib.custom_icons['asterisk'].icon_id)
+                row.label(text='', icon_value=lib.get_icon('asterisk'))
 
             # Indicate packed image
             if image.packed_file:
@@ -3637,7 +3640,7 @@ class NODE_UL_YPaint_channels(bpy.types.UIList):
 
         row = layout.row()
 
-        icon_value = lib.custom_icons[lib.channel_custom_icon_dict[item.type]].icon_id
+        icon_value = lib.get_icon(lib.channel_custom_icon_dict[item.type])
         row.prop(item, 'name', text='', emboss=False, icon_value=icon_value)
 
         if not yp.use_baked or item.no_layer_using:
@@ -3955,7 +3958,7 @@ class NODE_UL_YPaint_layers(bpy.types.UIList):
         if active_image:
             # Asterisk icon to indicate dirty image
             if active_image.is_dirty:
-                row.label(text='', icon_value=lib.custom_icons['asterisk'].icon_id)
+                row.label(text='', icon_value=lib.get_icon('asterisk'))
 
             # Indicate packed image
             if active_image.packed_file:
@@ -4017,28 +4020,28 @@ class NODE_UL_YPaint_layers(bpy.types.UIList):
             #row.active = is_hidden
             row.active = layer.enable_masks
             if layer.enable_masks:
-                icon_value = lib.custom_icons["mask"].icon_id
-            else: icon_value = lib.custom_icons["disabled_mask"].icon_id
+                icon_value = lib.get_icon("mask")
+            else: icon_value = lib.get_icon("disabled_mask")
             row.prop(layer, 'enable_masks', emboss=False, text='', icon_value=icon_value)
             #row.prop(layer, 'enable_masks', emboss=False, text='', icon='MOD_MASK')
 
         # Layer intensity
         row = master.row()
         row.scale_x = 0.4
-        if is_greater_than_300():
+        if is_bl_newer_than(3):
             row.emboss = 'NONE_OR_STATUS'
-        elif is_greater_than_292():
+        elif is_bl_newer_than(2, 92):
             row.emboss = 'UI_EMBOSS_NONE_OR_STATUS'
-        elif is_greater_than_280(): row.emboss = 'NONE'
+        elif is_bl_newer_than(2, 80): row.emboss = 'NONE'
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             draw_input_prop(row, layer, 'intensity_value')
         else: draw_input_prop(row, layer, 'intensity_value', emboss=False)          
 
         # Layer visibility
         row = master.row()
         row.active = is_hidden
-        if not is_greater_than_280():
+        if not is_bl_newer_than(2, 80):
             if layer.enable: eye_icon = 'RESTRICT_VIEW_OFF'
             else: eye_icon = 'RESTRICT_VIEW_ON'
         else:
@@ -4070,7 +4073,7 @@ class YPAssetBrowserMenu(bpy.types.Menu):
 
 def draw_yp_asset_browser_menu(self, context):
 
-    assets = context.selected_assets if is_greater_than_400() else context.selected_asset_files
+    assets = context.selected_assets if is_bl_newer_than(4) else context.selected_asset_files
 
     mat_asset = None
     for asset in assets:
@@ -4108,9 +4111,19 @@ class YPFileBrowserMenu(bpy.types.Menu):
             self.layout.label(text='Image: ' + filename)
             op = self.layout.operator("node.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Layer")
             op.file_browser_filepath = filepath
+            op.texcoord_type = 'UV'
             op = self.layout.operator("node.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Mask")
             op.file_browser_filepath = filepath
+            op.texcoord_type = 'UV'
 
+            self.layout.separator()
+
+            op = self.layout.operator("node.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Decal Layer")
+            op.file_browser_filepath = filepath
+            op.texcoord_type = 'Decal'
+            op = self.layout.operator("node.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Decal Mask")
+            op.file_browser_filepath = filepath
+            op.texcoord_type = 'Decal'
 
 def draw_yp_file_browser_menu(self, context):
     params = context.space_data.params
@@ -4156,7 +4169,7 @@ def draw_ypaint_about(self, context):
     if addon_updater_ops.updater.legacy_blender:
         col.operator(addon_updater_ops.AddonUpdaterUpdateTarget.bl_idname, text="Change Branch", icon="FILE_SCRIPT")
     else:
-        row.menu(addon_updater_ops.UpdaterSettingMenu.bl_idname, text='', icon='PREFERENCES')
+        row.menu(addon_updater_ops.UpdaterSettingMenu.bl_idname, text='', icon='DOWNARROW_HLT')
 
     if updater.async_checking:
         col.enabled = False
@@ -4252,7 +4265,7 @@ class YPaintSpecialMenu(bpy.types.Menu):
         col.label(text='Option:')
         col.prop(yp, 'use_linear_blending')
 
-        if is_greater_than_280() and not is_greater_than_300():
+        if is_bl_newer_than(2, 80) and not is_bl_newer_than(3):
             col.prop(yp, 'enable_tangent_sign_hacks')
 
         #col.prop(yp, 'enable_backface_always_up')
@@ -4279,8 +4292,14 @@ class YBakeTargetMenu(bpy.types.Menu):
 
         if context.image:
             if context.image.packed_file:
-                col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').unpack = True
-            else: col.operator('node.y_save_as_image', text='Save As Image').unpack = False
+                op = col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE')
+                op.unpack = True
+                op.copy = False
+            else: 
+                op = col.operator('node.y_save_as_image', text='Save As Image')
+                op.unpack = False
+                op.copy = False
+            col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
 class YNewChannelMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_new_channel_menu"
@@ -4295,13 +4314,13 @@ class YNewChannelMenu(bpy.types.Menu):
         col = self.layout.column()
         col.label(text='Add New Channel')
 
-        icon_value = lib.custom_icons[lib.channel_custom_icon_dict['VALUE']].icon_id
+        icon_value = lib.get_icon(lib.channel_custom_icon_dict['VALUE'])
         col.operator("node.y_add_new_ypaint_channel", icon_value=icon_value, text='Value').type = 'VALUE'
 
-        icon_value = lib.custom_icons[lib.channel_custom_icon_dict['RGB']].icon_id
+        icon_value = lib.get_icon(lib.channel_custom_icon_dict['RGB'])
         col.operator("node.y_add_new_ypaint_channel", icon_value=icon_value, text='RGB').type = 'RGB'
 
-        icon_value = lib.custom_icons[lib.channel_custom_icon_dict['NORMAL']].icon_id
+        icon_value = lib.get_icon(lib.channel_custom_icon_dict['NORMAL'])
         col.operator("node.y_add_new_ypaint_channel", icon_value=icon_value, text='Normal').type = 'NORMAL'
 
 class YNewLayerMenu(bpy.types.Menu):
@@ -4328,10 +4347,12 @@ class YNewLayerMenu(bpy.types.Menu):
 
         #col.separator()
 
-        col.operator("node.y_open_image_to_layer", text='Open Image').file_browser_filepath = ''
+        op = col.operator("node.y_open_image_to_layer", text='Open Image...')
+        op.texcoord_type = 'UV'
+        op.file_browser_filepath = ''
         col.operator("node.y_open_available_data_to_layer", text='Open Available Image').type = 'IMAGE'
 
-        col.operator("node.y_open_images_to_single_layer", text='Open Images to Single Layer')
+        col.operator("node.y_open_images_to_single_layer", text='Open Images to Single Layer...')
         col.operator("node.y_open_images_from_material_to_single_layer", text='Open Images from Material').asset_library_path = ''
 
         # NOTE: Dedicated menu for opening images to single layer is kinda hard to see, so it's probably better be hidden for now
@@ -4348,9 +4369,9 @@ class YNewLayerMenu(bpy.types.Menu):
         col.operator("node.y_open_available_data_to_layer", text='Open Available Vertex Color').type = 'VCOL'
         col.separator()
 
-        #col.menu("NODE_MT_y_new_solid_color_layer_menu", text='Solid Color', icon_value=lib.custom_icons['color'].icon_id)
+        #col.menu("NODE_MT_y_new_solid_color_layer_menu", text='Solid Color', icon_value=lib.get_icon('color'))
 
-        icon_value = lib.custom_icons["color"].icon_id
+        icon_value = lib.get_icon("color")
         c = col.operator("node.y_new_layer", icon_value=icon_value, text='Solid Color')
         c.type = 'COLOR'
         c.add_mask = False
@@ -4370,7 +4391,7 @@ class YNewLayerMenu(bpy.types.Menu):
         c.add_mask = True
         c.mask_type = 'COLOR_ID'
 
-        if is_greater_than_293():
+        if is_bl_newer_than(2, 93):
             c = col.operator("node.y_new_layer", text='Solid Color w/ Edge Detect Mask')
             c.type = 'COLOR'
             c.add_mask = True
@@ -4384,7 +4405,7 @@ class YNewLayerMenu(bpy.types.Menu):
         c.add_mask = True
         c.mask_type = 'IMAGE'
 
-        #if is_greater_than_280():
+        #if is_bl_newer_than(2, 80):
         #    c = col.operator("node.y_new_layer", text='Background w/ Vertex Color Mask')
         #else: c = col.operator("node.y_new_layer", text='Background w/ Vertex Color Mask')
         c = col.operator("node.y_new_layer", text='Background w/ Vertex Color Mask')
@@ -4393,7 +4414,7 @@ class YNewLayerMenu(bpy.types.Menu):
         c.add_mask = True
         c.mask_type = 'VCOL'
 
-        if is_greater_than_320():
+        if is_bl_newer_than(3, 2):
             col.separator()
             col.operator("node.y_new_vdm_layer", text='Vector Displacement Image', icon='SCULPTMODE_HLT')
 
@@ -4404,7 +4425,7 @@ class YNewLayerMenu(bpy.types.Menu):
         col.operator("node.y_new_layer", text='Checker').type = 'CHECKER'
         col.operator("node.y_new_layer", text='Gradient').type = 'GRADIENT'
         col.operator("node.y_new_layer", text='Magic').type = 'MAGIC'
-        if not is_greater_than_410(): col.operator("node.y_new_layer", text='Musgrave').type = 'MUSGRAVE'
+        if not is_bl_newer_than(4, 1): col.operator("node.y_new_layer", text='Musgrave').type = 'MUSGRAVE'
         col.operator("node.y_new_layer", text='Noise').type = 'NOISE'
         col.operator("node.y_new_layer", text='Voronoi').type = 'VORONOI'
         col.operator("node.y_new_layer", text='Wave').type = 'WAVE'
@@ -4449,7 +4470,7 @@ class YNewLayerMenu(bpy.types.Menu):
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.separator()
 
             c = col.operator("node.y_bake_to_layer", text='Multires Normal')
@@ -4462,7 +4483,7 @@ class YNewLayerMenu(bpy.types.Menu):
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
-        if is_greater_than_277():
+        if is_bl_newer_than(2, 77):
             col.separator()
 
             c = col.operator("node.y_bake_to_layer", text='Other Objects Emission')
@@ -4522,13 +4543,20 @@ class YBakedImageMenu(bpy.types.Menu):
         col.operator('node.y_save_image', icon='FILE_TICK')
 
         if context.image.packed_file:
-            col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').unpack = True
-        else: col.operator('node.y_save_as_image', text='Save As Image').unpack = False
+            op = col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE')
+            op.unpack = True
+            op.copy = False
+        else: 
+            op = col.operator('node.y_save_as_image', text='Save As Image')
+            op.unpack = False
+            op.copy = False
+        col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
 
-        icon = 'FILEBROWSER' if is_greater_than_280() else 'FILE_FOLDER'
-        col.operator('node.y_save_all_baked_images', text='Save All Baked Images to..', icon=icon)
+        icon = 'FILEBROWSER' if is_bl_newer_than(2, 80) else 'FILE_FOLDER'
+        col.operator('node.y_save_all_baked_images', text='Save All Baked Images to...', icon=icon).copy = False
+        col.operator('node.y_save_all_baked_images', text='Save All Baked Image Copies to...').copy = True
 
         col.separator()
         col.operator('node.y_delete_baked_channel_images', text='Delete All Baked Images', icon='ERROR')
@@ -4593,34 +4621,36 @@ class YLayerListSpecialMenu(bpy.types.Menu):
             op.layer_name = context.layer.name
         if hasattr(context, 'image'):
             op.image_name = context.image.name
+        col.operator("node.y_invert_image", icon='IMAGE_ALPHA')
 
         col.separator()
         col.operator('node.y_pack_image', icon='PACKAGE')
         col.operator('node.y_save_image', icon='FILE_TICK')
         if hasattr(context, 'image') and context.image.packed_file:
-            col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').unpack = True
+            op = col.operator('node.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE')
+            op.unpack = True
+            op.copy = False
         else:
-            if is_greater_than_280():
-                col.operator('node.y_save_as_image', text='Save As Image').unpack = False
-                col.operator('node.y_save_pack_all', text='Save/Pack All')
+            if is_bl_newer_than(2, 80):
+                op = col.operator('node.y_save_as_image', text='Save As Image...')
+                op.unpack = False
+                op.copy = False
             else: 
-                col.operator('node.y_save_as_image', text='Save As Image', icon='SAVE_AS').unpack = False
-                col.operator('node.y_save_pack_all', text='Save/Pack All', icon='FILE_TICK')
+                op = col.operator('node.y_save_as_image', text='Save As Image...', icon='SAVE_AS')
+                op.unpack = False
+                op.copy = False
+        col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
         col.operator("node.y_reload_image", icon='FILE_REFRESH')
 
-        # Invert image is causing crash since Blender 2.82
-        #if not is_greater_than_282():
         col.separator()
-        col.operator("node.y_invert_image", icon='IMAGE_ALPHA')
-
-        #if hasattr(context, 'entity') and context.entity:
-        #    col = row.column()
-        #    col.label(text=context.entity.name, icon=get_layer_type_icon(context.entity.type))
 
         if hasattr(context, 'image'):
             col.menu("NODE_MT_y_image_convert_menu", text='Convert Image')
+
+        if is_bl_newer_than(2, 80): col.operator('node.y_save_pack_all', text='Save/Pack All Images')
+        else: col.operator('node.y_save_pack_all', text='Save/Pack All Images', icon='FILE_TICK')
 
 class YOpenImagesToSingleLayerMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_open_images_to_single_layer_menu"
@@ -4649,7 +4679,7 @@ class YNewSolidColorLayerMenu(bpy.types.Menu):
     def draw(self, context):
         col = self.layout.column()
 
-        icon_value = lib.custom_icons["color"].icon_id
+        icon_value = lib.get_icon("color")
         c = col.operator("node.y_new_layer", icon_value=icon_value, text='Solid Color')
         c.type = 'COLOR'
         c.add_mask = False
@@ -4669,7 +4699,7 @@ class YNewSolidColorLayerMenu(bpy.types.Menu):
         c.add_mask = True
         c.mask_type = 'COLOR_ID'
 
-        if is_greater_than_293():
+        if is_bl_newer_than(2, 93):
             c = col.operator("node.y_new_layer", text='Solid Color w/ Edge Detect Mask')
             c.type = 'COLOR'
             c.add_mask = True
@@ -4743,7 +4773,7 @@ class YModifierMenu(bpy.types.Menu):
         op.direction = 'DOWN'
 
         col.separator()
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             op = col.operator('node.y_remove_ypaint_modifier', icon='REMOVE', text='Remove Modifier')
         else: op = col.operator('node.y_remove_ypaint_modifier', icon='ZOOMOUT', text='Remove Modifier')
 
@@ -4776,7 +4806,7 @@ class YModifier1Menu(bpy.types.Menu):
         op.direction = 'DOWN'
 
         col.separator()
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             op = col.operator('node.y_remove_normalmap_modifier', icon='REMOVE', text='Remove Modifier')
         else: op = col.operator('node.y_remove_normalmap_modifier', icon='ZOOMOUT', text='Remove Modifier')
 
@@ -4806,7 +4836,7 @@ class YMaskModifierMenu(bpy.types.Menu):
 
         col.separator()
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             op = col.operator('node.y_remove_mask_modifier', icon='REMOVE', text='Remove Modifier')
         else: op = col.operator('node.y_remove_mask_modifier', icon='ZOOMOUT', text='Remove Modifier')
 
@@ -4829,7 +4859,7 @@ class YTransitionBumpMenu(bpy.types.Menu):
             col.label(text='ERROR: Context has no parent!', icon='ERROR')
             return
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.operator('node.y_hide_transition_effect', text='Remove Transition Bump', icon='REMOVE').type = 'BUMP'
         else: col.operator('node.y_hide_transition_effect', text='Remove Transition Bump', icon='ZOOMOUT').type = 'BUMP'
 
@@ -4855,7 +4885,7 @@ class YTransitionRampMenu(bpy.types.Menu):
 
         col.separator()
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.operator('node.y_hide_transition_effect', text='Remove Transition Ramp', icon='REMOVE').type = 'RAMP'
         else: col.operator('node.y_hide_transition_effect', text='Remove Transition Ramp', icon='ZOOMOUT').type = 'RAMP'
 
@@ -4888,7 +4918,7 @@ class YTransitionAOMenu(bpy.types.Menu):
         col.separator()
 
         col = layout.column()
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.operator('node.y_hide_transition_effect', text='Remove Transition AO', icon='REMOVE').type = 'AO'
         else: col.operator('node.y_hide_transition_effect', text='Remove Transition AO', icon='ZOOMOUT').type = 'AO'
 
@@ -4928,7 +4958,9 @@ class YAddLayerMaskMenu(bpy.types.Menu):
 
         col.label(text='Image Mask:')
         new_mask_button(col, 'node.y_new_layer_mask', 'New Image Mask', lib_icon='image', otype='IMAGE')
-        new_mask_button(col, 'node.y_open_image_as_mask', 'Open Image as Mask', lib_icon='open_image').file_browser_filepath = ''
+        op = new_mask_button(col, 'node.y_open_image_as_mask', 'Open Image as Mask...', lib_icon='open_image')
+        op.texcoord_type = 'UV'
+        op.file_browser_filepath = ''
         new_mask_button(col, 'node.y_open_available_data_as_mask', 'Open Available Image as Mask', lib_icon='open_image', otype='IMAGE')
         col.separator()
 
@@ -4945,7 +4977,7 @@ class YAddLayerMaskMenu(bpy.types.Menu):
         new_mask_button(col, 'node.y_new_layer_mask', 'Checker', otype='CHECKER')
         new_mask_button(col, 'node.y_new_layer_mask', 'Gradient', otype='GRADIENT')
         new_mask_button(col, 'node.y_new_layer_mask', 'Magic', otype='MAGIC')
-        if not is_greater_than_410(): 
+        if not is_bl_newer_than(4, 1): 
             new_mask_button(col, 'node.y_new_layer_mask', 'Musgrave', otype='MUSGRAVE')
         new_mask_button(col, 'node.y_new_layer_mask', 'Noise', otype='NOISE')
         new_mask_button(col, 'node.y_new_layer_mask', 'Voronoi', otype='VORONOI')
@@ -4957,7 +4989,7 @@ class YAddLayerMaskMenu(bpy.types.Menu):
         col.separator()
         new_mask_button(col, 'node.y_new_layer_mask', 'Object Index', otype='OBJECT_INDEX', lib_icon='object_index')
         new_mask_button(col, 'node.y_new_layer_mask', 'Backface', otype='BACKFACE', lib_icon='backface')
-        if is_greater_than_293():
+        if is_bl_newer_than(2, 93):
             new_mask_button(col, 'node.y_new_layer_mask', 'Edge Detect', otype='EDGE_DETECT', lib_icon='edge_detect')
 
         col = row.column(align=True)
@@ -5025,7 +5057,7 @@ class YLayerMaskMenu(bpy.types.Menu):
         col.context_pointer_set('entity', mask)
         col.operator('node.y_bake_entity_to_image', icon_value=lib.get_icon('bake'), text='Bake as Image')
         if mask.baked_source != '':
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 col.operator('node.y_remove_baked_entity', text='Remove Baked Image', icon='REMOVE')
             else: col.operator('node.y_remove_baked_entity', text='Remove Baked Image', icon='ZOOMOUT')
 
@@ -5035,7 +5067,7 @@ class YLayerMaskMenu(bpy.types.Menu):
 
         #col.separator()
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.operator('node.y_remove_layer_mask', text='Remove Mask', icon='REMOVE')
         else: col.operator('node.y_remove_layer_mask', text='Remove Mask', icon='ZOOMOUT')
 
@@ -5129,14 +5161,9 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
             col.label(text=label, icon=icon)
 
         row = col.row(align=True)
-        # Blender 2.79 will create weird margin if there's blank space inside menu
-        #if is_greater_than_280():
-        #    ccol = row.column(align=True)
-        #    ccol.label(text='', icon='BLANK1')
 
         ccol = row.column(align=True)
-        #ccol.operator('node.y_replace_layer_channel_override', text='Open Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
-        ccol.operator('node.y_open_image_to_override_layer_channel', text='Open Image', icon_value=lib.get_icon('open_image'))
+        ccol.operator('node.y_open_image_to_override_layer_channel', text='Open Image...', icon_value=lib.get_icon('open_image'))
         ccol.operator('node.y_open_available_data_to_override_channel', text='Open Available Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
         
         col.separator()
@@ -5155,14 +5182,7 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
         else:
             col.label(text=label, icon=icon)
 
-        #icon = 'RADIOBUT_ON' if ch.override_type == 'VCOL' else 'RADIOBUT_OFF'
-        #col.label(text='Vertex Color', icon=icon)
-
         row = col.row(align=True)
-        # Blender 2.79 will create weird margin if there's blank space inside menu
-        #if is_greater_than_280():
-        #    ccol = row.column(align=True)
-        #    ccol.label(text='', icon='BLANK1')
 
         ccol = row.column(align=True)
         #ccol.operator('node.y_replace_layer_channel_override', text='New Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
@@ -5171,7 +5191,7 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
 
         col.separator()
 
-        for item in channel_override_type_items_410 if is_greater_than_410() else channel_override_type_items:
+        for item in channel_override_type_items_410 if is_bl_newer_than(4, 1) else channel_override_type_items:
             if item[0] == ch.override_type:
                 icon = 'RADIOBUT_ON'
             else: icon = 'RADIOBUT_OFF'
@@ -5179,19 +5199,6 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
             if item[0] in {'DEFAULT', 'IMAGE', 'VCOL'}: continue
 
             col.operator('node.y_replace_layer_channel_override', text=item[1], icon=icon).type = item[0]
-
-        #col = row.column()
-        #col.label(text='Override Using Image:')
-
-        ##col.operator('node.y_replace_layer_channel_override', text='New Image', icon_value=lib.get_icon('image')).type = 'IMAGE'
-        #col.operator('node.y_replace_layer_channel_override', text='Open Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
-        #col.operator('node.y_replace_layer_channel_override', text='Open Available Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
-
-        #col = row.column()
-        #col.label(text='Override Using Vertex Color:')
-
-        #col.operator('node.y_replace_layer_channel_override', text='New Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
-        #col.operator('node.y_replace_layer_channel_override', text='Use Available Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
 
 class YReplaceChannelOverride1Menu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_replace_channel_override_1_menu"
@@ -5252,8 +5259,7 @@ class YReplaceChannelOverride1Menu(bpy.types.Menu):
         #ccol.label(text='', icon='BLANK1')
 
         ccol = row.column(align=True)
-        #ccol.operator('node.y_replace_layer_channel_override_1', text='Open Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
-        ccol.operator('node.y_open_image_to_override_1_layer_channel', text='Open Image', icon_value=lib.get_icon('open_image'))
+        ccol.operator('node.y_open_image_to_override_1_layer_channel', text='Open Image...', icon_value=lib.get_icon('open_image'))
         ccol.operator('node.y_open_available_data_to_override_1_channel', text='Open Available Image', icon_value=lib.get_icon('open_image'))
 
 class YChannelSpecialMenu(bpy.types.Menu):
@@ -5417,7 +5423,7 @@ class YLayerSpecialMenu(bpy.types.Menu):
         col.operator('node.y_replace_layer_type', text='Checker', icon_value=lib.get_icon('texture')).type = 'CHECKER'
         col.operator('node.y_replace_layer_type', text='Gradient', icon_value=lib.get_icon('texture')).type = 'GRADIENT'
         col.operator('node.y_replace_layer_type', text='Magic', icon_value=lib.get_icon('texture')).type = 'MAGIC'
-        if not is_greater_than_410(): col.operator('node.y_replace_layer_type', text='Musgrave', icon_value=lib.get_icon('texture')).type = 'MUSGRAVE'
+        if not is_bl_newer_than(4, 1): col.operator('node.y_replace_layer_type', text='Musgrave', icon_value=lib.get_icon('texture')).type = 'MUSGRAVE'
         col.operator('node.y_replace_layer_type', text='Noise', icon_value=lib.get_icon('texture')).type = 'NOISE'
         col.operator('node.y_replace_layer_type', text='Voronoi', icon_value=lib.get_icon('texture')).type = 'VORONOI'
         col.operator('node.y_replace_layer_type', text='Wave', icon_value=lib.get_icon('texture')).type = 'WAVE'
@@ -5904,7 +5910,7 @@ def yp_load_ui_settings(scene):
 
 def register():
 
-    if not is_greater_than_280():
+    if not is_bl_newer_than(2, 80):
         bpy.utils.register_class(YPaintAboutMenu)
     else: bpy.utils.register_class(YPaintAboutPopover)
 
@@ -5945,7 +5951,7 @@ def register():
     bpy.utils.register_class(YPAssetBrowserMenu)
     bpy.utils.register_class(YPFileBrowserMenu)
 
-    if not is_greater_than_280():
+    if not is_bl_newer_than(2, 80):
         bpy.utils.register_class(VIEW3D_PT_YPaint_tools)
         bpy.utils.register_class(NODE_PT_YPaint)
     else: 
@@ -5960,10 +5966,10 @@ def register():
     # Add yPaint node ui
     bpy.types.NODE_MT_add.append(add_new_ypaint_node_menu)
 
-    if is_greater_than_300():
+    if is_bl_newer_than(3):
         bpy.types.ASSETBROWSER_MT_context_menu.append(draw_yp_asset_browser_menu)
 
-    if is_greater_than_281():
+    if is_bl_newer_than(2, 81):
         bpy.types.FILEBROWSER_MT_context_menu.append(draw_yp_file_browser_menu)
 
     # Handlers
@@ -5972,7 +5978,7 @@ def register():
 
 def unregister():
 
-    if not is_greater_than_280():
+    if not is_bl_newer_than(2, 80):
         bpy.utils.unregister_class(YPaintAboutMenu)
     else: bpy.utils.unregister_class(YPaintAboutPopover)
 
@@ -6013,7 +6019,7 @@ def unregister():
     bpy.utils.unregister_class(YPAssetBrowserMenu)
     bpy.utils.unregister_class(YPFileBrowserMenu)
 
-    if not is_greater_than_280():
+    if not is_bl_newer_than(2, 80):
         bpy.utils.unregister_class(VIEW3D_PT_YPaint_tools)
         bpy.utils.unregister_class(NODE_PT_YPaint)
     else: 
@@ -6025,7 +6031,7 @@ def unregister():
     # Remove add yPaint node ui
     bpy.types.NODE_MT_add.remove(add_new_ypaint_node_menu)
 
-    if is_greater_than_300():
+    if is_bl_newer_than(3):
         bpy.types.ASSETBROWSER_MT_context_menu.remove(draw_yp_asset_browser_menu)
 
     # Remove Handlers

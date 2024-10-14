@@ -5,6 +5,11 @@ from bpy.app.handlers import persistent
 from . import image_ops
 from .common import *
 from . import addon_updater_ops
+from .lib import *
+
+def update_icons(self, context):
+    unload_custom_icons()
+    load_custom_icons()
 
 class YPaintPreferences(AddonPreferences):
     # this must match the addon name, use '__package__'
@@ -49,6 +54,20 @@ class YPaintPreferences(AddonPreferences):
             description = 'Use image preview or thumbnail on the layers list',
             default = False)
 
+    skip_property_popups : BoolProperty(
+            name = 'Skip Property Popups (Hold Shift to Show)',
+            description = 'Don\'t show property popups unless Shift key is pressed. Will use last invokation properties if skipped',
+            default = False)
+
+    icons : EnumProperty(
+            name = 'Icons',
+            description = 'Icon set',
+            items=(('DEFAULT', 'Default', 'Icon set from the current Blender version'),
+                   ('LEGACY', 'Legacy', 'Icon set from the old Blender version')),
+            default='DEFAULT',
+            update=update_icons
+            )
+
     make_preview_mode_srgb : BoolProperty(
             name = 'Make Preview Mode use sRGB',
             description = 'Make sure preview mode use sRGB color',
@@ -60,12 +79,18 @@ class YPaintPreferences(AddonPreferences):
             default = False)
 
     default_bake_device : EnumProperty(
-            name = 'Default Bake Device',
+            name = 'Bake Device',
             description = 'Default bake device',
             items = (('DEFAULT', 'Default', 'Use last selected bake device'),
                      ('CPU', 'CPU', 'Use CPU by default'),
                      ('GPU', 'GPU Compute', 'Use GPU by default')),
             default='DEFAULT'
+            )
+
+    enable_baked_outside_by_default : BoolProperty(
+            name = 'Enable Baked Outside by default',
+            description = "Enable baked outside by default when creating new "+get_addon_title()+" node.\n(Useful for creating game assets)",
+            default = False
             )
     
     # godot exporter
@@ -105,8 +130,9 @@ class YPaintPreferences(AddonPreferences):
         max=59)
 
     def draw(self, context):
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             self.layout.prop(self, 'default_bake_device')
+            self.layout.prop(self, 'icons')
 
         self.layout.prop(self, 'default_new_image_size')
         self.layout.prop(self, 'image_atlas_size')
@@ -114,6 +140,8 @@ class YPaintPreferences(AddonPreferences):
         self.layout.prop(self, 'unique_image_atlas_per_yp')
         self.layout.prop(self, 'make_preview_mode_srgb')
         self.layout.prop(self, 'use_image_preview')
+        self.layout.prop(self, 'skip_property_popups')
+        self.layout.prop(self, 'enable_baked_outside_by_default')
         self.layout.prop(self, 'show_experimental')
         self.layout.prop(self, 'developer_mode')
         self.layout.prop(self, 'godot_path')

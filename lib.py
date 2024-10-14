@@ -241,11 +241,30 @@ def load_custom_icons():
     if not hasattr(bpy.utils, 'previews'): return
     global custom_icons
     custom_icons = bpy.utils.previews.new()
-    folder = get_addon_filepath() + 'icons' + os.sep
+
+    if not is_bl_newer_than(2, 80):
+        icon_set = 'legacy'
+    else:
+        icons = get_user_preferences().icons 
+
+        if icons == 'DEFAULT':
+            bg_color = bpy.context.preferences.themes[0].preferences.space.back
+            is_dark_theme = bg_color[0] + bg_color[1] + bg_color[2] < 1.5
+            icon_set = 'light' if is_dark_theme else 'dark'
+        else:
+            icon_set = 'legacy'
+
+    folder = get_addon_filepath() + 'icons' + os.sep + icon_set.lower() + os.sep
 
     for f in os.listdir(folder):
         icon_name = f.replace('_icon.png', '')
         custom_icons.load(icon_name, folder + f, 'IMAGE')
+
+def unload_custom_icons():
+    global custom_icons
+    if hasattr(bpy.utils, 'previews'):
+        bpy.utils.previews.remove(custom_icons)
+        custom_icons = None
 
 def get_icon(custom_icon_name):
     return custom_icons[custom_icon_name].icon_id
@@ -412,6 +431,4 @@ def register():
     load_custom_icons()
 
 def unregister():
-    global custom_icons
-    if hasattr(bpy.utils, 'previews'):
-        bpy.utils.previews.remove(custom_icons)
+    unload_custom_icons()

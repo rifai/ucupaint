@@ -64,14 +64,14 @@ def fix_tree_output_index_400(interface, item, correct_index):
                 return
 
 def fix_tree_input_index(tree, item, correct_index):
-    if not is_greater_than_400():
+    if not is_bl_newer_than(4):
         fix_io_index_360(item, tree.inputs, correct_index)
         return
 
     fix_tree_input_index_400(tree.interface, item, correct_index)
 
 def fix_tree_output_index(tree, item, correct_index):
-    if not is_greater_than_400():
+    if not is_bl_newer_than(4):
         fix_io_index_360(item, tree.outputs, correct_index)
         return
 
@@ -90,7 +90,7 @@ def create_input(tree, name, socket_type, valid_inputs, index,
         if hasattr(inp, 'hide_value'): 
             inp.hide_value = hide_value
         else:
-            # NOTE: On some blender versions, hide_value is a node input prop
+            # NOTE: In some blender versions, hide_value is a node input prop
             if not node:
                 n = get_active_ypaint_node()
                 if n and n.node_tree == tree:
@@ -190,8 +190,8 @@ def check_start_end_root_ch_nodes(group_tree, specific_channel=None):
                             if end_max_height_tweak.inputs[index].name == 'Height Tweak':
                                 fc.data_path = channel.path_from_id() + '.height_tweak'
 
-            if not is_greater_than_300() and channel.enable_subdiv_setup:
-                if not is_greater_than_280():
+            if not is_bl_newer_than(3) and channel.enable_subdiv_setup:
+                if not is_bl_newer_than(2, 80):
                     lib_name = lib.CHECK_INPUT_NORMAL_MIXED_BL27
                 else: lib_name = lib.CHECK_INPUT_NORMAL_MIXED
             elif not channel.enable_smooth_bump and channel.enable_subdiv_setup: # and ypup.eevee_next_displacement:
@@ -257,7 +257,7 @@ def check_start_end_root_ch_nodes(group_tree, specific_channel=None):
             # Engine filter is needed if subdiv is on and channel is baked
             if yp.use_baked and channel.enable_subdiv_setup and any_layers_using_displacement(channel):
 
-                lib_name = lib.ENGINE_FILTER if is_greater_than_280() else lib.ENGINE_FILTER_LEGACY
+                lib_name = lib.ENGINE_FILTER if is_bl_newer_than(2, 80) else lib.ENGINE_FILTER_LEGACY
                 end_normal_engine_filter = replace_new_node(
                         group_tree, channel, 'end_normal_engine_filter', 'ShaderNodeGroup', 'End Engine Filter', lib_name)
                 for inp in end_normal_engine_filter.inputs:
@@ -460,11 +460,12 @@ def create_decal_empty():
     scene = bpy.context.scene
     empty_name = get_unique_name('Decal', bpy.data.objects)
     empty = bpy.data.objects.new(empty_name, None)
-    if is_greater_than_280():
+    if is_bl_newer_than(2, 80):
         empty.empty_display_type = 'SINGLE_ARROW'
     else: empty.empty_draw_type = 'SINGLE_ARROW'
-    link_object(scene, empty)
-    if is_greater_than_280():
+    custom_collection = obj.users_collection[0] if is_bl_newer_than(2, 80) and len(obj.users_collection) > 0 else None
+    link_object(scene, empty, custom_collection)
+    if is_bl_newer_than(2, 80):
         empty.location = scene.cursor.location.copy()
         empty.rotation_euler = scene.cursor.rotation_euler.copy()
     else: 
@@ -696,8 +697,8 @@ def check_all_layer_channel_io_and_nodes(layer, tree=None, specific_ch=None, do_
             other_layers.append(parent)
 
         # Check child layers
-        childs, child_ids = get_list_of_all_childs_and_child_ids(layer)
-        for child in childs: 
+        children, child_ids = get_list_of_all_children_and_child_ids(layer)
+        for child in children: 
             other_layers.append(child)
 
         # Check background layers
@@ -1200,7 +1201,7 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
 
                     # Set value back to prop
                     val = layer_node.inputs.get(inp.name).default_value
-                    socket_type = inp.socket_type if is_greater_than_400() else inp.type
+                    socket_type = inp.socket_type if is_bl_newer_than(4) else inp.type
                     if socket_type in {'NodeSocketColor', 'RGBA'}:
                         try: exec('layer' + inp.name + ' = (val[0], val[1], val[2])')
                         except Exception as e: print(e)

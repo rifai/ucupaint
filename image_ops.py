@@ -2,7 +2,6 @@ import bpy, shutil, os
 import tempfile
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper
-#from bpy_extras.image_utils import load_image  
 from .common import *
 import time
 from . import UDIM
@@ -104,7 +103,7 @@ def clean_object_references(image):
                 indices = []
                 for i, o in enumerate(segment.bake_info.selected_objects):
                     if o.object:
-                        if is_greater_than_280():
+                        if is_bl_newer_than(2, 80):
                             if not any([s for s in bpy.data.scenes if o.object.name in s.collection.all_objects]):
                                 removed_references.append(o.object.name)
                                 indices.append(i)
@@ -116,11 +115,11 @@ def clean_object_references(image):
                 for i in reversed(indices):
                     segment.bake_info.selected_objects.remove(i)
 
-                # Check if other objects data are still accessible on any view layers
+                # Check if other object's data is still accessible on any view layers
                 indices = []
                 for i, o in enumerate(segment.bake_info.other_objects):
                     if o.object:
-                        if is_greater_than_280():
+                        if is_bl_newer_than(2, 80):
                             if not any([s for s in bpy.data.scenes if o.object.name in s.collection.all_objects]):
                                 removed_references.append(o.object.name)
                                 indices.append(i)
@@ -140,7 +139,7 @@ def clean_object_references(image):
             indices = []
             for i, o in enumerate(image.y_bake_info.selected_objects):
                 if o.object:
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
                         if not any([s for s in bpy.data.scenes if o.object.name in s.collection.all_objects]):
                             removed_references.append(o.object.name)
                             indices.append(i)
@@ -151,11 +150,11 @@ def clean_object_references(image):
             for i in reversed(indices):
                 image.y_bake_info.selected_objects.remove(i)
 
-            # Check if other objects data are still accessible on any view layers
+            # Check if other object's data is still accessible on any view layers
             indices = []
             for i, o in enumerate(image.y_bake_info.other_objects):
                 if o.object:
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
                         if not any([s for s in bpy.data.scenes if o.object.name in s.collection.all_objects]):
                             removed_references.append(o.object.name)
                             indices.append(i)
@@ -238,7 +237,7 @@ def save_pack_all(yp):
 
     # Temporary scene for blender 3.30 hack
     tmpscene = None
-    if is_greater_than_330():
+    if is_bl_newer_than(3, 3):
         tmpscene = bpy.data.scenes.new('Temp Save Scene')
         try: tmpscene.view_settings.view_transform = 'Standard'
         except: print('EXCEPTIION: Cannot set view transform on temporary save scene!')
@@ -250,7 +249,7 @@ def save_pack_all(yp):
         if not image or not image.is_dirty: continue
         T = time.time()
         if image.packed_file or image.filepath == '':
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 image.pack()
             else:
                 if image.is_float:
@@ -259,13 +258,13 @@ def save_pack_all(yp):
                 else: 
                     image.pack(as_png=True)
 
-            print('INFO:', image.name, 'image is packed at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+            print('INFO:', image.name, 'image is packed in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
         else:
             if image.is_float:
                 save_float_image(image)
             else:
                 # BLENDER BUG: Blender 3.3 has wrong srgb if not packed first
-                if is_greater_than_330() and image.colorspace_settings.name in {'Linear', get_noncolor_name()}:
+                if is_bl_newer_than(3, 3) and image.colorspace_settings.name in {'Linear', get_noncolor_name()}:
 
                     # Get image path
                     path = bpy.path.abspath(image.filepath)
@@ -291,10 +290,10 @@ def save_pack_all(yp):
                     # Bring back linear
                     image.colorspace_settings.name = get_noncolor_name()
 
-                    # Remove unpacked images on Blender 3.3 
+                    # Remove unpacked images in Blender 3.3 
                     remove_unpacked_image_path(image, path, default_dir, default_dir_found, default_filepath, temp_path, unpacked_path)
 
-                    print('INFO:', image.name, 'image is saved at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+                    print('INFO:', image.name, 'image is saved in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
 
                 else:
                     try:
@@ -302,7 +301,7 @@ def save_pack_all(yp):
                         image.save()
                         image.colorspace_settings.name = ori_colorspace
 
-                        print('INFO:', image.name, 'image is saved at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+                        print('INFO:', image.name, 'image is saved in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
                     except Exception as e:
                         print(e)
 
@@ -311,7 +310,7 @@ def save_pack_all(yp):
         remove_datablock(bpy.data.scenes, tmpscene)
 
     # HACK: For some reason active float image will glitch after auto save
-    # This is only happen if active object is on texture paint mode
+    # This is only happen if active object is in texture paint mode
     obj = bpy.context.object
     if len(yp.layers) > 0 and obj and obj.mode == 'TEXTURE_PAINT':
         layer = yp.layers[yp.active_layer_index]
@@ -323,7 +322,7 @@ def save_pack_all(yp):
                 ypui.refresh_image_hack = True
 
     # Clean object reference on images
-    if is_greater_than_279():
+    if is_bl_newer_than(2, 79):
         for image in images:
             clean_object_references(image)
 
@@ -344,10 +343,10 @@ class YInvertImage(bpy.types.Operator):
             return {'CANCELLED'}
 
         # For some reason this no longer works since Blender 2.82, but worked again in Blender 4.2
-        if not is_greater_than_282() or is_greater_than_420():
+        if not is_bl_newer_than(2, 82) or is_bl_newer_than(4, 2):
             override = bpy.context.copy()
             override['edit_image'] = context.image
-            if is_greater_than_400():
+            if is_bl_newer_than(4):
                 with bpy.context.temp_override(**override):
                     bpy.ops.image.invert(invert_r=True, invert_g=True, invert_b=True)
             else: bpy.ops.image.invert(override, invert_r=True, invert_g=True, invert_b=True)
@@ -400,7 +399,7 @@ class YPackImage(bpy.types.Operator):
         T = time.time()
 
         # Save file to temporary place first if image is float
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             context.image.pack()
         else:
             if context.image.is_float:
@@ -419,7 +418,7 @@ class YPackImage(bpy.types.Operator):
 
                 baked_disp = tree.nodes.get(ch.baked_disp)
                 if baked_disp and baked_disp.image and not baked_disp.image.packed_file:
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
                         baked_disp.image.pack()
                     else:
                         if baked_disp.image.is_float:
@@ -430,7 +429,7 @@ class YPackImage(bpy.types.Operator):
 
                 baked_vdisp = tree.nodes.get(ch.baked_vdisp)
                 if baked_vdisp and baked_vdisp.image and not baked_vdisp.image.packed_file:
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
                         baked_vdisp.image.pack()
                     else:
                         if baked_vdisp.image.is_float:
@@ -442,7 +441,7 @@ class YPackImage(bpy.types.Operator):
                 if not is_overlay_normal_empty(yp):
                     baked_normal_overlay = tree.nodes.get(ch.baked_normal_overlay)
                     if baked_normal_overlay and baked_normal_overlay.image and not baked_normal_overlay.image.packed_file:
-                        if is_greater_than_280():
+                        if is_bl_newer_than(2, 80):
                             baked_normal_overlay.image.pack()
                         else:
                             if baked_normal_overlay.image.is_float:
@@ -451,7 +450,7 @@ class YPackImage(bpy.types.Operator):
 
                     baked_normal_overlay.image.filepath = ''
 
-        print('INFO:', context.image.name, 'image is packed at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        print('INFO:', context.image.name, 'image is packed in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
 
         return {'FINISHED'}
 
@@ -627,6 +626,10 @@ class YSaveAllBakedImages(bpy.types.Operator):
             default = 'PNG',
             )
 
+    copy : BoolProperty(name='Copy',
+            description = 'Create a new image file without modifying the current image in Blender',
+            default = False)
+
     def invoke(self, context, event):
         # Open browser, take reference to 'self' read the path to selected
         # file, put path in predetermined self fields.
@@ -642,6 +645,8 @@ class YSaveAllBakedImages(bpy.types.Operator):
         col = split.column()
         col.prop(self, 'file_format', text='')
 
+        self.layout.prop(self, 'copy')
+
     def execute(self, context):
 
         node = get_active_ypaint_node()
@@ -652,7 +657,7 @@ class YSaveAllBakedImages(bpy.types.Operator):
         settings = tmpscene.render.image_settings
 
         # Blender 2.80 has filmic as default color settings, change it to standard
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             tmpscene.view_settings.view_transform = 'Standard'
 
         images = []
@@ -688,6 +693,21 @@ class YSaveAllBakedImages(bpy.types.Operator):
             if image_node and image_node.image not in images:
                 images.append(image_node.image)
 
+        original_image_names = []
+        original_names = []
+        if self.copy:
+            copied_images = []
+            for image in images:
+                ori_name = image.name
+                image_copy = duplicate_image(image, ondisk_duplicate=False)
+                image.name += '____'
+                image_copy.name = ori_name
+                original_image_names.append(image.name)
+                original_names.append(ori_name)
+                copied_images.append(image_copy)
+
+            images = copied_images
+
         for image in images:
 
             settings.file_format = self.file_format
@@ -697,12 +717,14 @@ class YSaveAllBakedImages(bpy.types.Operator):
             if settings.file_format == 'OPEN_EXR':
                 settings.exr_codec = 'ZIP'
 
-            if image.filepath == '':
+            if image.filepath == '' or '.<UDIM>.' in image.filepath:
                 image_name = image.name
                 # Remove addon title from the file names
                 if image_name.startswith(get_addon_title() + ' '):
                     image_name = image_name.replace(get_addon_title() + ' ', '')
-                filename = image_name + format_extensions[settings.file_format]
+                filename = image_name
+                filename += '.<UDIM>' if '.<UDIM>.' in image.filepath else ''
+                filename += format_extensions[settings.file_format]
             else:
                 filename = bpy.path.basename(image.filepath)
                 ext = os.path.splitext(filename)[1]
@@ -717,14 +739,14 @@ class YSaveAllBakedImages(bpy.types.Operator):
 
             # Need to pack first to save the image
             if image.is_dirty:
-                if is_greater_than_280():
+                if is_bl_newer_than(2, 80):
                     image.pack()
                 else:
                     if image.is_float:
                         pack_float_image(image)
                     else: image.pack(as_png=True)
 
-            # Some image need to set to srgb when saving
+            # Some images need to set to srgb when saving
             ori_colorspace = image.colorspace_settings.name
             if not image.is_float and image.colorspace_settings.name != get_srgb_name():
                 image.colorspace_settings.name = get_srgb_name()
@@ -734,6 +756,9 @@ class YSaveAllBakedImages(bpy.types.Operator):
             if image.packed_file:
                 unpack = True
                 default_dir, default_dir_found, default_filepath, temp_path, unpacked_path = unpack_image(image, path)
+
+            if self.copy:
+                pass
 
             # Save image
             image.save_render(path, scene=tmpscene)
@@ -750,7 +775,15 @@ class YSaveAllBakedImages(bpy.types.Operator):
             if unpack:
                 remove_unpacked_image_path(image, path, default_dir, default_dir_found, default_filepath, temp_path, unpacked_path)
 
-            #print(path)
+        # Remove copied images
+        if self.copy:
+            for image in reversed(images):
+                remove_datablock(bpy.data.images, image)
+
+        # Recover image names
+        for i, ori_image_name in enumerate(original_image_names):
+            ori_image = bpy.data.images.get(ori_image_name)
+            ori_image.name = original_names[i]
 
         # Delete temporary scene
         remove_datablock(bpy.data.scenes, tmpscene)
@@ -776,7 +809,7 @@ def get_file_format_items():
             ('TIFF', 'TIFF', '', 'IMAGE_DATA', 12)
             ]
 
-    if is_greater_than_320():
+    if is_bl_newer_than(3, 2):
         items.append(('WEBP', 'WebP', '', 'IMAGE_DATA', 13))
 
     return items
@@ -925,10 +958,11 @@ class YSaveAsImage(bpy.types.Operator, ExportHelper):
         filename = bpy.path.basename(context.image.filepath)
 
         # Set filepath
-        if context.image.filepath == '' or filename == '':
+        if context.image.filepath == '' or filename == '' or '.<UDIM>.' in filename:
             yp = get_active_ypaint_node().node_tree.yp
 
             name = context.image.name
+            name += '.<UDIM>' if '.<UDIM>.' in filename else ''
 
             # Remove addon title from the file names
             if yp.use_baked and name.startswith(get_addon_title() + ' '):
@@ -1042,13 +1076,16 @@ class YSaveAsImage(bpy.types.Operator, ExportHelper):
             self.report({'ERROR'}, 'Unpacking image atlas is not supported yet!')
             return {'CANCELLED'}
 
+        if self.copy:
+            image = self.image = duplicate_image(image, ondisk_duplicate=False)
+
         # Packing and unpacking sometimes does not work if the blend file is not saved yet
         unpack = False
         if bpy.data.filepath != '':
 
             # Need to pack first to save the image
             if image.is_dirty:
-                if is_greater_than_280():
+                if is_bl_newer_than(2, 80):
                     image.pack()
                 else:
                     if image.is_float:
@@ -1060,45 +1097,43 @@ class YSaveAsImage(bpy.types.Operator, ExportHelper):
                 unpack = True
                 self.unpack_image(context)
 
-        # Create temporary scene
-        tmpscene = bpy.data.scenes.new('Temp Save As Scene')
-
-        # Blender 2.80 has filmic as default color settings, change it to standard
-        if is_greater_than_280():
-            tmpscene.view_settings.view_transform = 'Standard'
-
         # Some image need to set to srgb when saving
         ori_colorspace = image.colorspace_settings.name
         if not image.is_float and not image.is_dirty:
             image.colorspace_settings.name = get_srgb_name()
 
-        # Set settings
-        settings = tmpscene.render.image_settings
-        settings.file_format = self.file_format
-        settings.color_mode = self.color_mode
-        settings.color_depth = self.color_depth
-        settings.compression = self.compression
-        settings.quality = self.quality
-        if hasattr(settings, 'tiff_codec'): settings.tiff_codec = self.tiff_codec
-        settings.exr_codec = self.exr_codec
-        settings.jpeg2k_codec = self.jpeg2k_codec
-        settings.use_jpeg2k_cinema_48 = self.use_jpeg2k_cinema_48
-        settings.use_jpeg2k_cinema_preset = self.use_jpeg2k_cinema_preset
-        settings.use_jpeg2k_ycc = self.use_jpeg2k_ycc
-        settings.use_cineon_log = self.use_cineon_log
-        if hasattr(settings, 'use_zbuffer'): settings.use_zbuffer = self.use_zbuffer
-
-        #print(self.file_format)
-
         # Save image
         if image.source == 'TILED':
             override = bpy.context.copy()
             override['edit_image'] = image
-            if is_greater_than_400():
+            if is_bl_newer_than(4):
                 with bpy.context.temp_override(**override):
                     bpy.ops.image.save_as(copy=self.copy, filepath=self.filepath, relative_path=self.relative)
             else: bpy.ops.image.save_as(override, copy=self.copy, filepath=self.filepath, relative_path=self.relative)
         else:
+            # Create temporary scene
+            tmpscene = bpy.data.scenes.new('Temp Save As Scene')
+
+            # Blender 2.80 has filmic as default color settings, change it to standard
+            if is_bl_newer_than(2, 80):
+                tmpscene.view_settings.view_transform = 'Standard'
+
+            # Set settings
+            settings = tmpscene.render.image_settings
+            settings.file_format = self.file_format
+            settings.color_mode = self.color_mode
+            settings.color_depth = self.color_depth
+            settings.compression = self.compression
+            settings.quality = self.quality
+            if hasattr(settings, 'tiff_codec'): settings.tiff_codec = self.tiff_codec
+            settings.exr_codec = self.exr_codec
+            settings.jpeg2k_codec = self.jpeg2k_codec
+            settings.use_jpeg2k_cinema_48 = self.use_jpeg2k_cinema_48
+            settings.use_jpeg2k_cinema_preset = self.use_jpeg2k_cinema_preset
+            settings.use_jpeg2k_ycc = self.use_jpeg2k_ycc
+            settings.use_cineon_log = self.use_cineon_log
+            if hasattr(settings, 'use_zbuffer'): settings.use_zbuffer = self.use_zbuffer
+
             image.save_render(self.filepath, scene=tmpscene)
 
             if not self.copy:
@@ -1112,17 +1147,21 @@ class YSaveAsImage(bpy.types.Operator, ExportHelper):
                 image.source = 'FILE'
                 image.reload()
 
+            # Delete temporary scene
+            remove_datablock(bpy.data.scenes, tmpscene)
+
         # Remove unpacked file
         if unpack:
             self.remove_unpacked_image(context)
 
         # Set back colorspace settings
-        image.colorspace_settings.name = ori_colorspace
+        if image.colorspace_settings.name != ori_colorspace:
+            image.colorspace_settings.name = ori_colorspace
 
-        # Delete temporary scene
-        remove_datablock(bpy.data.scenes, tmpscene)
+        # Delete copied image
+        if self.copy:
+            remove_datablock(bpy.data.images, image)
 
-        #context.image.save()
         return {'FINISHED'}
 
 class YSavePackAll(bpy.types.Operator):
@@ -1140,7 +1179,7 @@ class YSavePackAll(bpy.types.Operator):
         #T = time.time()
         yp = get_active_ypaint_node().node_tree.yp
         save_pack_all(yp)
-        #print('INFO:', 'All images is saved/packed at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        #print('INFO:', 'All images are saved/packed in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
         ypui.refresh_image_hack = False
         return {'FINISHED'}
 
@@ -1196,7 +1235,7 @@ class YConvertImageBitDepth(bpy.types.Operator):
 
         # Pack image
         if image.packed_file and image.source != 'TILED':
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 new_image.pack()
             else:
                 if new_image.is_float:
