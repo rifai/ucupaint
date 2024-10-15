@@ -166,8 +166,14 @@ uniform float layer_{16}_decal_distance = {17};
 	script_decal_fragment = '''
 	
 	vec4 world_pos_{0} = INV_VIEW_MATRIX * vec4(VERTEX, 1.0);
-	mat4 world_view_{0} = layer_{0}_decal_matrix * inverse(MODEL_MATRIX);
-	vec4 cam_pos_{0} = world_view_0 * world_pos_0;
+
+	mat4 scale_mat_{0} = mat4(vec4({1}, 0.0, 0.0, 0.0),
+							vec4(0.0, {2}, 0.0, 0.0),
+							vec4(0.0, 0.0, {3}, 0.0),
+							vec4(0.0, 0.0, 0.0, 1.0)); 
+
+	mat4 world_view_{0} = scale_mat_{0} * layer_{0}_decal_matrix * inverse(MODEL_MATRIX);
+	vec4 cam_pos_{0} = world_view_{0} * world_pos_{0};
 
 	mat4 view_projection_matrix_{0} = projection_matrix * world_view_{0};
 	vec4 clip_pos_{0} = view_projection_matrix_{0} * world_pos_{0};
@@ -199,15 +205,6 @@ uniform float layer_{16}_decal_distance = {17};
 	NORMAL_MAP_DEPTH = normal_depth_all.r;
 '''
 
-	# converter failed
-	def convert_exr_to_png(self, image, png_path:str):
-		override = bpy.context.copy()
-		override['edit_image'] = image
-		if is_greater_than_400():
-			with bpy.context.temp_override(**override):
-				bpy.ops.image.save_as(copy=True, filepath=png_path, relative_path=True, save_as_render=True)
-		else: bpy.ops.image.save_as(copy=True, filepath=png_path, relative_path=True, save_as_render=True)
-	
 	def get_godot_directory(self, path:str):
 
 		current_dir = os.path.dirname(path)
@@ -443,10 +440,18 @@ uniform float layer_{16}_decal_distance = {17};
 					elif layer.texcoord_type == "Decal":
 						layer_tree = common.get_tree(layer)
 						texcoord = layer_tree.nodes.get(layer.texcoord)
-
 						decal_obj = texcoord.object
-
 						local_matrix = decal_obj.matrix_local
+
+						image = None
+						if source:
+							image = source.image
+
+						if image:
+							if image.size[0] > image.size[1]:
+								decal_scale = (image.size[1] / image.size[0], 1.0, 1.0)
+							else: 
+								decal_scale = (1.0, image.size[0] / image.size[1], 1.0)
 
 						layer_var = "layer_"+str(index)
 
@@ -458,6 +463,7 @@ uniform float layer_{16}_decal_distance = {17};
 						))
 
 						local_matrix = blender_to_godot @ local_matrix# @ blender_to_godot.inverted()
+						# print("local_matrix  3", local_matrix)
 						local_matrix.transpose()
 
 						# affine inverse
@@ -467,10 +473,10 @@ uniform float layer_{16}_decal_distance = {17};
     
 						lyr_distance = inp.default_value
 
-						print("Decal layer", decal_obj.type)
-						print("decal world ", decal_obj.matrix_world, decal_obj.name)
-						print("decal local ", decal_obj.matrix_local, decal_obj.name)
-						print("decal inverse ", decal_obj.matrix_parent_inverse, decal_obj.name)
+						# print("Decal layer", decal_obj.type)
+						# print("decal world ", decal_obj.matrix_world, decal_obj.name)
+						# print("decal local ", decal_obj.matrix_local, decal_obj.name)
+						# print("decal inverse ", decal_obj.matrix_parent_inverse, decal_obj.name)
 						print("decal gabungan ", local_matrix, decal_obj.name)
 
 						print("layer distance ", lyr_distance)
@@ -495,7 +501,7 @@ uniform float layer_{16}_decal_distance = {17};
 
 						albedo_overrides.append(layer_idx)
 
-						fragment_var = self.script_decal_fragment.format(index)
+						fragment_var = self.script_decal_fragment.format(index, decal_scale[0], decal_scale[1], decal_scale[2])
 						fragment_vars += fragment_var
 
 						index += 1
