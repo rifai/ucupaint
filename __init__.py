@@ -44,13 +44,15 @@ if "bpy" in locals():
     imp.reload(Root)
     imp.reload(versioning)
     imp.reload(addon_updater_ops)
-    imp.reload(godot)
+    imp.reload(exporter)
+    
 else:
     from . import Localization
     from . import image_ops, common, bake_common, modifier_common, lib, ui, subtree, transition_common, input_outputs, node_arrangements, node_connections, preferences
     from . import vector_displacement_lib, vector_displacement
-    from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, NormalMapModifier, Layer, Bake, BakeToLayer, Root, versioning, godot
+    from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, NormalMapModifier, Layer, Bake, BakeToLayer, Root, versioning
     from . import addon_updater_ops
+    from .godot import exporter 
 
 import bpy 
 
@@ -78,7 +80,7 @@ def register():
     Root.register()
     versioning.register()
     addon_updater_ops.register()
-    godot.register()
+    exporter.register()
 
     print('INFO: ' + common.get_addon_title() + ' ' + common.get_current_version_str() + ' is registered!')
 
@@ -106,7 +108,7 @@ def unregister():
     Root.unregister()
     versioning.unregister()
     addon_updater_ops.unregister()
-    godot.unregister()
+    exporter.unregister()
 
     print('INFO: ' + common.get_addon_title() + ' ' + common.get_current_version_str() + ' is unregistered!')
 
