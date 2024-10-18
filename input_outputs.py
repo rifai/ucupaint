@@ -64,21 +64,21 @@ def fix_tree_output_index_400(interface, item, correct_index):
                 return
 
 def fix_tree_input_index(tree, item, correct_index):
-    if not is_greater_than_400():
+    if not is_bl_newer_than(4):
         fix_io_index_360(item, tree.inputs, correct_index)
         return
 
     fix_tree_input_index_400(tree.interface, item, correct_index)
 
 def fix_tree_output_index(tree, item, correct_index):
-    if not is_greater_than_400():
+    if not is_bl_newer_than(4):
         fix_io_index_360(item, tree.outputs, correct_index)
         return
 
     fix_tree_output_index_400(tree.interface, item, correct_index)
 
 def create_input(tree, name, socket_type, valid_inputs, index, 
-        dirty = False, min_value=None, max_value=None, default_value=None, hide_value=False, description=''):
+        dirty = False, min_value=None, max_value=None, default_value=None, hide_value=False, description='', node=None):
 
     inp = get_tree_input_by_name(tree, name)
     if not inp:
@@ -87,7 +87,18 @@ def create_input(tree, name, socket_type, valid_inputs, index,
         if min_value != None and hasattr(inp, 'min_value'): inp.min_value = min_value
         if max_value != None and hasattr(inp, 'max_value'): inp.max_value = max_value
         if default_value != None: inp.default_value = default_value
-        if hasattr(inp, 'hide_value'): inp.hide_value = hide_value
+        if hasattr(inp, 'hide_value'): 
+            inp.hide_value = hide_value
+        else:
+            # NOTE: In some blender versions, hide_value is a node input prop
+            if not node:
+                n = get_active_ypaint_node()
+                if n and n.node_tree == tree:
+                    node = n
+            if node:
+                inpp = node.inputs.get(name)
+                if inpp and hasattr(inpp, 'hide_value'):
+                    inpp.hide_value = hide_value
 
     valid_inputs.append(inp)
     fix_tree_input_index(tree, inp, index)
@@ -179,8 +190,8 @@ def check_start_end_root_ch_nodes(group_tree, specific_channel=None):
                             if end_max_height_tweak.inputs[index].name == 'Height Tweak':
                                 fc.data_path = channel.path_from_id() + '.height_tweak'
 
-            if not is_greater_than_300() and channel.enable_subdiv_setup:
-                if not is_greater_than_280():
+            if not is_bl_newer_than(3) and channel.enable_subdiv_setup:
+                if not is_bl_newer_than(2, 80):
                     lib_name = lib.CHECK_INPUT_NORMAL_MIXED_BL27
                 else: lib_name = lib.CHECK_INPUT_NORMAL_MIXED
             elif not channel.enable_smooth_bump and channel.enable_subdiv_setup: # and ypup.eevee_next_displacement:
@@ -246,7 +257,7 @@ def check_start_end_root_ch_nodes(group_tree, specific_channel=None):
             # Engine filter is needed if subdiv is on and channel is baked
             if yp.use_baked and channel.enable_subdiv_setup and any_layers_using_displacement(channel):
 
-                lib_name = lib.ENGINE_FILTER if is_greater_than_280() else lib.ENGINE_FILTER_LEGACY
+                lib_name = lib.ENGINE_FILTER if is_bl_newer_than(2, 80) else lib.ENGINE_FILTER_LEGACY
                 end_normal_engine_filter = replace_new_node(
                         group_tree, channel, 'end_normal_engine_filter', 'ShaderNodeGroup', 'End Engine Filter', lib_name)
                 for inp in end_normal_engine_filter.inputs:
@@ -305,7 +316,7 @@ def check_start_end_root_ch_nodes(group_tree, specific_channel=None):
                     # Set normal tweak value to 1.0 if it's disabled
                     end_linear.inputs['Normal Tweak'].default_value = 1.0
 
-def check_all_channel_ios(yp, reconnect=True, specific_layer=None, remove_props=False, force_height_io=False, hard_reset=False):
+def check_all_channel_ios(yp, reconnect=True, specific_layer=None, remove_props=False, force_height_io=False, hard_reset=False, yp_node=None):
 
     #print("Checking YP IO. Specific Layer: " + str(specific_layer))
 
@@ -327,7 +338,7 @@ def check_all_channel_ios(yp, reconnect=True, specific_layer=None, remove_props=
         elif ch.type == 'NORMAL':
             # Use 999 as normal z value so it will fallback to use geometry normal at checking process
             create_input(group_tree, ch.name, channel_socket_input_bl_idnames[ch.type], 
-                    valid_inputs, input_index, default_value=(999,999,999), hide_value=True)
+                    valid_inputs, input_index, default_value=(999,999,999), hide_value=True, node=yp_node)
 
         create_output(group_tree, ch.name, channel_socket_output_bl_idnames[ch.type], 
                 valid_outputs, output_index)
@@ -445,18 +456,24 @@ def check_all_channel_ios(yp, reconnect=True, specific_layer=None, remove_props=
         rearrange_yp_nodes(group_tree)
 
 def create_decal_empty():
+    obj = bpy.context.object
     scene = bpy.context.scene
     empty_name = get_unique_name('Decal', bpy.data.objects)
     empty = bpy.data.objects.new(empty_name, None)
-    if is_greater_than_280():
+    if is_bl_newer_than(2, 80):
         empty.empty_display_type = 'SINGLE_ARROW'
     else: empty.empty_draw_type = 'SINGLE_ARROW'
-    link_object(scene, empty)
-    if is_greater_than_280():
+    custom_collection = obj.users_collection[0] if is_bl_newer_than(2, 80) and len(obj.users_collection) > 0 else None
+    link_object(scene, empty, custom_collection)
+    if is_bl_newer_than(2, 80):
         empty.location = scene.cursor.location.copy()
         empty.rotation_euler = scene.cursor.rotation_euler.copy()
     else: 
         empty.location = scene.cursor_location.copy()
+
+    # Parent empty to active object
+    empty.parent = obj
+    empty.matrix_parent_inverse = obj.matrix_world.inverted()
 
     return empty
 
@@ -529,7 +546,8 @@ def check_mask_texcoord_nodes(layer, mask, tree=None):
                 mask.original_image_extension = ''
 
     # Save original texcoord type
-    mask.original_texcoord = mask.texcoord_type
+    if mask.original_texcoord != mask.texcoord_type:
+        mask.original_texcoord = mask.texcoord_type
 
 def check_layer_texcoord_nodes(layer, tree=None):
     yp = layer.id_data.yp
@@ -607,7 +625,8 @@ def check_layer_texcoord_nodes(layer, tree=None):
                 layer.original_image_extension = ''
 
     # Save original texcoord type
-    layer.original_texcoord = layer.texcoord_type
+    if layer.original_texcoord != layer.texcoord_type:
+        layer.original_texcoord = layer.texcoord_type
 
 def check_all_layer_channel_io_and_nodes(layer, tree=None, specific_ch=None, do_recursive=True, remove_props=False, hard_reset=False): #, check_uvs=False): #, has_parent=False):
 
@@ -680,8 +699,8 @@ def check_all_layer_channel_io_and_nodes(layer, tree=None, specific_ch=None, do_
             other_layers.append(parent)
 
         # Check child layers
-        childs, child_ids = get_list_of_all_childs_and_child_ids(layer)
-        for child in childs: 
+        children, child_ids = get_list_of_all_children_and_child_ids(layer)
+        for child in children: 
             other_layers.append(child)
 
         # Check background layers
@@ -753,11 +772,14 @@ def create_prop_input(entity, prop_name, valid_inputs, input_index, dirty):
         dirty = True
 
     # Set animation data path back
-    if root_tree.animation_data and root_tree.animation_data.action:
+    if root_tree.animation_data:
         # Example: yp.layers[0].channels[0].intensity_value'
-        for fc in root_tree.animation_data.action.fcurves:
-            if fc.data_path == 'yp.layers[' + str(layer_index) + ']' + input_name:
-                fc.data_path = 'nodes["' + layer_node.name + '"].inputs[' + str(input_index) + '].default_value'
+
+        if root_tree.animation_data.action:
+            for fc in root_tree.animation_data.action.fcurves:
+                if fc.data_path == 'yp.layers[' + str(layer_index) + ']' + input_name:
+                    fc.data_path = 'nodes["' + layer_node.name + '"].inputs[' + str(input_index) + '].default_value'
+
         for driver in root_tree.animation_data.drivers:
             if driver.data_path == 'yp.layers[' + str(layer_index) + ']' + input_name:
                 driver.data_path = 'nodes["' + layer_node.name + '"].inputs[' + str(input_index) + '].default_value'
@@ -791,13 +813,16 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
     trans_bump_ch = get_transition_bump_channel(layer)
 
     # Rename fcurve and driver data path before rearranging the inputs
-    if root_tree.animation_data and root_tree.animation_data.action:
+    if root_tree.animation_data:
         # Example: nodes["Group.003"].inputs[9].default_value'
-        for fc in root_tree.animation_data.action.fcurves:
-            m = re.match(r'^nodes\["' + layer_node.name + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
-            if m:
-                inp = layer_node.inputs[int(m.group(1))]
-                fc.data_path = 'yp.layers[' + str(get_layer_index(layer)) + ']' + inp.name
+
+        if root_tree.animation_data.action:
+            for fc in root_tree.animation_data.action.fcurves:
+                m = re.match(r'^nodes\["' + layer_node.name + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
+                if m:
+                    inp = layer_node.inputs[int(m.group(1))]
+                    fc.data_path = 'yp.layers[' + str(get_layer_index(layer)) + ']' + inp.name
+
         for driver in root_tree.animation_data.drivers:
             m = re.match(r'^nodes\["' + layer_node.name + '"\]\.inputs\[(\d+)\]\.default_value$', driver.data_path)
             if m:
@@ -817,6 +842,10 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
 
         if layer.texcoord_type == 'Decal':
             dirty = create_prop_input(layer, 'decal_distance_value', valid_inputs, input_index, dirty)
+            input_index += 1
+        
+        if is_bl_newer_than(2, 81) and layer.enable_uniform_scale and is_layer_using_vector(layer):
+            dirty = create_prop_input(layer, 'uniform_scale_value', valid_inputs, input_index, dirty)
             input_index += 1
         
         # Channel prop inputs
@@ -935,6 +964,10 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
             dirty = create_prop_input(mask, 'intensity_value', valid_inputs, input_index, dirty)
             input_index += 1
 
+            if is_bl_newer_than(2, 81) and mask.enable_uniform_scale and is_mask_using_vector(mask):
+                dirty = create_prop_input(mask, 'uniform_scale_value', valid_inputs, input_index, dirty)
+                input_index += 1
+
             # Mask blur vector
             if mask.enable_blur_vector:
                 dirty = create_prop_input(mask, 'blur_vector_factor', valid_inputs, input_index, dirty)
@@ -948,6 +981,11 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
             # Color ID
             if mask.type == 'COLOR_ID':
                 dirty = create_prop_input(mask, 'color_id', valid_inputs, input_index, dirty)
+                input_index += 1
+
+            # Edge Detect
+            elif mask.type == 'EDGE_DETECT':
+                dirty = create_prop_input(mask, 'edge_detect_radius', valid_inputs, input_index, dirty)
                 input_index += 1
 
     # Tree input and outputs
@@ -1163,29 +1201,15 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
             # Set input prop before deleting input socket
             if inp.name.startswith('.'):
 
-                # For fully implemented prop only
-                if not any(prop for prop in [
-                    #'transition_bump_value', 
-                    #'transition_bump_second_edge_value',
-                    ] if prop in inp.name): 
-
-                    # Rename fcurve path first before deleting the input
-                    #if root_tree.animation_data and root_tree.animation_data.action:
-                    #    for fc in root_tree.animation_data.action.fcurves:
-                    #        if fc.data_path == 'nodes["' + layer_node.name + '"].inputs[' + str(i) + '].default_value':
-                    #            print([n.name for n in layer_node.inputs])
-                    #            print(fc.data_path, inp.name)
-                    #            fc.data_path = 'yp.layers[' + str(get_layer_index(layer)) + ']' + inp.name
-
-                    # Set value back to prop
-                    val = layer_node.inputs.get(inp.name).default_value
-                    socket_type = inp.socket_type if is_greater_than_400() else inp.type
-                    if socket_type in {'NodeSocketColor', 'RGBA'}:
-                        try: exec('layer' + inp.name + ' = (val[0], val[1], val[2])')
-                        except Exception as e: print(e)
-                    else:
-                        try: exec('layer' + inp.name + ' = val')
-                        except Exception as e: print(e)
+                # Set value back to prop
+                val = layer_node.inputs.get(inp.name).default_value
+                socket_type = inp.socket_type if is_bl_newer_than(4) else inp.type
+                if socket_type in {'NodeSocketColor', 'RGBA'}:
+                    try: exec('layer' + inp.name + ' = (val[0], val[1], val[2])')
+                    except Exception as e: print(e)
+                else:
+                    try: exec('layer' + inp.name + ' = val')
+                    except Exception as e: print(e)
 
             # Remove input socket
             remove_tree_input(tree, inp)

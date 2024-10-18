@@ -520,7 +520,7 @@ def check_create_spread_alpha(layer, tree, root_ch, ch):
     channel_enabled = get_channel_enabled(ch, layer, root_ch)
     need_reconnect = False
 
-    # NOTE: Remove spread alpha node entirely (at least for now), since it provides almost nothing in most situation
+    # NOTE: Remove spread alpha node entirely (at least for now), since it provides almost nothing in most situations
     if False and channel_enabled and layer.type == 'IMAGE' and ch.normal_map_type != 'NORMAL_MAP': # and ch.enable_transition_bump:
         if root_ch.enable_smooth_bump:
             spread_alpha, dirty = replace_new_node(tree, ch, 'spread_alpha', 
@@ -591,7 +591,8 @@ def check_mask_mix_nodes(layer, tree=None, specific_mask=None, specific_ch=None)
                     need_reconnect = True
                     mix = new_mix_node(tree, c, 'mix', 'Mask Blend')
                     mix.inputs[0].default_value = mask.intensity_value
-                mix.blend_type = mask.blend_type
+                if mix.blend_type != mask.blend_type:
+                    mix.blend_type = mask.blend_type
                 # Use clamp to keep value between 0.0 to 1.0
                 if mask.blend_type not in {'MIX', 'MULTIPLY'}: 
                     set_mix_clamp(mix, True)
@@ -603,7 +604,8 @@ def check_mask_mix_nodes(layer, tree=None, specific_mask=None, specific_ch=None)
                     if not mix_pure:
                         need_reconnect = True
                         mix_pure = new_mix_node(tree, c, 'mix_pure', 'Mask Blend Pure')
-                        mix_pure.blend_type = mask.blend_type
+                        if mix_pure.blend_type != mask.blend_type:
+                            mix_pure.blend_type = mask.blend_type
                         # Use clamp to keep value between 0.0 to 1.0
                         set_mix_clamp(mix_pure, True)
                         mix_pure.inputs[0].default_value = mask.intensity_value
@@ -620,7 +622,8 @@ def check_mask_mix_nodes(layer, tree=None, specific_mask=None, specific_ch=None)
                         need_reconnect = True
                         mix_remains = new_mix_node(tree, c, 'mix_remains', 'Mask Blend Remaining')
                         mix_remains.inputs[0].default_value = mask.intensity_value
-                    mix_remains.blend_type = mask.blend_type
+                    if mix_remains.blend_type != mask.blend_type:
+                        mix_remains.blend_type = mask.blend_type
                     # Use clamp to keep value between 0.0 to 1.0
                     if mask.blend_type not in {'MIX', 'MULTIPLY'}: 
                         set_mix_clamp(mix_remains, True)
@@ -633,7 +636,8 @@ def check_mask_mix_nodes(layer, tree=None, specific_mask=None, specific_ch=None)
                         need_reconnect = True
                         mix_normal = new_mix_node(tree, c, 'mix_normal', 'Mask Normal')
                         mix_normal.inputs[0].default_value = mask.intensity_value
-                    mix_normal.blend_type = mask.blend_type
+                    if mix_normal.blend_type != mask.blend_type:
+                        mix_normal.blend_type = mask.blend_type
                     # Use clamp to keep value between 0.0 to 1.0
                     if mask.blend_type not in {'MIX', 'MULTIPLY'}: 
                         set_mix_clamp(mix_normal, True)
@@ -652,7 +656,8 @@ def check_mask_mix_nodes(layer, tree=None, specific_mask=None, specific_ch=None)
                         mix_remains = new_mix_node(tree, c, 'mix_remains', 'Mask Blend n')
                         mix_remains.inputs[0].default_value = mask.intensity_value
 
-                    mix_remains.blend_type = mask.blend_type
+                    if mix_remains.blend_type != mask.blend_type:
+                        mix_remains.blend_type = mask.blend_type
                     # Use clamp to keep value between 0.0 to 1.0
                     if mask.blend_type not in {'MIX', 'MULTIPLY'}: 
                         set_mix_clamp(mix_remains, True)
@@ -734,10 +739,10 @@ def recover_tangent_sign_process(ori_obj, ori_mode, ori_selects):
     # Recover selected and active objects
     bpy.ops.object.select_all(action='DESELECT')
     for o in ori_selects:
-        if is_greater_than_280(): o.select_set(True)
+        if is_bl_newer_than(2, 80): o.select_set(True)
         else: o.select = True
 
-    if is_greater_than_280(): bpy.context.view_layer.objects.active = ori_obj
+    if is_bl_newer_than(2, 80): bpy.context.view_layer.objects.active = ori_obj
     else: bpy.context.scene.objects.active = ori_obj
 
     # Back to original mode
@@ -748,7 +753,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
 
     if obj.type != 'MESH': return None
 
-    # Cannot do this on edit mode
+    # Cannot do this in edit mode
     ori_obj = bpy.context.object
     ori_mode = ori_obj.mode
     if ori_mode != 'OBJECT':
@@ -758,7 +763,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
     ori_selects = [o for o in bpy.context.selected_objects]
     bpy.ops.object.select_all(action='DESELECT')
 
-    if is_greater_than_280(): 
+    if is_bl_newer_than(2, 80): 
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
     else: 
@@ -786,7 +791,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
                 return None
 
             # Set default color to be white
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 for d in vcol.data: 
                     d.color = (1.0, 1.0, 1.0, 1.0)
             else: 
@@ -809,7 +814,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
                     bs = max(vert.bitangent_sign, 0.0)
                     # Invert bitangent sign so the default value is 0.0 rather than 1.0
                     bs = 1.0 - bs
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
                         vcol.data[i].color = (bs, bs, bs, 1.0)
                     else: vcol.data[i].color = (bs, bs, bs)
                     i += 1
@@ -818,7 +823,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
         except:
 
             # Remember selection
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 ori_select = [o for o in bpy.context.view_layer.objects if o.select_get()]
             else: ori_select = [o for o in bpy.context.scene.objects if o.select]
 
@@ -836,7 +841,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
             temp_ob.data = obj.data.copy()
             temp_ob.name = '___TEMP__'
 
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 bpy.context.scene.collection.objects.link(temp_ob)
                 bpy.context.view_layer.objects.active = temp_ob
             else: 
@@ -871,13 +876,13 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
                     bs = max(vert.bitangent_sign, 0.0)
                     # Invert bitangent sign so the default value is 0.0 rather than 1.0
                     bs = 1.0 - bs
-                    if is_greater_than_280():
+                    if is_bl_newer_than(2, 80):
                         temp_vcol.data[i].color = (bs, bs, bs, 1.0)
                     else: temp_vcol.data[i].color = (bs, bs, bs)
                     i += 1
 
             # Set active object back to the original mesh
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 bpy.context.view_layer.objects.active = obj
             else: bpy.context.scene.objects.active = obj
 
@@ -918,13 +923,11 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
                     m.show_render = ori_show_render_mods[i]
 
             # Delete temp object
-            temp_me = temp_ob.data
-            bpy.data.objects.remove(temp_ob)
-            bpy.data.meshes.remove(temp_me)
+            remove_mesh_obj(temp_ob)
 
             # Set back original select
             for o in ori_select:
-                if is_greater_than_280():
+                if is_bl_newer_than(2, 80):
                     o.select_set(True)
                 else: o.select = True
 
@@ -935,7 +938,7 @@ def actual_refresh_tangent_sign_vcol(obj, uv_name):
                 for o in related_objs:
                     o.data = obj.data
 
-                bpy.data.meshes.remove(ori_mesh)
+                remove_datablock(bpy.data.meshes, ori_mesh)
                 o.data.name = ori_name
 
         # Recover active uv
@@ -1009,9 +1012,9 @@ def check_actual_uv_nodes(yp, uv, obj):
         if not tangent_process:
             # Create tangent process which output both tangent and bitangent
             tangent_process = new_node(tree, uv, 'tangent_process', 'ShaderNodeGroup', uv.name + ' Tangent Process')
-            if is_greater_than_300():
+            if is_bl_newer_than(3):
                 tangent_process.node_tree = get_node_tree_lib(lib.TANGENT_PROCESS_300)
-            elif is_greater_than_280():
+            elif is_bl_newer_than(2, 80):
                 tangent_process.node_tree = get_node_tree_lib(lib.TANGENT_PROCESS)
             else: tangent_process.node_tree = get_node_tree_lib(lib.TANGENT_PROCESS_LEGACY)
             duplicate_lib_node_tree(tangent_process)
@@ -1283,15 +1286,15 @@ def clear_parallax_node_data(yp, parallax, baked=False):
         it = parallax_loop.node_tree.nodes.get('_iterate_depth_' + str(counter))
 
         if it and it.node_tree:
-            bpy.data.node_groups.remove(it.node_tree)
+            remove_datablock(bpy.data.node_groups, it.node_tree, user=it, user_prop='node_tree')
         else: break
 
         counter += 1
 
     # Remove node trees
-    bpy.data.node_groups.remove(iterate.node_tree)
-    bpy.data.node_groups.remove(parallax_loop.node_tree)
-    bpy.data.node_groups.remove(depth_source_0.node_tree)
+    remove_datablock(bpy.data.node_groups, iterate.node_tree, user=iterate, user_prop='node_tree')
+    remove_datablock(bpy.data.node_groups, parallax_loop.node_tree, user=parallax_loop, user_prop='node_tree')
+    remove_datablock(bpy.data.node_groups, depth_source_0.node_tree, user=depth_source_0, user_prop='node_tree')
 
     # Clear parallax uv node names
     for uv in yp.uvs:
@@ -1375,7 +1378,7 @@ def check_parallax_node(yp, height_ch, unused_uvs=[], unused_texcoords=[], baked
         if not baked_parallax_filter:
             baked_parallax_filter = tree.nodes.new('ShaderNodeGroup')
             baked_parallax_filter.name = BAKED_PARALLAX_FILTER
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 baked_parallax_filter.node_tree = get_node_tree_lib(lib.ENGINE_FILTER)
             else: baked_parallax_filter.node_tree = get_node_tree_lib(lib.ENGINE_FILTER_LEGACY)
             baked_parallax_filter.label = 'Baked Parallax Filter'
@@ -2044,7 +2047,7 @@ def check_channel_normal_map_nodes(tree, layer, root_ch, ch, need_reconnect=Fals
         # NOTE: Normal flip node is kinda unecessary since non smooth bump don't support backface up for now
         # Normal flip
         if False and not root_ch.enable_smooth_bump and not write_height:
-            if is_greater_than_280(): lib_name = lib.FLIP_BACKFACE_BUMP
+            if is_bl_newer_than(2, 80): lib_name = lib.FLIP_BACKFACE_BUMP
             else: lib_name = lib.FLIP_BACKFACE_BUMP_LEGACY
 
             normal_flip = replace_new_node(tree, ch, 'normal_flip', 'ShaderNodeGroup', 
@@ -2087,7 +2090,8 @@ def update_preview_mix(ch, preview):
     if preview.type != 'GROUP': return
     # Set channel layer blending
     mix = preview.node_tree.nodes.get('Mix')
-    if mix: mix.blend_type = ch.blend_type
+    if mix and mix.blend_type != ch.blend_type:
+        mix.blend_type = ch.blend_type
 
 def check_override_1_layer_channel_nodes(root_ch, layer, ch):
 
@@ -2437,7 +2441,7 @@ def check_layer_channel_linear_node(ch, layer=None, root_ch=None, reconnect=Fals
             and root_ch.colorspace == 'SRGB' 
             and (
                 (not ch.gamma_space and ch.layer_input == 'RGB' and layer.type not in {'IMAGE', 'BACKGROUND', 'GROUP'})
-                or (layer.type == 'IMAGE' and image.is_float and image.colorspace_settings.name != 'sRGB') # Float images need to converted to linear for some reason in Blender
+                or (layer.type == 'IMAGE' and image.is_float and image.colorspace_settings.name != get_srgb_name()) # Float images need to converted to linear for some reason in Blender
                 )
         ) or (
             yp.use_linear_blending
@@ -2459,7 +2463,7 @@ def check_layer_channel_linear_node(ch, layer=None, root_ch=None, reconnect=Fals
             and root_ch.colorspace == 'SRGB' 
             and (
                 (ch.gamma_space and ch.layer_input == 'RGB' and layer.type not in {'IMAGE', 'BACKGROUND', 'GROUP'})
-                #or (layer.type == 'IMAGE' and image.is_float and image.colorspace_settings.name == 'sRGB') 
+                #or (layer.type == 'IMAGE' and image.is_float and image.colorspace_settings.name == get_srgb_name()) 
                 )
         ):
         if root_ch.type == 'VALUE':

@@ -3,7 +3,7 @@ from .common import *
 from bpy.props import *
 
 class YBakeInfoOtherObject(bpy.types.PropertyGroup):
-    if is_greater_than_279():
+    if is_bl_newer_than(2, 79):
         object : PointerProperty(type=bpy.types.Object)
     object_name : StringProperty(default='')
 
@@ -11,7 +11,7 @@ class YBakeInfoSelectedVertex(bpy.types.PropertyGroup):
     index : IntProperty(default=0)
 
 class YBakeInfoSelectedObject(bpy.types.PropertyGroup):
-    if is_greater_than_279():
+    if is_bl_newer_than(2, 79):
         object : PointerProperty(type=bpy.types.Object)
     object_name : StringProperty(default='')
 
@@ -131,6 +131,11 @@ class YBakeInfoProps(bpy.types.PropertyGroup):
             description = 'Image interpolation type',
             items = interpolation_type_items,
             default = 'Linear')
+
+    use_float_for_normal : BoolProperty(
+            name = 'Use Float for Normal',
+            description='Use float image for baked normal',
+            default=False)
 
     use_float_for_displacement : BoolProperty(
             name = 'Use Float for Displacement',

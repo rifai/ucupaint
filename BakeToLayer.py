@@ -7,7 +7,7 @@ from .subtree import *
 from .input_outputs import *
 from .node_connections import *
 from .node_arrangements import *
-from . import lib, Layer, Mask, ImageAtlas, Modifier, MaskModifier, BakeInfo, UDIM, vector_displacement_lib, vector_displacement
+from . import lib, Layer, Mask, ImageAtlas, UDIM, vector_displacement_lib, vector_displacement
 
 TEMP_VCOL = '__temp__vcol__'
 TEMP_EMISSION = '_TEMP_EMI_'
@@ -38,7 +38,7 @@ class YTryToSelectBakedVertexSelect(bpy.types.Operator):
         scene_objs = get_scene_objects()
         objs = []
         for bso in bi.selected_objects:
-            if is_greater_than_279():
+            if is_bl_newer_than(2, 79):
                 bsoo = bso.object
             else: bsoo = scene_objs.get(bso.object_name)
 
@@ -48,7 +48,7 @@ class YTryToSelectBakedVertexSelect(bpy.types.Operator):
         # Get actual selectable objects
         actual_selectable_objs = []
         for o in objs:
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 layer_cols = get_object_parent_layer_collections([], bpy.context.view_layer.layer_collection, o)
 
                 #for lc in layer_cols:
@@ -75,7 +75,7 @@ class YTryToSelectBakedVertexSelect(bpy.types.Operator):
         bpy.ops.mesh.select_all(action='DESELECT')
 
         for bso in bi.selected_objects:
-            if is_greater_than_279():
+            if is_bl_newer_than(2, 79):
                 obj = bso.object
             else: obj = scene_objs.get(bso.object_name)
 
@@ -135,11 +135,12 @@ class YRemoveBakeInfoOtherObject(bpy.types.Operator):
 def update_bake_to_layer_uv_map(self, context):
     if not UDIM.is_udim_supported(): return
 
-    mat = get_active_material()
-    objs = get_all_objects_with_same_materials(mat)
-    self.use_udim = UDIM.is_uvmap_udim(objs, self.uv_map)
+    if get_user_preferences().enable_auto_udim_detection:
+        mat = get_active_material()
+        objs = get_all_objects_with_same_materials(mat)
+        self.use_udim = UDIM.is_uvmap_udim(objs, self.uv_map)
 
-class YBakeToLayer(bpy.types.Operator):
+class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
     bl_idname = "node.y_bake_to_layer"
     bl_label = "Bake To Layer"
     bl_description = "Bake something as layer/mask"
@@ -173,20 +174,6 @@ class YBakeToLayer(bpy.types.Operator):
 
     overwrite_image_name : StringProperty(default='')
     overwrite_segment_name : StringProperty(default='')
-
-    samples : IntProperty(name='Bake Samples', 
-            description='Bake Samples, more means less jagged on generated textures', 
-            default=1, min=1)
-
-    margin : IntProperty(name='Bake Margin',
-            description = 'Bake margin in pixels',
-            default=5, min=0, subtype='PIXEL')
-
-    margin_type : EnumProperty(name = 'Margin Type',
-            description = '',
-            items = (('ADJACENT_FACES', 'Adjacent Faces', 'Use pixels from adjacent faces across UV seams.'),
-                     ('EXTEND', 'Extend', 'Extend border pixels outwards')),
-            default = 'ADJACENT_FACES')
 
     type : EnumProperty(
             name = 'Bake Type',
@@ -242,9 +229,6 @@ class YBakeToLayer(bpy.types.Operator):
             description = "Use Denoise on baked image",
             default=True)
 
-    width : IntProperty(name='Width', default = 1234, min=1, max=16384)
-    height : IntProperty(name='Height', default = 1234, min=1, max=16384)
-
     channel_idx : EnumProperty(
             name = 'Channel',
             description = 'Channel of new layer, can be changed later',
@@ -298,14 +282,6 @@ class YBakeToLayer(bpy.types.Operator):
             description='Force bake all polygons, useful if material is not using direct polygon (ex: solidify material)',
             default=False)
 
-    bake_device : EnumProperty(
-            name='Bake Device',
-            description='Device to use for baking',
-            items = (('GPU', 'GPU Compute', ''),
-                     ('CPU', 'CPU', '')),
-            default='CPU'
-            )
-
     use_image_atlas : BoolProperty(
             name = 'Use Image Atlas',
             description='Use Image Atlas',
@@ -320,7 +296,12 @@ class YBakeToLayer(bpy.types.Operator):
     def poll(cls, context):
         return get_active_ypaint_node() and context.object.type == 'MESH'
 
+    @classmethod
+    def description(self, context, properties):
+        return get_operator_description(self)
+
     def invoke(self, context, event):
+        self.invoke_operator(context)
 
         if hasattr(context, 'entity'):
             self.entity = context.entity
@@ -334,10 +315,6 @@ class YBakeToLayer(bpy.types.Operator):
 
         # UDIM is turned off by default
         #self.use_udim = False
-
-        # Use user preference default image size if input uses default image size
-        if self.width == 1234 and self.height == 1234:
-            self.width = self.height = ypup.default_new_image_size
 
         # Default normal map type is bump
         self.normal_map_type = 'BUMP_MAP'
@@ -417,7 +394,6 @@ class YBakeToLayer(bpy.types.Operator):
             self.subsurf_influence = False
 
             self.margin = 0
-            self.ssaa = True
 
         elif self.type == 'OTHER_OBJECT_NORMAL':
             self.subsurf_influence = False
@@ -428,13 +404,11 @@ class YBakeToLayer(bpy.types.Operator):
                 self.normal_blend_type = 'OVERLAY'
 
             self.margin = 0
-            self.ssaa = True
 
         elif self.type == 'OTHER_OBJECT_CHANNELS':
             self.subsurf_influence = False
             self.use_image_atlas = False
             self.margin = 0
-            self.ssaa = True
 
         elif self.type == 'SELECTED_VERTICES':
             self.subsurf_influence = False
@@ -578,6 +552,10 @@ class YBakeToLayer(bpy.types.Operator):
         for ob in get_scene_objects():
             if ob != obj and ob not in bpy.context.selected_objects and ob.type == 'MESH':
                 self.cage_object_coll.add().name = ob.name
+ 
+        requires_popup = self.type in {'OTHER_OBJECT_NORMAL', 'OTHER_OBJECT_EMISSION', 'OTHER_OBJECT_CHANNELS', 'FLOW'}
+        if not requires_popup and get_user_preferences().skip_property_popups and not event.shift:
+            return self.execute(context)
 
         return context.window_manager.invoke_props_dialog(self, width=320)
 
@@ -651,7 +629,7 @@ class YBakeToLayer(bpy.types.Operator):
         if self.type == 'FLOW':
             col.label(text='Straight UV Map:')
         col.label(text='Margin:')
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.separator()
             col.label(text='Bake Device:')
         col.label(text='Interpolation:')
@@ -721,14 +699,14 @@ class YBakeToLayer(bpy.types.Operator):
         col.prop_search(self, "uv_map", self, "uv_map_coll", text='', icon='GROUP_UVS')
         if self.type == 'FLOW':
             col.prop_search(self, "uv_map_1", self, "uv_map_coll", text='', icon='GROUP_UVS')
-        if is_greater_than_310():
+        if is_bl_newer_than(3, 1):
             split = split_layout(col, 0.4, align=True)
             split.prop(self, 'margin', text='')
             split.prop(self, 'margin_type', text='')
         else:
             col.prop(self, 'margin', text='')
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.separator()
             col.prop(self, 'bake_device', text='')
         col.prop(self, 'interpolation', text='')
@@ -738,7 +716,7 @@ class YBakeToLayer(bpy.types.Operator):
             col.prop(self, 'ssaa')
         else: col.prop(self, 'fxaa')
 
-        if self.type in {'AO', 'BEVEL_MASK'} and is_greater_than_281():
+        if self.type in {'AO', 'BEVEL_MASK'} and is_bl_newer_than(2, 81):
             col.prop(self, 'denoise')
 
         col.separator()
@@ -785,7 +763,7 @@ class YBakeToLayer(bpy.types.Operator):
             active_layer = yp.layers[yp.active_layer_index]
 
         if self.type == 'SELECTED_VERTICES' and obj.mode != 'EDIT':
-            self.report({'ERROR'}, "Should be on edit mode!")
+            self.report({'ERROR'}, "Should be in edit mode!")
             return {'CANCELLED'}
 
         if self.target_type == 'MASK' and not active_layer:
@@ -796,12 +774,12 @@ class YBakeToLayer(bpy.types.Operator):
             self.report({'ERROR'}, "Overwrite layer/mask cannot be empty!")
             return {'CANCELLED'}
 
-        if self.type in {'BEVEL_NORMAL', 'BEVEL_MASK'} and not is_greater_than_280():
+        if self.type in {'BEVEL_NORMAL', 'BEVEL_MASK'} and not is_bl_newer_than(2, 80):
             self.report({'ERROR'}, "Blender 2.80+ is needed to use this feature!")
             return {'CANCELLED'}
 
-        if self.type in {'MULTIRES_NORMAL', 'MULTIRES_DISPLACEMENT'} and not is_greater_than_280():
-            #self.report({'ERROR'}, "This feature is not implemented yet on Blender 2.79!")
+        if self.type in {'MULTIRES_NORMAL', 'MULTIRES_DISPLACEMENT'} and not is_bl_newer_than(2, 80):
+            #self.report({'ERROR'}, "This feature is not implemented yet in Blender 2.79!")
             self.report({'ERROR'}, "Blender 2.80+ is needed to use this feature!")
             return {'CANCELLED'}
 
@@ -896,12 +874,12 @@ class YBakeToLayer(bpy.types.Operator):
 
                 scene_objs = get_scene_objects()
                 for oo in bi.other_objects:
-                    if is_greater_than_279():
+                    if is_bl_newer_than(2, 79):
                         ooo = oo.object
                     else: ooo = scene_objs.get(oo.object_name)
 
                     if ooo:
-                        if is_greater_than_280():
+                        if is_bl_newer_than(2, 80):
                             # Check if object is on current view layer
                             layer_cols = get_object_parent_layer_collections([], bpy.context.view_layer.layer_collection, ooo)
                             if ooo not in other_objs and any(layer_cols):
@@ -936,7 +914,7 @@ class YBakeToLayer(bpy.types.Operator):
         use_ssaa = self.ssaa and self.type.startswith('OTHER_OBJECT_')
 
         # Denoising only available for AO bake for now
-        use_denoise = self.denoise and self.type in {'AO', 'BEVEL_MASK'} and is_greater_than_281()
+        use_denoise = self.denoise and self.type in {'AO', 'BEVEL_MASK'} and is_bl_newer_than(2, 81)
 
         # SSAA will multiply size by 2 then resize it back
         if use_ssaa:
@@ -962,7 +940,7 @@ class YBakeToLayer(bpy.types.Operator):
         if (self.type == 'CAVITY' and (self.subsurf_influence or self.use_baked_disp)):
 
             # NOTE: Baking cavity with subdiv setup can only happen if there's only one object and no UDIM
-            if is_greater_than_420() and len(objs) == 1 and not self.use_udim and height_root_ch and height_root_ch.enable_subdiv_setup:
+            if is_bl_newer_than(4, 2) and len(objs) == 1 and not self.use_udim and height_root_ch and height_root_ch.enable_subdiv_setup:
 
                 # Check if there's VDM layer
                 vdm_layer = get_first_vdm_layer(yp)
@@ -1012,7 +990,7 @@ class YBakeToLayer(bpy.types.Operator):
             if context.tool_settings.mesh_select_mode[0] or context.tool_settings.mesh_select_mode[1]:
                 fill_mode = 'VERTEX'
 
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 edit_objs = [o for o in objs if o.mode == 'EDIT']
             else: edit_objs = [context.object]
 
@@ -1143,7 +1121,9 @@ class YBakeToLayer(bpy.types.Operator):
                     # Apply shape keys and modifiers
                     if any(need_to_be_applied_modifiers):
                         if obj.data.shape_keys:
-                            bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+                            if is_bl_newer_than(3, 3):
+                                bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+                            else: bpy.ops.object.shape_key_remove(all=True)
 
                         for m in need_to_be_applied_modifiers:
                             bpy.ops.object.modifier_apply(modifier=m.name)
@@ -1157,7 +1137,7 @@ class YBakeToLayer(bpy.types.Operator):
 
                 bpy.ops.paint.vertex_color_dirt(dirt_angle=math.pi/2)
 
-            print('BAKE TO LAYER: Applying subsurf/multires is done at', '{:0.2f}'.format(time.time() - tt), 'seconds!')
+            print('BAKE TO LAYER: Applying subsurf/multires is done in', '{:0.2f}'.format(time.time() - tt), 'seconds!')
 
         # Setup for flow
         if self.type == 'FLOW':
@@ -1173,7 +1153,7 @@ class YBakeToLayer(bpy.types.Operator):
         # Flip normals setup
         if self.flip_normals:
             #ori_mode[obj.name] = obj.mode
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 # Deselect other objects first
                 for o in other_objs:
                     o.select_set(False)
@@ -1271,7 +1251,7 @@ class YBakeToLayer(bpy.types.Operator):
             geometry = mat.node_tree.nodes.new('ShaderNodeNewGeometry')
             vector_math = mat.node_tree.nodes.new('ShaderNodeVectorMath')
             vector_math.operation = 'CROSS_PRODUCT'
-            if is_greater_than_281():
+            if is_bl_newer_than(2, 81):
                 vector_math_1 = mat.node_tree.nodes.new('ShaderNodeVectorMath')
                 vector_math_1.operation = 'LENGTH'
 
@@ -1297,7 +1277,7 @@ class YBakeToLayer(bpy.types.Operator):
                     src.inputs['Distance'].default_value = self.ao_distance
 
                 # Links
-                if not is_greater_than_280():
+                if not is_bl_newer_than(2, 80):
                     mat.node_tree.links.new(src.outputs[0], output.inputs[0])
                 else:
                     mat.node_tree.links.new(src.outputs['AO'], bsdf.inputs[0])
@@ -1355,7 +1335,7 @@ class YBakeToLayer(bpy.types.Operator):
             mat.node_tree.links.new(geometry.outputs['Normal'], vector_math.inputs[0])
             mat.node_tree.links.new(src.outputs[0], vector_math.inputs[1])
             #mat.node_tree.links.new(src.outputs[0], bsdf.inputs['Normal'])
-            if is_greater_than_281():
+            if is_bl_newer_than(2, 81):
                 mat.node_tree.links.new(vector_math.outputs[0], vector_math_1.inputs[0])
                 mat.node_tree.links.new(vector_math_1.outputs[1], bsdf.inputs[0])
             else:
@@ -1363,7 +1343,7 @@ class YBakeToLayer(bpy.types.Operator):
             mat.node_tree.links.new(bsdf.outputs[0], output.inputs[0])
 
         elif self.type == 'SELECTED_VERTICES':
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 src = mat.node_tree.nodes.new('ShaderNodeVertexColor')
                 src.layer_name = TEMP_VCOL
             else:
@@ -1432,7 +1412,7 @@ class YBakeToLayer(bpy.types.Operator):
 
             # Image name and colorspace
             image_name = self.name
-            colorspace = 'sRGB'
+            colorspace = get_srgb_name()
 
             if self.type == 'OTHER_OBJECT_CHANNELS':
 
@@ -1480,10 +1460,10 @@ class YBakeToLayer(bpy.types.Operator):
                         elif socket:
                             m.node_tree.links.new(socket, temp_emi.inputs[0])
 
-                colorspace = 'Non-Color' if root_ch.colorspace == 'LINEAR' else 'sRGB'
+                colorspace = get_noncolor_name() if root_ch.colorspace == 'LINEAR' else get_srgb_name()
 
             elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL'}:
-                colorspace = 'Non-Color'
+                colorspace = get_noncolor_name()
 
             # Base color of baked image
             if self.type == 'AO':
@@ -1548,12 +1528,29 @@ class YBakeToLayer(bpy.types.Operator):
             mat.node_tree.nodes.active = tex
 
             # Bake!
-            if self.type.startswith('MULTIRES_'):
-                bpy.ops.object.bake_image()
-            else:
-                if bake_type != 'EMIT':
-                    bpy.ops.object.bake(type=bake_type)
-                else: bpy.ops.object.bake()
+            try:
+                if self.type.startswith('MULTIRES_'):
+                    bpy.ops.object.bake_image()
+                else:
+                    if bake_type != 'EMIT':
+                        bpy.ops.object.bake(type=bake_type)
+                    else: bpy.ops.object.bake()
+            except Exception as e:
+
+                # Try to use CPU if GPU baking is failed
+                if self.bake_device == 'GPU':
+                    print('EXCEPTIION: GPU baking failed! Trying to use CPU...')
+                    self.bake_device = 'CPU'
+                    scene.cycles.device = 'CPU'
+
+                    if self.type.startswith('MULTIRES_'):
+                        bpy.ops.object.bake_image()
+                    else:
+                        if bake_type != 'EMIT':
+                            bpy.ops.object.bake(type=bake_type)
+                        else: bpy.ops.object.bake()
+                else:
+                    print('EXCEPTIION:', e)
 
             if use_fxaa: fxaa_image(image, False, bake_device=self.bake_device)
 
@@ -1561,7 +1558,7 @@ class YBakeToLayer(bpy.types.Operator):
             #if self.type.startswith('OTHER_OBJECT_'):
             if self.type == 'OTHER_OBJECT_NORMAL':
                 temp_img = image.copy()
-                temp_img.colorspace_settings.name = 'Non-Color'
+                temp_img.colorspace_settings.name = get_noncolor_name()
                 tex.image = temp_img
 
                 # Set temp filepath
@@ -1596,7 +1593,7 @@ class YBakeToLayer(bpy.types.Operator):
                         UDIM.swap_tile(temp_img, 1001, tilenum)
 
                 # Remove temp image
-                remove_datablock(bpy.data.images, temp_img)
+                remove_datablock(bpy.data.images, temp_img, user=tex, user_prop='image')
 
             # Back to original size if using SSA
             if use_ssaa:
@@ -1626,7 +1623,7 @@ class YBakeToLayer(bpy.types.Operator):
 
                     if self.use_udim:
                         segment = UDIM.get_set_udim_atlas_segment(tilenums, color=(0,0,0,0), 
-                                colorspace='sRGB', hdr=self.hdr, yp=yp)
+                                colorspace=get_srgb_name(), hdr=self.hdr, yp=yp)
                     else:
                         # Clearing unused image atlas segments
                         img_atlas = ImageAtlas.check_need_of_erasing_segments(yp, 'TRANSPARENT', self.width, self.height, self.hdr)
@@ -1804,19 +1801,19 @@ class YBakeToLayer(bpy.types.Operator):
 
                 # Remember other objects to bake info
                 for o in other_objs:
-                    if is_greater_than_279(): 
+                    if is_bl_newer_than(2, 79): 
                         oo_recorded = any([oo for oo in bi.other_objects if oo.object == o])
                     else: oo_recorded = any([oo for oo in bi.other_objects if oo.object_name == o.name])
 
                     if not oo_recorded:
                         oo = bi.other_objects.add()
-                        if is_greater_than_279(): 
+                        if is_bl_newer_than(2, 79): 
                             oo.object = o
                         oo.object_name = o.name
 
                 # Remove unused other objects on bake info
                 for i, oo in reversed(list(enumerate(bi.other_objects))):
-                    if is_greater_than_279():
+                    if is_bl_newer_than(2, 79):
                         ooo = oo.object
                     else: ooo = bpy.data.objects.get(oo.object_name)
 
@@ -1835,7 +1832,7 @@ class YBakeToLayer(bpy.types.Operator):
                 for obj_name, v_indices in obj_vertex_indices.items():
                     obj = bpy.data.objects.get(obj_name)
                     bso = bi.selected_objects.add()
-                    if is_greater_than_279():
+                    if is_bl_newer_than(2, 79):
                         bso.object = obj
                     bso.object_name = obj.name
 
@@ -1924,7 +1921,7 @@ class YBakeToLayer(bpy.types.Operator):
             #bpy.ops.mesh.flip_normals()
             #bpy.ops.mesh.select_all(action='DESELECT')
             #bpy.ops.object.mode_set(mode = ori_mode)
-            if is_greater_than_280():
+            if is_bl_newer_than(2, 80):
                 # Deselect other objects first
                 for o in other_objs:
                     o.select_set(False)
@@ -1994,8 +1991,8 @@ class YBakeToLayer(bpy.types.Operator):
         # Refresh mapping and stuff
         #yp.active_layer_index = yp.active_layer_index
 
-        if image: print('BAKE TO LAYER: Baking', image.name, 'is done at', '{:0.2f}'.format(time.time() - T), 'seconds!')
-        else: print('BAKE TO LAYER: No image created! Executed at', '{:0.2f}'.format(time.time() - T), 'seconds!')
+        if image: print('BAKE TO LAYER: Baking', image.name, 'is done in', '{:0.2f}'.format(time.time() - T), 'seconds!')
+        else: print('BAKE TO LAYER: No image created! Executed in', '{:0.2f}'.format(time.time() - T), 'seconds!')
 
         return {'FINISHED'}
 
@@ -2091,11 +2088,11 @@ def bake_as_image(objs, mat, entity, name, width=1024, height=1024, hdr=False, s
     if mask:
         color = (0,0,0,1)
         color_str = 'BLACK'
-        colorspace = 'Non-Color'
+        colorspace = get_noncolor_name()
     else: 
         color = (0,0,0,0)
         color_str = 'TRANSPARENT'
-        colorspace = 'sRGB'
+        colorspace = get_srgb_name()
 
     # Create image
     if use_udim:
@@ -2124,7 +2121,7 @@ def bake_as_image(objs, mat, entity, name, width=1024, height=1024, hdr=False, s
     bpy.ops.object.bake()
 
     if blur: 
-        samples = 4096 if is_greater_than_300() else 128
+        samples = 4096 if is_bl_newer_than(3) else 128
         blur_image(image, False, bake_device=bake_device, factor=blur_factor, samples=samples)
     if denoise:
         denoise_image(image)
@@ -2169,11 +2166,11 @@ def bake_as_image(objs, mat, entity, name, width=1024, height=1024, hdr=False, s
 
     return image
 
-class YBakeEntityToImage(bpy.types.Operator):
+class YBakeEntityToImage(bpy.types.Operator, BaseBakeOperator):
     bl_idname = "node.y_bake_entity_to_image"
     bl_label = "Bake Layer/Mask To Image"
     bl_description = "Bake Layer/Mask to an image"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'UNDO'}
 
     name : StringProperty(default='')
 
@@ -2181,31 +2178,6 @@ class YBakeEntityToImage(bpy.types.Operator):
     uv_map_coll : CollectionProperty(type=bpy.types.PropertyGroup)
 
     hdr : BoolProperty(name='32 bit Float', default=False)
-
-    width : IntProperty(name='Width', default = 1234, min=1, max=16384)
-    height : IntProperty(name='Height', default = 1234, min=1, max=16384)
-
-    margin : IntProperty(name='Bake Margin',
-            description = 'Bake margin in pixels',
-            default=5, min=0, subtype='PIXEL')
-
-    margin_type : EnumProperty(name = 'Margin Type',
-            description = '',
-            items = (('ADJACENT_FACES', 'Adjacent Faces', 'Use pixels from adjacent faces across UV seams.'),
-                     ('EXTEND', 'Extend', 'Extend border pixels outwards')),
-            default = 'ADJACENT_FACES')
-
-    samples : IntProperty(name='Bake Samples', 
-            description='Bake Samples, more means less jagged on generated textures', 
-            default=1, min=1)
-
-    bake_device : EnumProperty(
-            name='Bake Device',
-            description='Device to use for baking',
-            items = (('GPU', 'GPU Compute', ''),
-                     ('CPU', 'CPU', '')),
-            default='CPU'
-            )
 
     fxaa : BoolProperty(name='Use FXAA', 
             description = "Use FXAA to baked image (doesn't work with float images)",
@@ -2248,7 +2220,12 @@ class YBakeEntityToImage(bpy.types.Operator):
     def poll(cls, context):
         return get_active_ypaint_node() and context.object.type == 'MESH'
 
+    @classmethod
+    def description(self, context, properties):
+        return get_operator_description(self)
+
     def invoke(self, context, event):
+        self.invoke_operator(context)
 
         obj = context.object
         ypup = get_user_preferences()
@@ -2348,10 +2325,6 @@ class YBakeEntityToImage(bpy.types.Operator):
             if len(self.uv_map_coll) > 0:
                 self.uv_map = self.uv_map_coll[0].name
 
-            # Use user preference default image size if input uses default image size
-            if self.width == 1234 and self.height == 1234:
-                self.width = self.height = ypup.default_new_image_size
-
             # Auto set some props for some types
             if self.entity.type == 'EDGE_DETECT':
                 self.samples = 32
@@ -2363,6 +2336,9 @@ class YBakeEntityToImage(bpy.types.Operator):
                 self.hdr = False
                 self.fxaa = True
                 self.denoise = False
+
+        if get_user_preferences().skip_property_popups and not event.shift:
+            return self.execute(context)
 
         return context.window_manager.invoke_props_dialog(self, width=320)
 
@@ -2392,12 +2368,12 @@ class YBakeEntityToImage(bpy.types.Operator):
         col.label(text='UV Map:')
         col.label(text='Margin:')
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.separator()
             col.label(text='Bake Device:')
         col.separator()
         col.label(text='')
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.label(text='')
         col.label(text='')
         col.label(text='')
@@ -2412,19 +2388,19 @@ class YBakeEntityToImage(bpy.types.Operator):
         col.prop(self, 'samples', text='')
         col.prop_search(self, "uv_map", self, "uv_map_coll", text='', icon='GROUP_UVS')
 
-        if is_greater_than_310():
+        if is_bl_newer_than(3, 1):
             split = split_layout(col, 0.4, align=True)
             split.prop(self, 'margin', text='')
             split.prop(self, 'margin_type', text='')
         else:
             col.prop(self, 'margin', text='')
 
-        if is_greater_than_280():
+        if is_bl_newer_than(2, 80):
             col.separator()
             col.prop(self, 'bake_device', text='')
         col.separator()
         col.prop(self, 'fxaa')
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             col.prop(self, 'denoise', text='Use Denoise')
         ccol = col.column(align=True)
 
@@ -2453,7 +2429,7 @@ class YBakeEntityToImage(bpy.types.Operator):
 
             if self.use_udim:
                 segment = UDIM.get_set_udim_atlas_segment(self.tilenums, color=(0,0,0,1), 
-                        colorspace='Non-Color', hdr=self.hdr, yp=yp)
+                        colorspace=get_noncolor_name(), hdr=self.hdr, yp=yp)
             else:
                 # Clearing unused image atlas segments
                 img_atlas = ImageAtlas.check_need_of_erasing_segments(yp, 'BLACK', self.width, self.height, self.hdr)
@@ -2750,14 +2726,14 @@ class YRemoveBakedEntity(bpy.types.Operator):
 
 def register():
     bpy.utils.register_class(YBakeToLayer)
+    bpy.utils.register_class(YBakeEntityToImage)
     bpy.utils.register_class(YRemoveBakeInfoOtherObject)
     bpy.utils.register_class(YTryToSelectBakedVertexSelect)
-    bpy.utils.register_class(YBakeEntityToImage)
     bpy.utils.register_class(YRemoveBakedEntity)
 
 def unregister():
     bpy.utils.unregister_class(YBakeToLayer)
+    bpy.utils.unregister_class(YBakeEntityToImage)
     bpy.utils.unregister_class(YRemoveBakeInfoOtherObject)
     bpy.utils.unregister_class(YTryToSelectBakedVertexSelect)
-    bpy.utils.unregister_class(YBakeEntityToImage)
     bpy.utils.unregister_class(YRemoveBakedEntity)

@@ -1,4 +1,3 @@
-import bpy
 from .common import *
 
 def create_link(tree, out, inp):
@@ -230,22 +229,6 @@ def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
 
             if root_ch.enable_smooth_bump:
 
-                io_name = root_ch.name + io_suffix['HEIGHT_ONS']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
-                io_name = root_ch.name + io_suffix['HEIGHT_EW']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
-                io_name = root_ch.name + io_suffix['HEIGHT_ONS'] + io_suffix['ALPHA']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
-                io_name = root_ch.name + io_suffix['HEIGHT_EW'] + io_suffix['ALPHA']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
                 for letter in nsew_letters:
 
                     io_name = root_ch.name + io_suffix['HEIGHT_' + letter.upper()]
@@ -257,6 +240,10 @@ def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
                         break_input_link(tree, node.inputs[io_name])
 
             io_name = root_ch.name + io_suffix['MAX_HEIGHT']
+            if io_name in node.inputs:
+                break_input_link(tree, node.inputs[io_name])
+
+            io_name = root_ch.name + io_suffix['VDISP']
             if io_name in node.inputs:
                 break_input_link(tree, node.inputs[io_name])
 
@@ -285,7 +272,7 @@ def remove_unused_group_node_connections(tree, layer, node): #, height_only=Fals
 
     for i, ch in enumerate(layer.channels):
         root_ch = yp.channels[i]
-        if has_channel_childrens(layer, root_ch): continue
+        if has_channel_children(layer, root_ch): continue
 
         io_name = root_ch.name + io_suffix['HEIGHT'] + io_suffix['GROUP']
         if io_name in node.inputs:
@@ -311,22 +298,6 @@ def remove_unused_group_node_connections(tree, layer, node): #, height_only=Fals
             break_input_link(tree, node.inputs[io_name])
 
         if root_ch.enable_smooth_bump:
-
-            io_name = root_ch.name + io_suffix['HEIGHT_ONS'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
-
-            io_name = root_ch.name + io_suffix['HEIGHT_EW'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
-
-            io_name = root_ch.name + io_suffix['HEIGHT_ONS'] + io_suffix['ALPHA'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
-
-            io_name = root_ch.name + io_suffix['HEIGHT_EW'] + io_suffix['ALPHA'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
 
             for letter in nsew_letters:
                 io_name = root_ch.name + io_suffix['HEIGHT_' + letter.upper()] + io_suffix['GROUP']
@@ -1527,7 +1498,7 @@ def reconnect_yp_nodes(tree, merged_layer_ids = []):
 
         #print(rgb)
         # Blender 2.79 cycles does not need bump normal
-        if not is_greater_than_280() and normal_no_bump and ch.type == 'NORMAL' and ch.enable_subdiv_setup:
+        if not is_bl_newer_than(2, 80) and normal_no_bump and ch.type == 'NORMAL' and ch.enable_subdiv_setup:
             create_link(tree, normal_no_bump, end.inputs[io_name])
         else: create_link(tree, rgb, end.inputs[io_name])
 
@@ -1663,7 +1634,7 @@ def reconnect_source_internal_nodes(layer):
 
     create_link(tree, start.outputs[0], source.inputs[0])
 
-    if is_greater_than_281() and layer.type == 'VORONOI' and layer.voronoi_feature == 'N_SPHERE_RADIUS':
+    if is_bl_newer_than(2, 81) and layer.type == 'VORONOI' and layer.voronoi_feature == 'N_SPHERE_RADIUS':
         rgb = source.outputs['Radius']
     else: rgb = source.outputs[0]
 
@@ -1801,12 +1772,6 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
         if prev_max_height and 'Max Height' in bump_process.inputs: create_link(tree, prev_max_height, bump_process.inputs['Max Height'])
 
         if height_root_ch.enable_smooth_bump:
-            #prev_height_ons = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_ONS'])
-            #prev_height_ew = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_EW'])
-
-            #if prev_height_ons and 'Height ONS' in bump_process.inputs: create_link(tree, prev_height_ons, bump_process.inputs['Height ONS'])
-            #if prev_height_ew and 'Height EW' in bump_process.inputs: create_link(tree, prev_height_ew, bump_process.inputs['Height EW'])
-
             prev_height_n = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_N'])
             prev_height_s = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_S'])
             prev_height_e = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_E'])
@@ -1852,6 +1817,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
         if vector and mapping and layer.texcoord_type != 'Decal':
             vector = create_link(tree, vector, mapping.inputs[0])[0]
+        
+        # Layer UV uniform scale value
+        if is_bl_newer_than(2, 81):
+            uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(layer, 'uniform_scale_value'))
+            if uniform_scale_value:
+                if layer.enable_uniform_scale:
+                    create_link(tree, uniform_scale_value, mapping.inputs[3])
+                else:
+                    break_link(tree, uniform_scale_value, mapping.inputs[3])
 
     if vector and layer.type not in {'VCOL', 'BACKGROUND', 'COLOR', 'GROUP', 'HEMI', 'OBJECT_INDEX'}:
         create_link(tree, vector, source.inputs[0])
@@ -1884,7 +1858,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
 
     # RGB
-    if is_greater_than_281() and layer.type == 'VORONOI' and layer.voronoi_feature == 'N_SPHERE_RADIUS' and 'Radius' in source.outputs:
+    if is_bl_newer_than(2, 81) and layer.type == 'VORONOI' and layer.voronoi_feature == 'N_SPHERE_RADIUS' and 'Radius' in source.outputs:
         start_rgb = source.outputs['Radius']
     else: start_rgb = source.outputs[0]
 
@@ -2000,18 +1974,18 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
         mask_source_index = 0
         if not mask.use_baked and mask.type not in {'COLOR_ID', 'HEMI', 'OBJECT_INDEX', 'EDGE_DETECT'}:
             # Noise and voronoi output has flipped order since Blender 2.81
-            if is_greater_than_281() and mask.type == 'VORONOI' and mask.voronoi_feature == 'DISTANCE_TO_EDGE':
+            if is_bl_newer_than(2, 81) and mask.type == 'VORONOI' and mask.voronoi_feature == 'DISTANCE_TO_EDGE':
                 mask_source_index = 'Distance'
-            elif is_greater_than_281() and mask.type == 'VORONOI' and mask.voronoi_feature == 'N_SPHERE_RADIUS':
+            elif is_bl_newer_than(2, 81) and mask.type == 'VORONOI' and mask.voronoi_feature == 'N_SPHERE_RADIUS':
                 mask_source_index = 'Radius'
-            elif is_greater_than_281() and mask.type in {'NOISE', 'VORONOI'}:
+            elif is_bl_newer_than(2, 81) and mask.type in {'NOISE', 'VORONOI'}:
                 if mask.source_input == 'RGB':
                     mask_source_index = 1
             elif mask.type == 'BACKFACE':
                 mask_source_index = 'Backfacing'
             elif mask.source_input == 'ALPHA':
                 if mask.type == 'VCOL':
-                    if is_greater_than_292():
+                    if is_bl_newer_than(2, 92):
                         mask_source_index = 'Alpha'
                     else: mask_source_index = 'Fac'
                 else: mask_source_index = 1
@@ -2059,6 +2033,12 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
             color_id_val = get_essential_node(tree, TREE_START).get(get_entity_input_name(mask, 'color_id'))
             if color_id_val and 'Color ID' in mask_source.inputs:
                 create_link(tree, color_id_val, mask_source.inputs['Color ID'])
+
+        # Edge Detect related
+        elif mask.type == 'EDGE_DETECT':
+            edge_detect_radius_val = get_essential_node(tree, TREE_START).get(get_entity_input_name(mask, 'edge_detect_radius'))
+            if edge_detect_radius_val and 'Radius' in mask_source.inputs:
+                create_link(tree, edge_detect_radius_val, mask_source.inputs['Radius'])
 
         # Hemi related
         if mask.type == 'HEMI' and not mask.use_baked: #and 'Normal' in mask_source.inputs:
@@ -2109,6 +2089,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                         mask_vector = create_link(tree, mask_vector, mask_mapping.inputs[0])[0]
 
                 create_link(tree, mask_vector, mask_source.inputs[0])
+
+                # Mask UV uniform scale value
+                if is_bl_newer_than(2, 81):
+                    uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(mask, 'uniform_scale_value'))
+                    if uniform_scale_value:
+                        if mask.enable_uniform_scale:
+                            create_link(tree, uniform_scale_value, mask_mapping.inputs[3])
+                        else:
+                            break_link(tree, uniform_scale_value, mask_mapping.inputs[3])
 
         # Mask uv neighbor
         mask_uv_neighbor = nodes.get(mask.uv_neighbor) if mask.texcoord_type != 'Layer' else uv_neighbor
@@ -2339,7 +2328,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
         source_index = 0
         if layer.type not in {'IMAGE', 'VCOL', 'BACKGROUND', 'COLOR', 'HEMI', 'OBJECT_INDEX', 'MUSGRAVE'}:
             # Noise and voronoi output has flipped order since Blender 2.81
-            if is_greater_than_281() and (layer.type == 'NOISE' or (layer.type == 'VORONOI' and layer.voronoi_feature not in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'})):
+            if is_bl_newer_than(2, 81) and (layer.type == 'NOISE' or (layer.type == 'VORONOI' and layer.voronoi_feature not in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'})):
                 if ch.layer_input == 'RGB':
                     rgb = start_rgb_1
                     alpha = start_alpha_1
@@ -2372,7 +2361,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
 
             if ch_source:
-                if is_greater_than_281() and ch.override_type == 'VORONOI' and ch.voronoi_feature == 'N_SPHERE_RADIUS':
+                if is_bl_newer_than(2, 81) and ch.override_type == 'VORONOI' and ch.voronoi_feature == 'N_SPHERE_RADIUS':
                     rgb = ch_source.outputs['Radius']
                 else: rgb = ch_source.outputs[0]
                 # Override channel will not output alpha whatsoever
@@ -2441,7 +2430,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 if ch_source_1: 
                     normal = ch_source_1.outputs[0]
 
-                    if 'Vector' in ch_source_1.inputs:
+                    if vector and 'Vector' in ch_source_1.inputs:
                         create_link(tree, vector, ch_source_1.inputs['Vector'])
 
             ch_linear_1 = nodes.get(ch.linear_1)

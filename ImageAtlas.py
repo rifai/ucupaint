@@ -1,4 +1,4 @@
-import bpy, time, random, numpy, re
+import bpy, time, random, re
 from bpy.props import *
 from .common import *
 from .subtree import *
@@ -60,17 +60,17 @@ def create_image_atlas(color='BLACK', size=8192, hdr=False, name=''):
 
     if color == 'BLACK':
         img.generated_color = (0,0,0,1)
-        img.colorspace_settings.name = 'Non-Color'
+        img.colorspace_settings.name = get_noncolor_name()
     elif color == 'WHITE':
         img.generated_color = (1,1,1,1)
-        img.colorspace_settings.name = 'Non-Color'
+        img.colorspace_settings.name = get_noncolor_name()
     else: img.generated_color = (0,0,0,0)
 
     img.yia.is_image_atlas = True
     img.yia.color = color
     #img.yia.float_buffer = hdr
     #if hdr:
-    #img.colorspace_settings.name = 'Non-Color'
+    #img.colorspace_settings.name = get_noncolor_name()
 
     return img
 
@@ -148,7 +148,7 @@ def get_set_image_atlas_segment(width, height, color='BLACK', hdr=False, img_fro
         images = bpy.data.images
         name = ''
 
-    # Serach for available image atlas
+    # Search for available image atlas
     for img in images:
         #if img.yia.is_image_atlas and img.yia.color == color and img.yia.float_buffer == hdr:
         if img.yia.is_image_atlas and img.yia.color == color and img.is_float == hdr:
@@ -240,7 +240,7 @@ def replace_segment_with_image(yp, segment, image, uv_name=''):
 #            uv_coords.x += 0.1
 #            #print(uv_coords)
 #
-#        print('INFO: UV Map of', ob.name, 'is updated at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+#        print('INFO: UV Map of', ob.name, 'is updated in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
 #
 #        return {'FINISHED'}
 
@@ -269,7 +269,7 @@ def set_segment_mapping(entity, segment, image, use_baked=False):
     else: mapping = get_mask_mapping(entity, get_baked=use_baked)
 
     if mapping:
-        if is_greater_than_281():
+        if is_bl_newer_than(2, 81):
             mapping.inputs[3].default_value[0] = scale_x
             mapping.inputs[3].default_value[1] = scale_y
 
@@ -379,7 +379,7 @@ class YNewImageAtlasSegmentTest(bpy.types.Operator):
         # Update image editor
         update_image_editor_image(context, atlas_img)
 
-        print('INFO: Segment is created at', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        print('INFO: Segment is created in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
 
         return {'FINISHED'}
 
@@ -426,7 +426,7 @@ class YRefreshTransformedLayerUV(bpy.types.Operator):
 class YBackToOriginalUV(bpy.types.Operator):
     bl_idname = "node.y_back_to_original_uv"
     bl_label = "Back to Original UV"
-    bl_description = "Transformed UV detected, your changes will lost if you edit on this UV.\nClick this button to go back to original UV"
+    bl_description = "Transformed UV detected, your changes will be lost if you edit on this UV.\nClick this button to go back to original UV"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -538,7 +538,7 @@ class YConvertToImageAtlas(bpy.types.Operator):
 
             # Image used by masks will use black image atlas instead of transparent so it will use linear color by default
             color = 'BLACK' if used_by_masks else 'TRANSPARENT'
-            colorspace = 'Non-Color' if used_by_masks else 'sRGB'
+            colorspace = get_noncolor_name() if used_by_masks else get_srgb_name()
 
             # Get segment
             if image.source == 'TILED':

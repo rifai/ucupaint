@@ -1,4 +1,4 @@
-import bpy, time, os
+import bpy, os
 from .common import *
 from mathutils import *
 
@@ -216,6 +216,12 @@ MOD_INTENSITY_HARDNESS = '~yPL Mod Intensity Hardness'
 MOD_MATH = '~yPL Mod Math'
 MOD_MATH_VALUE = '~yPL Mod Math Value'
 
+# GLTF related
+GLTF_MATERIAL_OUTPUT = 'glTF Material Output'
+GLTF_SETTINGS = 'glTF Settings'
+
+# Manual BSDFs
+BL278_BSDF = 'bsdf278'
 
 channel_custom_icon_dict = {
         'RGB' : 'rgb_channel',
@@ -229,17 +235,39 @@ channel_icon_dict = {
         'NORMAL' : 'KEYTYPE_BREAKDOWN_VEC',
         }
 
+def get_icon_folder():
+    if not is_bl_newer_than(2, 80):
+        icon_set = 'legacy'
+    else:
+        icons = get_user_preferences().icons 
+
+        if icons == 'DEFAULT':
+            bg_color = bpy.context.preferences.themes[0].preferences.space.back
+            is_dark_theme = bg_color[0] + bg_color[1] + bg_color[2] < 1.5
+            icon_set = 'light' if is_dark_theme else 'dark'
+        else:
+            icon_set = 'legacy'
+
+    return get_addon_filepath() + 'icons' + os.sep + icon_set.lower() + os.sep
+
 def load_custom_icons():
     import bpy.utils.previews
     # Custom Icon
     if not hasattr(bpy.utils, 'previews'): return
     global custom_icons
     custom_icons = bpy.utils.previews.new()
-    folder = get_addon_filepath() + 'icons' + os.sep
+
+    folder = get_icon_folder()
 
     for f in os.listdir(folder):
         icon_name = f.replace('_icon.png', '')
         custom_icons.load(icon_name, folder + f, 'IMAGE')
+
+def unload_custom_icons():
+    global custom_icons
+    if hasattr(bpy.utils, 'previews'):
+        bpy.utils.previews.remove(custom_icons)
+        custom_icons = None
 
 def get_icon(custom_icon_name):
     return custom_icons[custom_icon_name].icon_id
@@ -400,12 +428,10 @@ def get_smooth_mix_node(blend_type, layer_type=''):
 def clean_unused_libraries():
     for ng in bpy.data.node_groups:
         if ng.name.startswith('~yPL ') and ng.users == 0:
-            bpy.data.node_groups.remove(ng)
+            remove_datablock(bpy.data.node_groups, ng)
 
 def register():
     load_custom_icons()
 
 def unregister():
-    global custom_icons
-    if hasattr(bpy.utils, 'previews'):
-        bpy.utils.previews.remove(custom_icons)
+    unload_custom_icons()
