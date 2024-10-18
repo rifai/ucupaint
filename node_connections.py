@@ -1,4 +1,3 @@
-import bpy
 from .common import *
 
 def create_link(tree, out, inp):
@@ -230,22 +229,6 @@ def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
 
             if root_ch.enable_smooth_bump:
 
-                io_name = root_ch.name + io_suffix['HEIGHT_ONS']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
-                io_name = root_ch.name + io_suffix['HEIGHT_EW']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
-                io_name = root_ch.name + io_suffix['HEIGHT_ONS'] + io_suffix['ALPHA']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
-                io_name = root_ch.name + io_suffix['HEIGHT_EW'] + io_suffix['ALPHA']
-                if io_name in node.inputs:
-                    break_input_link(tree, node.inputs[io_name])
-
                 for letter in nsew_letters:
 
                     io_name = root_ch.name + io_suffix['HEIGHT_' + letter.upper()]
@@ -257,6 +240,10 @@ def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
                         break_input_link(tree, node.inputs[io_name])
 
             io_name = root_ch.name + io_suffix['MAX_HEIGHT']
+            if io_name in node.inputs:
+                break_input_link(tree, node.inputs[io_name])
+
+            io_name = root_ch.name + io_suffix['VDISP']
             if io_name in node.inputs:
                 break_input_link(tree, node.inputs[io_name])
 
@@ -311,22 +298,6 @@ def remove_unused_group_node_connections(tree, layer, node): #, height_only=Fals
             break_input_link(tree, node.inputs[io_name])
 
         if root_ch.enable_smooth_bump:
-
-            io_name = root_ch.name + io_suffix['HEIGHT_ONS'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
-
-            io_name = root_ch.name + io_suffix['HEIGHT_EW'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
-
-            io_name = root_ch.name + io_suffix['HEIGHT_ONS'] + io_suffix['ALPHA'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
-
-            io_name = root_ch.name + io_suffix['HEIGHT_EW'] + io_suffix['ALPHA'] + io_suffix['GROUP']
-            if io_name in node.inputs:
-                break_input_link(tree, node.inputs[io_name])
 
             for letter in nsew_letters:
                 io_name = root_ch.name + io_suffix['HEIGHT_' + letter.upper()] + io_suffix['GROUP']
@@ -1801,12 +1772,6 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
         if prev_max_height and 'Max Height' in bump_process.inputs: create_link(tree, prev_max_height, bump_process.inputs['Max Height'])
 
         if height_root_ch.enable_smooth_bump:
-            #prev_height_ons = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_ONS'])
-            #prev_height_ew = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_EW'])
-
-            #if prev_height_ons and 'Height ONS' in bump_process.inputs: create_link(tree, prev_height_ons, bump_process.inputs['Height ONS'])
-            #if prev_height_ew and 'Height EW' in bump_process.inputs: create_link(tree, prev_height_ew, bump_process.inputs['Height EW'])
-
             prev_height_n = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_N'])
             prev_height_s = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_S'])
             prev_height_e = get_essential_node(tree, TREE_START).get(height_root_ch.name + io_suffix['HEIGHT_E'])
@@ -1852,6 +1817,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
         if vector and mapping and layer.texcoord_type != 'Decal':
             vector = create_link(tree, vector, mapping.inputs[0])[0]
+        
+        # Layer UV uniform scale value
+        if is_bl_newer_than(2, 81):
+            uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(layer, 'uniform_scale_value'))
+            if uniform_scale_value:
+                if layer.enable_uniform_scale:
+                    create_link(tree, uniform_scale_value, mapping.inputs[3])
+                else:
+                    break_link(tree, uniform_scale_value, mapping.inputs[3])
 
     if vector and layer.type not in {'VCOL', 'BACKGROUND', 'COLOR', 'GROUP', 'HEMI', 'OBJECT_INDEX'}:
         create_link(tree, vector, source.inputs[0])
@@ -2115,6 +2089,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                         mask_vector = create_link(tree, mask_vector, mask_mapping.inputs[0])[0]
 
                 create_link(tree, mask_vector, mask_source.inputs[0])
+
+                # Mask UV uniform scale value
+                if is_bl_newer_than(2, 81):
+                    uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(mask, 'uniform_scale_value'))
+                    if uniform_scale_value:
+                        if mask.enable_uniform_scale:
+                            create_link(tree, uniform_scale_value, mask_mapping.inputs[3])
+                        else:
+                            break_link(tree, uniform_scale_value, mask_mapping.inputs[3])
 
         # Mask uv neighbor
         mask_uv_neighbor = nodes.get(mask.uv_neighbor) if mask.texcoord_type != 'Layer' else uv_neighbor

@@ -1,4 +1,4 @@
-import bpy, shutil, os
+import bpy, os
 import tempfile
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper
@@ -170,79 +170,11 @@ def clean_object_references(image):
 
 def save_pack_all(yp):
 
-    tree = yp.id_data
-
-    images = []
-    for layer in yp.layers:
-        
-        # Layer image
-        if layer.type == 'IMAGE':
-            source = get_layer_source(layer)
-            if source.image and source.image not in images:
-                images.append(source.image)
-
-        # Mask image
-        for mask in layer.masks:
-            mask_tree = get_mask_tree(mask)
-
-            if mask.type == 'IMAGE':
-                source = mask_tree.nodes.get(mask.source)
-                if source.image and source.image not in images:
-                    images.append(source.image)
-
-            baked_source = mask_tree.nodes.get(mask.baked_source)
-            if baked_source and baked_source.image and baked_source.image not in images:
-                images.append(baked_source.image)
-
-        # Channel override image
-        for ch in layer.channels:
-
-            if ch.override and ch.override_type == 'IMAGE':
-                source = get_channel_source(ch, layer)
-                if source.image and source.image not in images:
-                    images.append(source.image)
-
-            if ch.override_1 and ch.override_1_type == 'IMAGE':
-                source = get_channel_source_1(ch, layer)
-                if source.image and source.image not in images:
-                    images.append(source.image)
-
-    # Baked images
-    for ch in yp.channels:
-        baked = tree.nodes.get(ch.baked)
-        if baked and baked.image and baked.image not in images:
-            images.append(baked.image)
-
-        if ch.type == 'NORMAL':
-            baked_disp = tree.nodes.get(ch.baked_disp)
-            if baked_disp and baked_disp.image and baked_disp.image not in images:
-                images.append(baked_disp.image)
-
-            baked_vdisp = tree.nodes.get(ch.baked_vdisp)
-            if baked_vdisp and baked_vdisp.image and baked_vdisp.image not in images:
-                images.append(baked_vdisp.image)
-
-            if not is_overlay_normal_empty(yp):
-                baked_normal_overlay = tree.nodes.get(ch.baked_normal_overlay)
-                if baked_normal_overlay and baked_normal_overlay.image and baked_normal_overlay.image not in images:
-                    images.append(baked_normal_overlay.image)
-
-    # Custom bake target images
-    for bt in yp.bake_targets:
-        image_node = tree.nodes.get(bt.image_node)
-        if image_node and image_node.image not in images:
-            images.append(image_node.image)
-
+    images = get_yp_images(yp, get_baked_channels=True, check_overlay_normal=True)
     packed_float_images = []
 
-    # Temporary scene for blender 3.30 hack
+    # Temporary scene for Blender 3.3 hack
     tmpscene = None
-    if is_bl_newer_than(3, 3):
-        tmpscene = bpy.data.scenes.new('Temp Save Scene')
-        try: tmpscene.view_settings.view_transform = 'Standard'
-        except: print('EXCEPTIION: Cannot set view transform on temporary save scene!')
-        try: tmpscene.render.image_settings.file_format = 'PNG'
-        except: print('EXCEPTIION: Cannot set file format on temporary save scene!')
 
     # Save/pack images
     for image in images:
@@ -265,6 +197,15 @@ def save_pack_all(yp):
             else:
                 # BLENDER BUG: Blender 3.3 has wrong srgb if not packed first
                 if is_bl_newer_than(3, 3) and image.colorspace_settings.name in {'Linear', get_noncolor_name()}:
+
+                    # Create temporary scene
+                    if not tmpscene:
+                        print('INFO: Creating temporary scene for saving some images...')
+                        tmpscene = bpy.data.scenes.new('Temp Save Scene')
+                        try: tmpscene.view_settings.view_transform = 'Standard'
+                        except: print('EXCEPTIION: Cannot set view transform on temporary save scene!')
+                        try: tmpscene.render.image_settings.file_format = 'PNG'
+                        except: print('EXCEPTIION: Cannot set file format on temporary save scene!')
 
                     # Get image path
                     path = bpy.path.abspath(image.filepath)
@@ -307,6 +248,7 @@ def save_pack_all(yp):
 
     # Delete temporary scene
     if tmpscene:
+        print('INFO: Deleting temporary scene used for saving some images...')
         remove_datablock(bpy.data.scenes, tmpscene)
 
     # HACK: For some reason active float image will glitch after auto save

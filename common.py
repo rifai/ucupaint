@@ -1,4 +1,4 @@
-import bpy, os, sys, re, time, numpy, math, pathlib
+import bpy, os, sys, re, numpy, math, pathlib
 import bpy_extras.image_utils
 from mathutils import *
 from bpy.app.handlers import persistent
@@ -934,8 +934,9 @@ def copy_id_props(source, dest, extras = [], reverse=False):
             for i, subval in enumerate(val):
                 dest_val[i] = subval
         else:
-            try: setattr(dest, prop, val)
-            except: print('Error set prop:', prop)
+            if getattr(dest, prop) != val:
+                try: setattr(dest, prop, val)
+                except: print('Error set prop:', prop)
 
 def copy_node_props_(source, dest, extras = []):
 
@@ -966,17 +967,12 @@ def copy_node_props_(source, dest, extras = []):
             for i, subval in enumerate(val):
                 try: 
                     dest_val[i] = subval
-                    #print('SUCCESS:', prop, dest_val[i])
                 except: 
-                    #print('FAILED:', prop, dest_val[i])
                     pass
         else:
-            try: 
-                setattr(dest, prop, val)
-                #print('SUCCESS:', prop, val)
-            except: 
-                #print('FAILED:', prop, val)
-                pass
+            if getattr(dest, prop) != val:
+                try: setattr(dest, prop, val)
+                except: pass
 
 def copy_node_props(source, dest, extras=[]):
     if source.type != dest.type: return
@@ -1270,7 +1266,13 @@ def is_image_single_user(image):
 
 def safe_remove_image(image, remove_on_disk=False, user=None, user_prop=''):
 
+    scene = bpy.context.scene
+
     if is_image_single_user(image):
+
+        # Remove image from canvas
+        if scene.tool_settings.image_paint.canvas == image:
+            scene.tool_settings.image_paint.canvas = None
 
         if remove_on_disk and not image.packed_file and image.filepath != '':
             if image.source == 'TILED':
@@ -1394,8 +1396,8 @@ def remove_node(tree, entity, prop, remove_data=True, parent=None, remove_on_dis
         tree.nodes.remove(node)
         dirty = True
 
-    setattr(entity, prop, '')
-    #entity[prop] = ''
+    if getattr(entity, prop) != '':
+        setattr(entity, prop, '')
 
     return dirty
 
@@ -2166,6 +2168,19 @@ def get_entity_mapping(entity, get_baked=False):
     elif m2: return get_mask_mapping(entity, get_baked)
 
     return None
+
+def update_entity_uniform_scale_enabled(entity):
+    mapping = get_entity_mapping(entity)
+    if mapping:
+        scale_input = mapping.inputs[3]
+
+        if entity.enable_uniform_scale:
+            # Set the uniform scale to min axis of regular scale when uniform scale is enabled
+            set_entity_prop_value(entity, 'uniform_scale_value', min(map(abs, scale_input.default_value)))
+        else:
+            # Set the regular scale axes to the uniform scale when uniform scale is disabled
+            scale = get_entity_prop_value(entity, 'uniform_scale_value')
+            scale_input.default_value = (scale, scale, scale)
 
 def get_neighbor_uv_space_input(texcoord_type):
     if texcoord_type == 'UV':
@@ -4122,7 +4137,7 @@ def update_layer_bump_process_max_height(height_root_ch, layer, tree=None):
         max_height = get_displacement_max_height(height_root_ch, prev_layer)
     else: max_height = 0.0
 
-    if 'Max Height' in bump_process.inputs:
+    if 'Max Height' in bump_process.inputs and bump_process.inputs['Max Height'].default_value != max_height:
         bump_process.inputs['Max Height'].default_value = max_height
 
     #if height_root_ch.enable_smooth_bump:
@@ -4809,7 +4824,7 @@ def is_entity_need_tangent_input(entity, uv_name):
         height_ch = get_height_channel(layer)
 
         # Previous normal is calculated using normal process
-        if height_root_ch and check_need_prev_normal(layer):
+        if height_root_ch and height_root_ch.enable_smooth_bump and check_need_prev_normal(layer):
             return True
 
         if height_root_ch and height_ch and get_channel_enabled(height_ch, layer, height_root_ch):
@@ -5198,7 +5213,7 @@ def get_all_objects_with_same_materials(mat, mesh_only=False, uv_name='', select
 
     return objs
 
-def get_layer_images(layer, udim_only=False, ondisk_only=False, packed_only=False):
+def get_layer_images(layer, udim_only=False, ondisk_only=False, packed_only=False, udim_atlas_only=False):
 
     layers = [layer]
 
@@ -5240,9 +5255,10 @@ def get_layer_images(layer, udim_only=False, ondisk_only=False, packed_only=Fals
 
     filtered_images = []
     for image in images:
-        if udim_only and image.source != 'TILED': continue
+        if (udim_only or udim_atlas_only) and image.source != 'TILED': continue
         if ondisk_only and (image.packed_file or image.filepath == ''): continue
         if packed_only and not image.packed_file and image.filepath != '': continue
+        if udim_atlas_only and not image.yua.is_udim_atlas: continue
         if image not in filtered_images:
             filtered_images.append(image)
 
@@ -5256,6 +5272,13 @@ def any_decal_inside_layer(layer):
         if mask.texcoord_type == 'Decal':
             return True
 
+    return False
+
+def any_dirty_images_inside_layer(layer):
+    for image in get_layer_images(layer):
+        if image.is_dirty:
+            return True
+    
     return False
 
 def any_single_user_ondisk_image_inside_layer(layer):
@@ -5273,10 +5296,44 @@ def any_single_user_ondisk_image_inside_group(group):
 
     return False
 
-def get_yp_images(yp, udim_only=False):
+def get_yp_images(yp, udim_only=False, get_baked_channels=False, check_overlay_normal=False):
+
     images = []
+
+    # Layer images
     for layer in yp.layers:
-        images.extend(get_layer_images(layer, udim_only))
+        layer_images = get_layer_images(layer, udim_only)
+        for image in layer_images:
+            if image not in images:
+                images.append(image)
+
+    # Baked images
+    if get_baked_channels:
+        tree = yp.id_data
+        for ch in yp.channels:
+            baked = tree.nodes.get(ch.baked)
+            if baked and baked.image and baked.image not in images:
+                images.append(baked.image)
+
+            if ch.type == 'NORMAL':
+                baked_disp = tree.nodes.get(ch.baked_disp)
+                if baked_disp and baked_disp.image and baked_disp.image not in images:
+                    images.append(baked_disp.image)
+
+                baked_vdisp = tree.nodes.get(ch.baked_vdisp)
+                if baked_vdisp and baked_vdisp.image and baked_vdisp.image not in images:
+                    images.append(baked_vdisp.image)
+
+                if not check_overlay_normal or not is_overlay_normal_empty(yp):
+                    baked_normal_overlay = tree.nodes.get(ch.baked_normal_overlay)
+                    if baked_normal_overlay and baked_normal_overlay.image and baked_normal_overlay.image not in images:
+                        images.append(baked_normal_overlay.image)
+
+        # Custom bake target images
+        for bt in yp.bake_targets:
+            image_node = tree.nodes.get(bt.image_node)
+            if image_node and image_node.image not in images:
+                images.append(image_node.image)
 
     return images
 
@@ -5829,7 +5886,8 @@ def replace_new_mix_node(tree, entity, prop, label='', return_status=False, hard
             return_status=True, hard_replace=hard_replace, dirty=dirty, force_replace=force_replace)
 
     if is_bl_newer_than(3, 4):
-        node.data_type = data_type
+        if node.data_type != data_type:
+            node.data_type = data_type
 
     if return_status:
         return node, dirty
@@ -5837,9 +5895,9 @@ def replace_new_mix_node(tree, entity, prop, label='', return_status=False, hard
     return node
 
 def set_mix_clamp(mix, bool_val):
-    if hasattr(mix, 'clamp_result'):
+    if hasattr(mix, 'clamp_result') and mix.clamp_result != bool_val:
         mix.clamp_result = bool_val
-    elif hasattr(mix, 'use_clamp'):
+    elif hasattr(mix, 'use_clamp') and mix.use_clamp != bool_val:
         mix.use_clamp = bool_val
 
 def get_mix_color_indices(mix):
@@ -6629,6 +6687,7 @@ def get_mesh_hash(obj):
     return str(h)
 
 def remove_decal_object(tree, entity):
+    if not tree: return
     # NOTE: This will remove the texcoord object even if the entity is not using decal
     #if entity.texcoord_type == 'Decal':
     texcoord = tree.nodes.get(entity.texcoord)
@@ -6643,3 +6702,7 @@ def load_image(path, directory, check_existing=True):
         return bpy_extras.image_utils.load_image(path, directory)
 
     return bpy_extras.image_utils.load_image(path, directory, check_existing=check_existing)
+
+def get_active_tool_idname():
+    tools = bpy.context.workspace.tools
+    return tools.from_space_view3d_mode(bpy.context.mode).idname
