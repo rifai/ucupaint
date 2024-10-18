@@ -473,15 +473,9 @@ uniform float layer_{16}_decal_distance = {17};
     
 						lyr_distance = inp.default_value
 
-						# print("Decal layer", decal_obj.type)
-						# print("decal world ", decal_obj.matrix_world, decal_obj.name)
-						# print("decal local ", decal_obj.matrix_local, decal_obj.name)
-						# print("decal inverse ", decal_obj.matrix_parent_inverse, decal_obj.name)
-						print("decal gabungan ", local_matrix, decal_obj.name)
-
-						print("layer distance ", lyr_distance)
-
-						print("obj= ", obj.matrix_world, obj.name)
+						# print("decal gabungan ", local_matrix, decal_obj.name)
+						# print("layer distance ", lyr_distance)
+						# print("obj= ", obj.matrix_world, obj.name)
 						global_vars += self.script_decal_matrix.format(
 							local_matrix[0][0], local_matrix[0][1], local_matrix[0][2], local_matrix[0][3], 
 							local_matrix[1][0], local_matrix[1][1], local_matrix[1][2], local_matrix[1][3], 
@@ -489,13 +483,51 @@ uniform float layer_{16}_decal_distance = {17};
 							local_matrix[3][0], local_matrix[3][1], local_matrix[3][2], local_matrix[3][3],
 							index, lyr_distance)
 						
-						image_path = source.image.filepath_from_user()
+						image_path = image.filepath_from_user()
+
+						# check if width and height is not power of 2
+						if not math.log2(image.size[0]).is_integer() or not math.log2(image.size[1]).is_integer():
+							# get name without extension
+							# Split the file path into directory and file name
+							directory, old_name = os.path.split(image_path)
+							
+							# Create the new file name
+							name, ext = os.path.splitext(old_name)
+							new_name = f"{name}-resized{ext}"	
+							new_name = os.path.join(directory, new_name)	
+
+							print("path save as "+image_path, " to "+new_name)
+
+							new_image = image.copy()
+
+							# resize new image 
+							new_width = new_image.size[0]
+							new_height = new_image.size[1]
+							
+							# ceil to nearest power of 2
+							new_width = 2 ** math.ceil(math.log2(new_width))
+							new_height = 2 ** math.ceil(math.log2(new_height))
+
+							print("scale from ", image.size[0], image.size[1], " to ", new_width, new_height)
+
+							new_image.scale(new_width, new_height)
+
+							override = bpy.context.copy()
+							override['edit_image'] = new_image
+							
+							if is_bl_newer_than(4):
+								with bpy.context.temp_override(**override):
+									bpy.ops.image.save_as(filepath=new_name, relative_path=True)
+							else: bpy.ops.image.save_as(override, filepath=new_name, relative_path=True)
+
+							remove_datablock(bpy.data.images, new_image)
+
+							copying_files.append(new_name)
 
 						asset_args.append(layer_var)
 						asset_args.append(bpy.path.basename(image_path))
 
 						# copy to directory 
-						print("copy decal", image_path, " to ", my_directory)
 						# shutil.copy(image_path, my_directory)
 						copying_files.append(image_path)
 
