@@ -8,7 +8,7 @@ from bpy.props import *
 from bpy.types import PropertyGroup, Panel, Operator, UIList, Scene
 import mathutils
 
-import bpy
+import bpy, numpy
 
 # export shader, choose location, save file
 class ExportShader(Operator):
@@ -20,8 +20,8 @@ class ExportShader(Operator):
 	filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
 	export_gltf: BoolProperty(name="Export GLTF", default=True)
 
-	shader_generation_test = False
-	use_shortcut = False
+	shader_generation_test = True
+	use_shortcut = True
 
 	godot_directory = ""
 
@@ -470,7 +470,7 @@ uniform float layer_{16}_decal_distance = {17};
 						local_matrix = local_matrix.inverted()
 
 						inp = get_entity_prop_input(layer, "decal_distance_value")
-    
+	
 						lyr_distance = inp.default_value
 
 						# print("decal gabungan ", local_matrix, decal_obj.name)
@@ -632,7 +632,73 @@ uniform float layer_{16}_decal_distance = {17};
 		col = self.layout.column()
 		col.prop(self, "export_gltf")
 
-classes = [ExportShader]
+
+# export shader, choose location, save file
+class ModifyDecalTexture(Operator):
+	"""Modify Decal Texture"""
+
+	bl_label = "Modify Decal"
+	bl_idname = "godot.modify_decal"
+
+	image_name :StringProperty (default="Group 4.png")
+	padding = 1
+
+
+	def execute(self, context):
+		print("Execute modify decal "+self.image_name)
+		image = bpy.data.images[self.image_name]
+		scaled_image = image.copy()
+
+		new_width = 2 ** math.ceil(math.log2(image.size[0])) - self.padding * 2
+		new_height = 2 ** math.ceil(math.log2(image.size[1])) - self.padding * 2
+
+		print("scale from ", image.size[0], image.size[1], " to ", new_width, new_height)
+
+		scaled_image.scale(new_width, new_height)
+
+		new_width = new_width + 2 * self.padding
+		new_height = new_height + 2 * self.padding
+		
+		new_image = bpy.data.images.new("00paded", width=new_width, height=new_height, alpha=True)
+
+		# Copy image pixels
+		# copy_image_pixels(image, new_image)
+
+		target_pxs = numpy.empty(shape=new_height*new_width*4, dtype=numpy.float32)
+		source_pxs = numpy.empty(shape=scaled_image.size[0]*scaled_image.size[1]*4, dtype=numpy.float32)
+		new_image.pixels.foreach_get(target_pxs)
+		scaled_image.pixels.foreach_get(source_pxs)
+
+		# Set array to 3d
+		target_pxs.shape = (new_height, new_width, 4)
+		source_pxs.shape = (scaled_image.size[1], scaled_image.size[0], 4)
+
+		target_pxs[self.padding:self.padding+scaled_image.size[1], self.padding:self.padding+scaled_image.size[0]] = source_pxs
+		target_pxs[:self.padding, :] = [0, 0, 0, 0]  # Top border
+		target_pxs[-self.padding:, :] = [0, 0, 0, 0]  # Bottom border
+		target_pxs[:, :self.padding] = [0, 0, 0, 0]  # Left border
+		target_pxs[:, -self.padding:] = [0, 0, 0, 0]  # Right border
+
+		new_image.pixels.foreach_set(target_pxs.ravel())
+	
+		# extract file name and extension
+		base, ext = os.path.splitext(image.filepath)
+		filepath_new = base + "_edited" + ext
+
+		override = bpy.context.copy()
+		override['edit_image'] = new_image
+		if is_bl_newer_than(4):
+			with bpy.context.temp_override(**override):
+				bpy.ops.image.save_as(filepath=filepath_new)
+		else: bpy.ops.image.save_as(override, filepath=filepath_new)
+
+		remove_datablock(bpy.data.images, new_image)
+		remove_datablock(bpy.data.images, scaled_image)
+
+		print("Execute modify decal")
+		return {'FINISHED'}
+
+classes = [ExportShader, ModifyDecalTexture]
 
 def register():
 	for cl in classes:
