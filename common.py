@@ -111,6 +111,9 @@ def entity_input_items(self, context):
         if is_bl_newer_than(2, 81) and entity.type == 'VORONOI':
             items.append(('RGB', label + ' Color',  ''))
             items.append(('ALPHA', label + ' Distance',  ''))
+        elif entity.type == 'GABOR':
+            items.append(('RGB', label + ' Value',  ''))
+            items.append(('ALPHA', label + ' Phase',  ''))
         elif entity.type == 'VCOL':
             items.append(('RGB', label,  ''))
             items.append(('ALPHA', label + ' Alpha',  ''))
@@ -133,7 +136,6 @@ neighbor_directions = ['n', 's', 'e', 'w']
 
 normal_blend_items = (
         ('MIX', 'Mix', ''),
-        #('VECTOR_MIX', 'Vector Mix', ''),
         ('OVERLAY', 'Add', ''),
         ('COMPARE', 'Compare Height', '')
         )
@@ -146,15 +148,12 @@ height_blend_items = (
 
 layer_type_items = (
         ('IMAGE', 'Image', ''),
-        #('ENVIRONMENT', 'Environment', ''),
         ('BRICK', 'Brick', ''),
         ('CHECKER', 'Checker', ''),
         ('GRADIENT', 'Gradient', ''),
         ('MAGIC', 'Magic', ''),
         ('MUSGRAVE', 'Musgrave', ''),
         ('NOISE', 'Noise', ''),
-        #('POINT_DENSITY', 'Point Density', ''),
-        #('SKY', 'Sky', ''),
         ('VORONOI', 'Voronoi', ''),
         ('WAVE', 'Wave', ''),
         ('VCOL', 'Vertex Color', ''),
@@ -162,19 +161,17 @@ layer_type_items = (
         ('COLOR', 'Solid Color', ''),
         ('GROUP', 'Group', ''),
         ('HEMI', 'Fake Lighting', ''),
+        ('GABOR', 'Gabor', ''),
         )
 
 mask_type_items = (
         ('IMAGE', 'Image', ''),
-        #('ENVIRONMENT', 'Environment', ''),
         ('BRICK', 'Brick', ''),
         ('CHECKER', 'Checker', ''),
         ('GRADIENT', 'Gradient', ''),
         ('MAGIC', 'Magic', ''),
         ('MUSGRAVE', 'Musgrave', ''),
         ('NOISE', 'Noise', ''),
-        #('POINT_DENSITY', 'Point Density', ''),
-        #('SKY', 'Sky', ''),
         ('VORONOI', 'Voronoi', ''),
         ('WAVE', 'Wave', ''),
         ('VCOL', 'Vertex Color', ''),
@@ -184,40 +181,22 @@ mask_type_items = (
         ('BACKFACE', 'Backface', ''),
         ('EDGE_DETECT', 'Edge Detect', ''),
         ('MODIFIER', 'Modifier', ''),
+        ('GABOR', 'Gabor', ''),
         )
 
 channel_override_type_items = (
         ('DEFAULT', 'Default', ''),
         ('IMAGE', 'Image', ''),
-        #('ENVIRONMENT', 'Environment', ''),
         ('BRICK', 'Brick', ''),
         ('CHECKER', 'Checker', ''),
         ('GRADIENT', 'Gradient', ''),
         ('MAGIC', 'Magic', ''),
         ('MUSGRAVE', 'Musgrave', ''),
         ('NOISE', 'Noise', ''),
-        #('POINT_DENSITY', 'Point Density', ''),
-        #('SKY', 'Sky', ''),
         ('VORONOI', 'Voronoi', ''),
         ('WAVE', 'Wave', ''),
         ('VCOL', 'Vertex Color', ''),
-        #('BACKGROUND', 'Background', ''),
-        #('COLOR', 'Solid Color', ''),
-        #('GROUP', 'Group', ''),
-        #('HEMI', 'Fake Lighting', ''),
-        )
-
-channel_override_type_items_410 = (
-        ('DEFAULT', 'Default', ''),
-        ('IMAGE', 'Image', ''),
-        ('BRICK', 'Brick', ''),
-        ('CHECKER', 'Checker', ''),
-        ('GRADIENT', 'Gradient', ''),
-        ('MAGIC', 'Magic', ''),
-        ('NOISE', 'Noise', ''),
-        ('VORONOI', 'Voronoi', ''),
-        ('WAVE', 'Wave', ''),
-        ('VCOL', 'Vertex Color', ''),
+        ('GABOR', 'Gabor', ''),
         )
 
 # Override 1 will only use default value or image for now
@@ -234,15 +213,12 @@ hemi_space_items = (
 
 layer_type_labels = {
         'IMAGE' : 'Image',
-        #'ENVIRONMENT' : 'Environment',
         'BRICK' : 'Brick',
         'CHECKER' : 'Checker',
         'GRADIENT' : 'Gradient',
         'MAGIC' : 'Magic',
         'MUSGRAVE' : 'Musgrave',
         'NOISE' : 'Noise',
-        #'POINT_DENSITY' : 'Point Density',
-        #'SKY' : 'Sky',
         'VORONOI' : 'Voronoi',
         'WAVE' : 'Wave',
         'VCOL' : 'Vertex Color',
@@ -250,6 +226,7 @@ layer_type_labels = {
         'COLOR' : 'Solid Color',
         'GROUP' : 'Layer Group',
         'HEMI' : 'Fake Lighting',
+        'GABOR' : 'Gabor',
         }
 
 bake_type_items = (
@@ -287,6 +264,7 @@ channel_override_labels = {
         'WAVE' : 'Wave',
         'VCOL' : 'Vertex Color',
         'HEMI' : 'Fake Lighting',
+        'GABOR' : 'Gabor',
         }
 
 bake_type_labels = {
@@ -430,6 +408,7 @@ layer_node_bl_idnames = {
         'COLOR_ID' : 'ShaderNodeGroup',
         'BACKFACE' : 'ShaderNodeNewGeometry',
         'EDGE_DETECT' : 'ShaderNodeGroup',
+        'GABOR' : 'ShaderNodeTexGabor',
         }
 
 io_suffix = {
