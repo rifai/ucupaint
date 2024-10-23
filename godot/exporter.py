@@ -81,7 +81,12 @@ void fragment() {{
 
 	script_vars = '''
 uniform sampler2D {0}:source_color, filter_linear_mipmap, repeat_enable;
-uniform vec2 {1} = vec2({2},{3}); 
+'''
+	script_var_scale_2 = '''
+uniform vec2 layer_{0}_scale = vec2({1},{2}); 
+'''	
+	script_var_scale_1 = '''
+uniform float layer_{0}_scale = {1}; 
 '''
 	script_vars_roughness = "uniform sampler2D {}_roughness:hint_roughness_r, filter_linear_mipmap, repeat_enable;\n"
 
@@ -106,9 +111,19 @@ uniform float layer_{16}_decal_distance = {17};
 	script_fragment_base_uv_heightmap = '''
 	scaled_uv_{0} = setHeight(scaled_uv_{0}, view_dir, {1}_heightmap, {1}_heightmap_scale);'''
 
-	script_fragment_var = '''
+	script_fragment_scale_uniform = '''
+	scaled_uv_{0} = vec2(layer_{0}_scale * layer_{0}_scale);'''
 
-	vec2 scaled_uv_{0} = UV * {1};{3}
+	script_scale_local_var_1 = '''
+	vec2 scaled_uv_{0} = vec2(layer_{0}_scale, layer_{0}_scale);
+'''	
+
+	script_scale_local_var_2 = '''
+	vec2 scaled_uv_{0} = layer_{0}_scale;
+'''
+
+	script_fragment_var = '''
+	scaled_uv_{0} = UV * scaled_uv_{0};{3}
 	vec4 albedo_{0} = texture({2}, scaled_uv_{0});'''
 
 	script_fragment_roughness_var = '''
@@ -308,8 +323,18 @@ uniform float layer_{16}_decal_distance = {17};
 
 						scale_var = layer_var + "_scale"
 
-						skala = mapping.inputs[3].default_value
-						global_vars += self.script_vars.format(layer_var, scale_var, skala.x, skala.y)
+						use_uniform_scale = layer.enable_uniform_scale
+
+						uniform_scale = 1.0
+						
+						global_vars += self.script_vars.format(layer_var)
+						if use_uniform_scale:
+							uniform_scale = get_entity_prop_value(layer, 'uniform_scale_value')
+							global_vars += self.script_var_scale_1.format(index, uniform_scale)
+						else:
+							skala = mapping.inputs[3].default_value
+							global_vars += self.script_var_scale_2.format(index, skala.x, skala.y)
+
 
 						heightmap_uv_script = ""
 						fragment_var = ""
@@ -391,8 +416,11 @@ uniform float layer_{16}_decal_distance = {17};
 						
 										global_vars += self.script_vars_normal.format(layer_var)
 										normal_overrides.append(layer_idx)
-
-						fragment_var = self.script_fragment_var.format(index, scale_var, layer_var, heightmap_uv_script) + fragment_var
+						if use_uniform_scale:
+							fragment_var = self.script_scale_local_var_1.format(index) + fragment_var
+						else:
+							fragment_var = self.script_scale_local_var_2.format(index) + fragment_var
+						fragment_var += self.script_fragment_var.format(index, scale_var, layer_var, heightmap_uv_script)
 						fragment_vars += fragment_var
 
 						# print("filepath ", index, " = ",source.image.filepath_from_user())
@@ -549,7 +577,7 @@ uniform float layer_{16}_decal_distance = {17};
 
 		content_shader = self.script_template.format(global_vars, fragment_vars)
 
-		# print(content_shader)
+		print(content_shader)
 
 		script_location = os.path.join(addon_dir, "blender_import.gd")
 		print("addon dir ", script_location)
