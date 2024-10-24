@@ -81,7 +81,9 @@ void fragment() {{
 
 	script_vars = '''
 uniform sampler2D {0}:source_color, filter_linear_mipmap, repeat_enable;
+uniform float {0}_intensity = {1};
 '''
+
 	script_var_scale_2 = '''
 uniform vec2 layer_{0}_scale = vec2({1},{2}); 
 '''	
@@ -98,6 +100,7 @@ uniform float {0}_normal_depth = 1.0;
 
 	script_decal_matrix = '''
 uniform sampler2D layer_{16}:source_color, filter_linear_mipmap, repeat_disable;
+uniform float layer_{16}_intensity = {18};
 const mat4 layer_{16}_decal_matrix = mat4(vec4({0}, {1}, {2}, {3}),
 							vec4({4}, {5}, {6}, {7}),
 							vec4({8}, {9}, {10}, {11}),
@@ -162,6 +165,11 @@ uniform float layer_{16}_decal_distance = {17};
 	albedo_all = layer(albedo_all, albedo_{0});
 '''
 
+	script_albedo_intensity = '''
+	albedo_{0} *= layer_{0}_intensity;
+'''
+	
+
 	script_roughness_1 = '''
 	vec4 roughness_all = roughness_{};
 '''
@@ -171,6 +179,10 @@ uniform float layer_{16}_decal_distance = {17};
 	script_roughness_combine_next = '''
 	roughness_all = layer(roughness_all, roughness_{0});
 '''
+	script_roughness_intensity = '''
+	roughness_{0} *= layer_{0}_intensity;
+'''
+
 	script_roughness_fragment = '''
 	vec4 roughness_texture_channel = vec4(0.33, 0.33, 0.33, 0.0);
 	float rough = dot(roughness_all, roughness_texture_channel);
@@ -214,6 +226,11 @@ uniform float layer_{16}_decal_distance = {17};
 	script_normal_combine_next = '''
 	normal_all = layer(normal_all, normal_{0});
 	normal_depth_all = layer(normal_depth_all, normal_depth_{0});'''
+
+	script_normal_intensity = '''
+	normal_{0} *= layer_{0}_intensity;
+	normal_depth_{0} *= layer_{0}_intensity;
+'''
 
 	script_normal_fragment = '''
 	NORMAL_MAP = normal_all.rgb;
@@ -326,8 +343,10 @@ uniform float layer_{16}_decal_distance = {17};
 						use_uniform_scale = layer.enable_uniform_scale
 
 						uniform_scale = 1.0
+
+						intensity_layer = get_entity_prop_value(layer, 'intensity_value')
 						
-						global_vars += self.script_vars.format(layer_var)
+						global_vars += self.script_vars.format(layer_var, intensity_layer)
 						if use_uniform_scale:
 							uniform_scale = get_entity_prop_value(layer, 'uniform_scale_value')
 							global_vars += self.script_var_scale_1.format(index, uniform_scale)
@@ -504,12 +523,15 @@ uniform float layer_{16}_decal_distance = {17};
 						# print("decal gabungan ", local_matrix, decal_obj.name)
 						# print("layer distance ", lyr_distance)
 						# print("obj= ", obj.matrix_world, obj.name)
+
+						intensity_layer = get_entity_prop_value(layer, 'intensity_value')
+
 						global_vars += self.script_decal_matrix.format(
 							local_matrix[0][0], local_matrix[0][1], local_matrix[0][2], local_matrix[0][3], 
 							local_matrix[1][0], local_matrix[1][1], local_matrix[1][2], local_matrix[1][3], 
 							local_matrix[2][0], local_matrix[2][1], local_matrix[2][2], local_matrix[2][3], 
 							local_matrix[3][0], local_matrix[3][1], local_matrix[3][2], local_matrix[3][3],
-							index, lyr_distance)
+							index, lyr_distance, intensity_layer)
 						
 						image_path = image.filepath_from_user()
 
@@ -534,9 +556,11 @@ uniform float layer_{16}_decal_distance = {17};
 
 		if len(albedo_overrides) > 0:
 			if len(albedo_overrides) == 1:
+				combine_content += self.script_albedo_intensity.format(albedo_overrides[0])
 				combine_content += self.script_albedo_1
 			else:
 				for lyr_idx, lyr in enumerate(albedo_overrides):
+					combine_content += self.script_albedo_intensity.format(albedo_overrides[lyr_idx])
 					if lyr_idx == 1:
 						combine_content += self.script_albedo_combine_0
 					elif lyr_idx > 1:
@@ -544,9 +568,11 @@ uniform float layer_{16}_decal_distance = {17};
 
 		if len(roughness_overrides) > 0:
 			if len(roughness_overrides) == 1:
+				combine_content += self.script_roughness_intensity.format(roughness_overrides[0])
 				combine_content += self.script_roughness_1.format(roughness_overrides[0])
 			else:
 				for lyr_idx, lyr in enumerate(roughness_overrides):
+					combine_content += self.script_roughness_intensity.format(roughness_overrides[lyr_idx])
 					if lyr_idx == 1:
 						combine_content += self.script_roughness_combine_0.format(roughness_overrides[lyr_idx - 1], roughness_overrides[lyr_idx])
 					elif lyr_idx > 1:
@@ -556,9 +582,11 @@ uniform float layer_{16}_decal_distance = {17};
 
 		if len(normal_overrides) > 0:
 			if len(normal_overrides) == 1:
+				combine_content += self.script_normal_intensity.format(normal_overrides[0])
 				combine_content += self.script_normal_1.format(normal_overrides[0])
 			else:
 				for lyr_idx, lyr in enumerate(normal_overrides):
+					combine_content += self.script_normal_intensity.format(normal_overrides[lyr_idx])
 					if lyr_idx == 1:
 						combine_content += self.script_normal_combine_0.format(normal_overrides[lyr_idx - 1], normal_overrides[lyr_idx])
 					elif lyr_idx > 1:
