@@ -234,7 +234,7 @@ def update_yp_tree(tree):
         for channel in yp.channels:
             channel_tree = get_mod_tree(channel)
             for mod in channel.modifiers:
-                if mod.type == 'MULTIPLIER' :
+                if mod.type == 'MULTIPLIER':
                     mods.append(mod)
                     parents.append(channel)
                     types.append(channel.type)
@@ -242,7 +242,7 @@ def update_yp_tree(tree):
         for layer in yp.layers:
             layer_tree = get_mod_tree(layer)
             for mod in layer.modifiers:
-                if mod.type == 'MULTIPLIER' :
+                if mod.type == 'MULTIPLIER':
                     mods.append(mod)
                     parents.append(layer)
                     types.append('RGB')
@@ -251,7 +251,7 @@ def update_yp_tree(tree):
                 root_ch = yp.channels[i]
                 ch_tree = get_mod_tree(ch)
                 for j, mod in enumerate(ch.modifiers):
-                    if mod.type == 'MULTIPLIER' :
+                    if mod.type == 'MULTIPLIER':
                         mods.append(mod)
                         parents.append(ch)
                         types.append(root_ch.type)
@@ -305,8 +305,10 @@ def update_yp_tree(tree):
                 smooth_bump_ch = get_smooth_bump_channel(layer)
                 if smooth_bump_ch and smooth_bump_ch.enable:
                     layer_tree = get_tree(layer)
-                    uv_neighbor_1 = replace_new_node(layer_tree, layer, 'uv_neighbor_1', 'ShaderNodeGroup', 'Neighbor UV 1', 
-                            NEIGHBOR_FAKE, hard_replace=True)
+                    uv_neighbor_1 = replace_new_node(
+                        layer_tree, layer, 'uv_neighbor_1', 'ShaderNodeGroup', 'Neighbor UV 1', 
+                        NEIGHBOR_FAKE, hard_replace=True
+                    )
 
                 reconnect_layer_nodes(layer)
                 rearrange_layer_nodes(layer)
@@ -519,13 +521,13 @@ def update_yp_tree(tree):
                 height_ch = get_height_channel(layer)
                 if height_ch:
                     if not yp.use_baked and not height_root_ch.enable_subdiv_setup:
-                        set_entity_prop_value(height_ch, 'bump_distance', height_ch.bump_distance*5.0)
-                        set_entity_prop_value(height_ch, 'normal_bump_distance', height_ch.normal_bump_distance*5.0)
-                        set_entity_prop_value(height_ch, 'transition_bump_distance', height_ch.transition_bump_distance*5.0)
+                        set_entity_prop_value(height_ch, 'bump_distance', height_ch.bump_distance * 5.0)
+                        set_entity_prop_value(height_ch, 'normal_bump_distance', height_ch.normal_bump_distance * 5.0)
+                        set_entity_prop_value(height_ch, 'transition_bump_distance', height_ch.transition_bump_distance * 5.0)
                     elif height_root_ch.subdiv_adaptive:
-                        set_entity_prop_value(height_ch, 'bump_distance', height_ch.bump_distance/5.0)
-                        set_entity_prop_value(height_ch, 'normal_bump_distance', height_ch.normal_bump_distance/5.0)
-                        set_entity_prop_value(height_ch, 'transition_bump_distance', height_ch.transition_bump_distance/5.0)
+                        set_entity_prop_value(height_ch, 'bump_distance', height_ch.bump_distance / 5.0)
+                        set_entity_prop_value(height_ch, 'normal_bump_distance', height_ch.normal_bump_distance / 5.0)
+                        set_entity_prop_value(height_ch, 'transition_bump_distance', height_ch.transition_bump_distance / 5.0)
 
             # Transfer channel intensity value to layer intensity value if there's only one enabled channel
             enabled_channels = [c for c in layer.channels if c.enable]
@@ -677,6 +679,22 @@ def update_yp_tree(tree):
                 if baked_vdisp and baked_vdisp.image:
                     bi = baked_vdisp.image.y_bake_info
                     bi.is_baked_channel = True
+
+    # Version 2.1.3 has resolution toggle, so update the bake info
+    if version_tuple(yp.version) < (2, 1, 3):
+
+        images = get_yp_images(yp, get_baked_channels=True)
+        for image in images:
+            if image.y_bake_info.is_baked:
+                if image.size[0] == image.size[1] == 512:
+                    image.y_bake_info.image_resolution = '512'
+                elif image.size[0] == image.size[1] == 1024:
+                    image.y_bake_info.image_resolution = '1024'
+                elif image.size[0] == image.size[1] == 2048:
+                    image.y_bake_info.image_resolution = '2048'
+                elif image.size[0] == image.size[1] == 4096:
+                    image.y_bake_info.image_resolution = '4096'
+                else: image.y_bake_info.use_custom_resolution = True
 
     # SECTION II: Updates based on the blender version
 
