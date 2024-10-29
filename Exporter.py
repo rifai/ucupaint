@@ -18,6 +18,7 @@ class YExporter(Operator):
 	filetype_packed = ".ucu"
 	filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
 	export_gltf: BoolProperty(name="Export GLTF", default=False)
+	pack_file: BoolProperty(name="Pack File", default=False)
 
 	blender_to_godot = mathutils.Matrix((
 							(1, 0, 0, 0),
@@ -42,6 +43,7 @@ class YExporter(Operator):
 	def execute(self, context):
 		node = get_active_ypaint_node()
 		yp = node.node_tree.yp
+		inputs = node.inputs
 
 		print("====================================")
 		index = 0
@@ -61,14 +63,17 @@ class YExporter(Operator):
 		# Prepare data to be saved
 		data = {
 			"version": self.version,
-			"layers": []
+			"layers": [],
 		}
 
+		for i in inputs:
+			print("input ", i.name, " = ", i.default_value, " type ", i.type)
+			in_key = i.name.lower()
 
-		albedo_overrides = []
-		roughness_overrides = []
-		normal_overrides = []
-		bump_overrides = []
+			if i.type == 'VALUE':
+				data[in_key] = i.default_value
+			else:
+				data[in_key] = i.default_value[:]
 
 		copying_files = []
 
@@ -81,8 +86,8 @@ class YExporter(Operator):
 				intensity_layer = get_entity_prop_value(layer, 'intensity_value')
 
 				layer_data = {
-                    "index": index,
-                    "name": layer.name,
+                    # "index": index,
+                    # "name": layer.name,
 					"intensity_value": intensity_layer
                 }
 
@@ -97,9 +102,22 @@ class YExporter(Operator):
 						layer_data["decal"] = False
 						
 						albedo = {
-							"key"	: layer_var,
-							"value" : bpy.path.basename(image_path)
+							"source" : bpy.path.basename(image_path)
 						}
+
+						mapping = get_layer_mapping(layer)
+						use_uniform_scale = layer.enable_uniform_scale
+
+						if use_uniform_scale:
+							uniform_scale = get_entity_prop_value(layer, 'uniform_scale_value')
+							layer_data["scale"] = uniform_scale
+						else:
+							skala = mapping.inputs[3].default_value
+							layer_data["scale"] = [skala.x, skala.y]
+
+						# todo : unpacked texture
+
+						print("copying image_path", image_path)
 						copying_files.append(image_path)
 
 						layer_data["albedo"] = albedo
@@ -127,23 +145,18 @@ class YExporter(Operator):
 									print("channel path 1", id_ch, " = ",ch_image_path_1)
 
 								if ch_image_path != "":
-									# if "exr" in ch_image_path:
-									#     png_path = os.path.join(my_directory, bpy.path.display_name_from_filepath(ch_image_path) + ".png")
-									#     self.convert_exr_to_png(source_ch.image, png_path)
-									#     ch_image_path = png_path
-									# shutil.copy(ch_image_path, my_directory)
+									print("copying ch_image_path", ch_image_path)
 									copying_files.append(ch_image_path)
 
 								if ch_image_path_1 != "":
-									# shutil.copy(ch_image_path_1, my_directory)
+									print("copying ch_image_path_1", ch_image_path_1)
 									copying_files.append(ch_image_path_1)
 
 								if ch_name == "Color":
 									albedo["intensity_value"] = intensity_channel
 								elif ch_name == "Roughness":
 									roughness = {
-										"key"	: layer_var + "_roughness",
-										"value" : bpy.path.basename(ch_image_path),
+										"source" : bpy.path.basename(ch_image_path),
 										"intensity_value": intensity_channel
 									}
 									layer_data["roughness"] = roughness
@@ -151,18 +164,14 @@ class YExporter(Operator):
 								elif ch_name == "Normal":
 									if ch_image_path != "":
 										heightmap = {
-											"key"	: layer_var + "_heightmap",
-											"value" : bpy.path.basename(ch_image_path),
+											"source" : bpy.path.basename(ch_image_path),
 											"intensity_value": intensity_channel
 										}
 										layer_data["heightmap"] = heightmap
 
-									if ch_image_path_1 != "":
-										layer_normal = layer_var + "_normal"
-										
+									if ch_image_path_1 != "":										
 										normal = {
-											"key"	: layer_normal,
-											"value" : bpy.path.basename(ch_image_path_1),
+											"source" : bpy.path.basename(ch_image_path_1),
 											"intensity_value": intensity_channel
 										}
 										layer_data["normal"] = normal
@@ -210,13 +219,12 @@ class YExporter(Operator):
 									print("mask path exist ", mask_image_path)
 									copying_files.append(mask_image_path)
 
-								mask_data["key"] = mask_var
-								mask_data["value"] = bpy.path.basename(mask_image_path)
+								mask_data["source"] = bpy.path.basename(mask_image_path)
 
 							elif mask_type == "COLOR_ID":
 								colorid_col = get_mask_color_id_color(msk)
 								mask_data["color"] = [colorid_col[0], colorid_col[1], colorid_col[2]]
-								mask_data["index"] = colorid_col
+								self.export_gltf = True
 							
 							mask_data["intensity_value"] = intensity_mask
 							layer_data["mask"] = mask_data
@@ -254,10 +262,9 @@ class YExporter(Operator):
 						new_path = resize_decal_texture(my_directory, image)
 
 						layer_data["decal"] = True
-						layer_data["key"] = layer_var
-						layer_data["value"] = bpy.path.basename(image_path)
+						layer_data["source"] = bpy.path.basename(image_path)
 						layer_data["decal_distance_value"] = inp.default_value
-						layer_data["decal_scale"] = [decal_scale[0], decal_scale[1], decal_scale[2]]
+						layer_data["scale"] = [decal_scale[0], decal_scale[1], decal_scale[2]]
 						layer_data["decal_matrix"] = [
 							local_matrix[0][0], local_matrix[0][1], local_matrix[0][2], local_matrix[0][3], 
 							local_matrix[1][0], local_matrix[1][1], local_matrix[1][2], local_matrix[1][3], 
@@ -270,7 +277,7 @@ class YExporter(Operator):
 				data["layers"].append(layer_data)
 		
 
-		data["copying_files"] = copying_files
+		# data["copying_files"] = copying_files
 		# Save data to JSON file
 		with open(self.filepath, 'w') as json_file:
 			json.dump(data, json_file, indent=4)
@@ -283,6 +290,29 @@ class YExporter(Operator):
 		# copying all textures
 		for file in copying_files:
 			shutil.copy(file, my_directory)
+
+		if self.pack_file:
+			file, ext = os.path.splitext(self.filepath)
+			packed_file = file + self.filetype_packed
+			print(f"Packing files into {packed_file}")
+			compress_folder_to_zip(my_directory, packed_file)
+
+			# remove all files except the packed file
+			for filename in os.listdir(my_directory):
+				file_path = os.path.join(my_directory, filename)
+				if file_path != packed_file:
+					if os.path.isfile(file_path):
+						os.remove(file_path)
+					elif os.path.isdir(file_path):
+						shutil.rmtree(file_path)
+					print(f"Removed: {file_path}")
+				else:
+					print(f"Kept: {file_path}")
+			
+
+		# Remove temporary scene
+		bpy.data.scenes.remove(tmpscene)
+
 		return {'FINISHED'}
 
 	def invoke(self, context, event):
@@ -292,7 +322,22 @@ class YExporter(Operator):
 	def draw(self, context):
 		col = self.layout.column()
 		col.prop(self, "export_gltf")
+		col.prop(self, "pack_file")
 
+def compress_folder_to_zip(folder_path, zip_file_path):
+	import zipfile
+	print("write zip file ", zip_file_path, " from ", folder_path)
+	with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+		for root, dirs, files in os.walk(folder_path):
+			for file in files:
+				file_path = os.path.join(root, file)
+				if file_path == zip_file_path:
+					continue
+				arcname = os.path.relpath(file_path, folder_path)
+				print("add file ", file_path, " to ", arcname)
+				zipf.write(file_path, arcname)
+
+	print(f"Files in {folder_path} have been compressed into {zip_file_path}")
 
 def resize_decal_texture(directory_path, image, padding = 1) -> str:
 	scaled_image = image.copy()
