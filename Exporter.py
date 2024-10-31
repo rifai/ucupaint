@@ -177,26 +177,55 @@ class YExporter(Operator):
 								"intensity_value" : intensity_channel
 							}
 
+							is_normal = ch_name == "Normal"
+							normal_type = channel.normal_map_type.lower()
+							is_normal_map = "normal" in normal_type
+							is_bump_map = "bump" in normal_type
+
 							if channel.override:
 								source_ch = get_channel_source(channel, layer)
+
+								
 								if source_ch:
 									ch_image_path = source_ch.image.filepath_from_user()
-									channel_info["source"] = bpy.path.basename(image_path)
-									print("channel path 0", id_ch, " = ",ch_image_path)
+
+									if is_normal and is_bump_map:
+										channels_data["bump"] = {
+											"source" : bpy.path.basename(ch_image_path),
+											"intensity_value" : intensity_channel,
+										}
+									else:
+										channel_info["source"] = bpy.path.basename(ch_image_path)
+										print("channel path 0", id_ch, " = ",ch_image_path)
 								else:
-									# inp = get_entity_prop_input(channel, prop_name)
 									ch_idx = get_layer_channel_index(layer, channel)
 									root_ch = yp.channels[ch_idx]
-									if root_ch.type == "VALUE":
-										channel_info["value"] = channel.override_value
-									elif root_ch.type == "RGB":
-										channel_info["value"] = channel.override_color[:]
+									if is_normal and is_bump_map:
+										channels_data["bump"] = {
+											"intensity_value" : intensity_channel,
+											"value" :  channel.override_color[:]
+										}
+									else:
+										if root_ch.type == "VALUE":
+											channel_info["value"] = channel.override_value
+										elif root_ch.type == "RGB":
+											channel_info["value"] = channel.override_color[:]
 
 							if channel.override_1:
 								source_ch_1 = get_channel_source_1(channel, layer)
-								ch_image_path_1 = source_ch_1.image.filepath_from_user()
-							
+								if is_normal and is_normal_map:
+									if source_ch_1:
+										ch_image_path_1 = source_ch_1.image.filepath_from_user()
+										channel_info["source"] = bpy.path.basename(ch_image_path_1)
+									else:
+										channel_info["value"] = channel.override_color[:]
+								else:
+									channel_info = None
+						
 								print("channel path 1", id_ch, " = ",ch_image_path_1)
+							else:
+								if is_normal:
+									channel_info = None
 
 							if ch_image_path != "":
 								print("copying ch_image_path", ch_image_path)
@@ -206,21 +235,8 @@ class YExporter(Operator):
 								print("copying ch_image_path_1", ch_image_path_1)
 								copying_files.append(ch_image_path_1)
 
-							# if ch_name == "Color":
-							# 	channel_info["source"] = image_path
-							# elif ch_name == "Roughness":
-							# 	channel_info["source"] = image_path
-							if ch_name == "Normal":
-								if ch_image_path != "":
-									channels_data["heightmap"] = {
-										"source" : bpy.path.basename(ch_image_path),
-										"intensity_value" : intensity_channel,
-									}
-
-								if ch_image_path_1 != "":										
-									channel_info["source"] =  bpy.path.basename(ch_image_path_1)
-
-							channels_data[key_name] = channel_info
+							if channel_info != None:
+								channels_data[key_name] = channel_info
 						layer_data["channels"] = channels_data
 
 					msk:Mask.YLayerMask
