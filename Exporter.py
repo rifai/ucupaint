@@ -125,7 +125,8 @@ class YExporter(Operator):
 						layer_tree = get_tree(layer)
 						texcoord = layer_tree.nodes.get(layer.texcoord)
 						decal_obj = texcoord.object
-						local_matrix = decal_obj.matrix_local
+						original_matrix = decal_obj.matrix_local
+						godot_matrix = decal_obj.matrix_local
 
 						image = None
 						if source:
@@ -136,28 +137,35 @@ class YExporter(Operator):
 								decal_scale = (image.size[1] / image.size[0], 1.0, 1.0)
 							else: 
 								decal_scale = (1.0, image.size[0] / image.size[1], 1.0)
-
-						local_matrix = self.blender_to_godot @ local_matrix# @ blender_to_godot.inverted()
+						
+						# todo : matrix for other engines
+						godot_matrix = self.blender_to_godot @ godot_matrix# @ blender_to_godot.inverted()
 						# print("local_matrix  3", local_matrix)
-						local_matrix.transpose()
+						godot_matrix.transpose()
 
 						# affine inverse
-						local_matrix = local_matrix.inverted()
+						godot_matrix = godot_matrix.inverted()
 
 						inp = get_entity_prop_input(layer, "decal_distance_value")
 	
-						new_path = resize_decal_texture(my_directory, image)
+						resize_decal_texture(my_directory, image)
 
 						layer_data["source"] = bpy.path.basename(image_path)
 						layer_data["scale"] = [decal_scale[0], decal_scale[1], decal_scale[2]]
 
 						decal_attributes = {
 							"distance" : inp.default_value,
-							"matrix" :  [
-								local_matrix[0][0], local_matrix[0][1], local_matrix[0][2], local_matrix[0][3], 
-								local_matrix[1][0], local_matrix[1][1], local_matrix[1][2], local_matrix[1][3], 
-								local_matrix[2][0], local_matrix[2][1], local_matrix[2][2], local_matrix[2][3], 
-								local_matrix[3][0], local_matrix[3][1], local_matrix[3][2], local_matrix[3][3],
+							"matrix" : [
+								original_matrix[0][0], original_matrix[0][1], original_matrix[0][2], original_matrix[0][3], 
+								original_matrix[1][0], original_matrix[1][1], original_matrix[1][2], original_matrix[1][3], 
+								original_matrix[2][0], original_matrix[2][1], original_matrix[2][2], original_matrix[2][3], 
+								original_matrix[3][0], original_matrix[3][1], original_matrix[3][2], original_matrix[3][3],
+							],
+							"matrix_godot" :  [
+								godot_matrix[0][0], godot_matrix[0][1], godot_matrix[0][2], godot_matrix[0][3], 
+								godot_matrix[1][0], godot_matrix[1][1], godot_matrix[1][2], godot_matrix[1][3], 
+								godot_matrix[2][0], godot_matrix[2][1], godot_matrix[2][2], godot_matrix[2][3], 
+								godot_matrix[3][0], godot_matrix[3][1], godot_matrix[3][2], godot_matrix[3][3],
 							]
 						}
 						layer_data["decal"] = decal_attributes
@@ -208,9 +216,11 @@ class YExporter(Operator):
 										channels_data["bump"]["value"] = channel.override_color[:]
 									else:
 										if root_ch.type == "VALUE":
-											channel_info["value"] = channel.override_value
+											val_ovr = get_entity_prop_value(channel, 'override_value')
+											channel_info["value"] = val_ovr
 										elif root_ch.type == "RGB":
-											channel_info["value"] = channel.override_color[:]
+											color_ovr = get_entity_prop_value(channel, 'override_color')
+											channel_info["value"] = color_ovr[:]
 
 							if channel.override_1:
 								source_ch_1 = get_channel_source_1(channel, layer)
