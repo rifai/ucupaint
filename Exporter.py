@@ -229,7 +229,8 @@ class YExporter(Operator):
 										ch_image_path_1 = source_ch_1.image.filepath_from_user()
 										channel_info["source"] = bpy.path.basename(ch_image_path_1)
 									else:
-										channel_info["value"] = channel.override_color[:]
+										color_ovr = get_entity_prop_value(channel, 'override_1_color')
+										channel_info["value"] = color_ovr[:]
 								else:
 									channel_info = None
 								print("channel path 1", id_ch, " = ",ch_image_path_1)
