@@ -110,7 +110,10 @@ class YExporter(Operator):
 							skala = mapping.inputs[3].default_value
 							layer_data["scale"] = [skala.x, skala.y]
 
-						# todo : unpacked texture
+						offset = mapping.inputs[1].default_value
+						layer_data["offset"] = offset[:]
+						rot = mapping.inputs[2].default_value
+						layer_data["rotation"] = rot[:]
 
 						print("copying image_path", image_path)
 						if image_path == "":
