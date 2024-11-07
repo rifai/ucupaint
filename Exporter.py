@@ -89,9 +89,7 @@ class YExporter(Operator):
 				layer_data = {
 					"intensity_value": intensity_layer
                 }
-
 				source = get_layer_source(layer)
-
 				channels_data = {}
 
 				if layer.type == "IMAGE":
@@ -105,10 +103,10 @@ class YExporter(Operator):
 
 						if use_uniform_scale:
 							uniform_scale = get_entity_prop_value(layer, 'uniform_scale_value')
-							layer_data["scale"] = [uniform_scale]
+							layer_data["scale"] = [uniform_scale, uniform_scale, uniform_scale]
 						else:
 							skala = mapping.inputs[3].default_value
-							layer_data["scale"] = [skala.x, skala.y]
+							layer_data["scale"] = [skala.x, skala.y, skala.z]
 
 						offset = mapping.inputs[1].default_value
 						layer_data["offset"] = offset[:]
@@ -123,7 +121,6 @@ class YExporter(Operator):
 						
 						layer_data["source"] = bpy.path.basename(image_path)
 
-			
 					elif texcoord_type == "Decal":
 						layer_tree = get_tree(layer)
 						texcoord = layer_tree.nodes.get(layer.texcoord)
@@ -173,117 +170,121 @@ class YExporter(Operator):
 						}
 						layer_data["decal"] = decal_attributes
 
-					for id_ch, channel in enumerate(layer.channels):
-						ch_name = yp.channels[id_ch].name
-						if channel.enable:
-							ch_image_path = ""
-							ch_image_path_1 = ""
+				elif layer.type == "COLOR":
+					layer_data["type"] = "COLOR"
+					color_layer = source.outputs[0].default_value
+					layer_data["color"] = color_layer[:]
 
-							intensity_channel = get_entity_prop_value(channel, 'intensity_value')
+				for id_ch, channel in enumerate(layer.channels):
+					ch_name = yp.channels[id_ch].name
+					if channel.enable:
+						ch_image_path = ""
+						ch_image_path_1 = ""
 
-							print("inter channel ", ch_name, " intensity ", intensity_channel)
-							key_name = ch_name.lower()
+						intensity_channel = get_entity_prop_value(channel, 'intensity_value')
 
-							channel_info = {
-								"intensity_value" : intensity_channel
-							}
+						print("inter channel ", ch_name, " intensity ", intensity_channel)
+						key_name = ch_name.lower()
 
-							is_normal = ch_name == "Normal"
-							normal_type = channel.normal_map_type.lower()
-							is_normal_map = is_normal and "normal" in normal_type
-							is_bump_map = is_normal and "bump" in normal_type
-
-							if is_normal_map:
-								channel_info["strength"] = channel.normal_strength
-							if is_bump_map:
-								channels_data["bump"] = {
-									"intensity_value" : intensity_channel,
-									"height" : channel.bump_distance,
-									"midlevel" : channel.bump_midlevel
-								}
-
-							if channel.override:
-								source_ch = get_channel_source(channel, layer)
-								
-								if source_ch:
-									ch_image_path = source_ch.image.filepath_from_user()
-
-									if is_bump_map:
-										channels_data["bump"]["source"] = bpy.path.basename(ch_image_path)
-									else:
-										channel_info["source"] = bpy.path.basename(ch_image_path)
-								else:
-									ch_idx = get_layer_channel_index(layer, channel)
-									root_ch = yp.channels[ch_idx]
-									if is_bump_map:
-										channels_data["bump"]["value"] = channel.override_color[:]
-									else:
-										if root_ch.type == "VALUE":
-											val_ovr = get_entity_prop_value(channel, 'override_value')
-											channel_info["value"] = val_ovr
-										elif root_ch.type == "RGB":
-											color_ovr = get_entity_prop_value(channel, 'override_color')
-											channel_info["value"] = color_ovr[:]
-
-							if channel.override_1:
-								source_ch_1 = get_channel_source_1(channel, layer)
-								if is_normal_map:
-									if source_ch_1:
-										ch_image_path_1 = source_ch_1.image.filepath_from_user()
-										channel_info["source"] = bpy.path.basename(ch_image_path_1)
-									else:
-										color_ovr = get_entity_prop_value(channel, 'override_1_color')
-										channel_info["value"] = color_ovr[:]
-								else:
-									channel_info = None
-								print("channel path 1", id_ch, " = ",ch_image_path_1)
-
-							if ch_image_path != "":
-								print("copying ch_image_path", ch_image_path)
-								copying_files.append(ch_image_path)
-
-							if ch_image_path_1 != "":
-								print("copying ch_image_path_1", ch_image_path_1)
-								copying_files.append(ch_image_path_1)
-
-							if channel_info != None:
-								channels_data[key_name] = channel_info
-
-						layer_data["channels"] = channels_data
-
-					msk:Mask.YLayerMask
-					for idx, msk in enumerate(layer.masks):
-						mask_type = msk.type
-						print("mask type ", mask_type)
-						mask_data = {
-							"type"	: mask_type,
+						channel_info = {
+							"intensity_value" : intensity_channel
 						}
 
-						intensity_mask = get_entity_prop_value(msk, 'intensity_value')
+						is_normal = ch_name == "Normal"
+						normal_type = channel.normal_map_type.lower()
+						is_normal_map = is_normal and "normal" in normal_type
+						is_bump_map = is_normal and "bump" in normal_type
 
+						if is_normal_map:
+							channel_info["strength"] = channel.normal_strength
+						if is_bump_map:
+							channels_data["bump"] = {
+								"intensity_value" : intensity_channel,
+								"height" : channel.bump_distance,
+								"midlevel" : channel.bump_midlevel
+							}
 
-						if mask_type == "IMAGE":
+						if channel.override:
+							source_ch = get_channel_source(channel, layer)
+							
+							if source_ch:
+								ch_image_path = source_ch.image.filepath_from_user()
 
-							mask_tree = get_mask_tree(msk)
-							mask_source = mask_tree.nodes.get(msk.source)
-
-							mask_image_path = mask_source.image.filepath_from_user()
-
-							if mask_image_path == "":
-								mask_image_path = copy_unpack_image(msk.name, my_directory, format_ext)
+								if is_bump_map:
+									channels_data["bump"]["source"] = bpy.path.basename(ch_image_path)
+								else:
+									channel_info["source"] = bpy.path.basename(ch_image_path)
 							else:
-								print("mask path exist ", mask_image_path)
-								copying_files.append(mask_image_path)
+								ch_idx = get_layer_channel_index(layer, channel)
+								root_ch = yp.channels[ch_idx]
+								if is_bump_map:
+									channels_data["bump"]["value"] = channel.override_color[:]
+								else:
+									if root_ch.type == "VALUE":
+										val_ovr = get_entity_prop_value(channel, 'override_value')
+										channel_info["value"] = val_ovr
+									elif root_ch.type == "RGB":
+										color_ovr = get_entity_prop_value(channel, 'override_color')
+										channel_info["value"] = color_ovr[:]
 
-							mask_data["source"] = bpy.path.basename(mask_image_path)
+						if channel.override_1:
+							source_ch_1 = get_channel_source_1(channel, layer)
+							if is_normal_map:
+								if source_ch_1:
+									ch_image_path_1 = source_ch_1.image.filepath_from_user()
+									channel_info["source"] = bpy.path.basename(ch_image_path_1)
+								else:
+									color_ovr = get_entity_prop_value(channel, 'override_1_color')
+									channel_info["value"] = color_ovr[:]
+							else:
+								channel_info = None
+							print("channel path 1", id_ch, " = ",ch_image_path_1)
 
-						elif mask_type == "COLOR_ID":
-							colorid_col = get_mask_color_id_color(msk)
-							mask_data["color"] = [colorid_col[0], colorid_col[1], colorid_col[2]]
-							self.export_gltf = True
-						
-						mask_data["intensity_value"] = intensity_mask
-						layer_data["mask"] = mask_data
+						if ch_image_path != "":
+							print("copying ch_image_path", ch_image_path)
+							copying_files.append(ch_image_path)
+
+						if ch_image_path_1 != "":
+							print("copying ch_image_path_1", ch_image_path_1)
+							copying_files.append(ch_image_path_1)
+
+						if channel_info != None:
+							channels_data[key_name] = channel_info
+
+					layer_data["channels"] = channels_data
+				msk:Mask.YLayerMask
+				for idx, msk in enumerate(layer.masks):
+					mask_type = msk.type
+					print("mask type ", mask_type)
+					mask_data = {
+						"type"	: mask_type,
+					}
+
+					intensity_mask = get_entity_prop_value(msk, 'intensity_value')
+
+
+					if mask_type == "IMAGE":
+
+						mask_tree = get_mask_tree(msk)
+						mask_source = mask_tree.nodes.get(msk.source)
+
+						mask_image_path = mask_source.image.filepath_from_user()
+
+						if mask_image_path == "":
+							mask_image_path = copy_unpack_image(msk.name, my_directory, format_ext)
+						else:
+							print("mask path exist ", mask_image_path)
+							copying_files.append(mask_image_path)
+
+						mask_data["source"] = bpy.path.basename(mask_image_path)
+
+					elif mask_type == "COLOR_ID":
+						colorid_col = get_mask_color_id_color(msk)
+						mask_data["color"] = [colorid_col[0], colorid_col[1], colorid_col[2]]
+						self.export_gltf = True
+					
+					mask_data["intensity_value"] = intensity_mask
+					layer_data["mask"] = mask_data
 
 					index += 1
 
