@@ -84,6 +84,7 @@ class YExporter(Operator):
 
 		for layer_idx, layer in enumerate(yp.layers):
 			if layer.enable:
+				print("layer=", layer.type, " name=", layer.name, "parent index=", layer.parent_idx)
 				intensity_layer = get_entity_prop_value(layer, 'intensity_value')
 
 				layer_data = {
@@ -175,6 +176,13 @@ class YExporter(Operator):
 					color_layer = source.outputs[0].default_value
 					layer_data["color"] = color_layer[:]
 
+				elif layer.type == "GROUP":
+					layer_data["type"] = "GROUP"
+					layer_data["layers"] = []
+
+					print("add group layer ", layer.name)
+
+
 				for id_ch, channel in enumerate(layer.channels):
 					ch_name = yp.channels[id_ch].name
 					if channel.enable:
@@ -192,19 +200,21 @@ class YExporter(Operator):
 
 						is_normal = ch_name == "Normal"
 						normal_type = channel.normal_map_type.lower()
+						if layer.type == "GROUP" and is_normal:
+							print("normal type of group=", normal_type)
+							print("overrides=", channel.override, channel.override_1)
+
 						is_normal_map = is_normal and "normal" in normal_type
 						is_bump_map = is_normal and "bump" in normal_type
 
-						if is_normal_map:
-							channel_info["strength"] = channel.normal_strength
-						if is_bump_map:
-							channels_data["bump"] = {
-								"intensity_value" : intensity_channel,
-								"height" : channel.bump_distance,
-								"midlevel" : channel.bump_midlevel
-							}
-
 						if channel.override:
+							if is_bump_map:
+								channels_data["bump"] = {
+									"intensity_value" : intensity_channel,
+									"height" : channel.bump_distance,
+									"midlevel" : channel.bump_midlevel
+								}
+
 							source_ch = get_channel_source(channel, layer)
 							
 							if source_ch:
@@ -227,9 +237,10 @@ class YExporter(Operator):
 										color_ovr = get_entity_prop_value(channel, 'override_color')
 										channel_info["value"] = color_ovr[:]
 
-						if channel.override_1:
+						if channel.override_1:								
 							source_ch_1 = get_channel_source_1(channel, layer)
 							if is_normal_map:
+								channel_info["strength"] = channel.normal_strength
 								if source_ch_1:
 									ch_image_path_1 = source_ch_1.image.filepath_from_user()
 									channel_info["source"] = bpy.path.basename(ch_image_path_1)
@@ -288,7 +299,11 @@ class YExporter(Operator):
 
 					index += 1
 
-				data["layers"].append(layer_data)
+				if layer.parent_idx != -1:
+					print("add layer to parent ", layer.parent_idx)
+					data["layers"][layer.parent_idx]["layers"].append(layer_data)
+				else:
+					data["layers"].append(layer_data)
 
 		# data["copying_files"] = copying_files
 		# Save data to JSON file
