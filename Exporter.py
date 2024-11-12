@@ -195,7 +195,8 @@ class YExporter(Operator):
 						key_name = ch_name.lower()
 
 						channel_info = {
-							"intensity_value" : intensity_channel
+							"intensity_value" : intensity_channel,
+							"blend" : channel.blend_type,
 						}
 
 						is_normal = ch_name == "Normal"
@@ -212,7 +213,8 @@ class YExporter(Operator):
 								channels_data["bump"] = {
 									"intensity_value" : intensity_channel,
 									"height" : channel.bump_distance,
-									"midlevel" : channel.bump_midlevel
+									"midlevel" : channel.bump_midlevel,
+									"blend" : channel.blend_type,
 								}
 
 							source_ch = get_channel_source(channel, layer)
