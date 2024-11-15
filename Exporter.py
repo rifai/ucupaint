@@ -88,7 +88,8 @@ class YExporter(Operator):
 				intensity_layer = get_entity_prop_value(layer, 'intensity_value')
 
 				layer_data = {
-					"intensity_value": intensity_layer
+					"intensity_value": intensity_layer,
+					"masks": [],
                 }
 				source = get_layer_source(layer)
 				channels_data = {}
@@ -297,7 +298,8 @@ class YExporter(Operator):
 						self.export_gltf = True
 					
 					mask_data["intensity_value"] = intensity_mask
-					layer_data["mask"] = mask_data
+					mask_data["blend"] = msk.blend_type
+					layer_data["masks"].append(mask_data)
 
 					index += 1
 
