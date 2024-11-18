@@ -48,48 +48,59 @@ COLOR_ID_VCOL_NAME = '__yp_color_id'
 
 BUMP_MULTIPLY_TWEAK = 5
 
-blend_type_items = (
-    ("MIX", "Mix", ""),
-    ("ADD", "Add", ""),
-    ("SUBTRACT", "Subtract", ""),
-    ("MULTIPLY", "Multiply", ""),
-    ("SCREEN", "Screen", ""),
-    ("OVERLAY", "Overlay", ""),
-    ("DIFFERENCE", "Difference", ""),
-    ("DIVIDE", "Divide", ""),
-    ("DARKEN", "Darken", ""),
-    ("LIGHTEN", "Lighten", ""),
-    ("HUE", "Hue", ""),
-    ("SATURATION", "Saturation", ""),
-    ("VALUE", "Value", ""),
-    ("COLOR", "Color", ""),
-    ("SOFT_LIGHT", "Soft Light", ""),
-    ("LINEAR_LIGHT", "Linear Light", ""),
-    ("DODGE", "Dodge", ""),
-    ("BURN", "Burn", "")
-)
+def blend_type_items(self, context):
+    items = [
+        ("MIX", "Mix", ""),
+        ("ADD", "Add", ""),
+        ("SUBTRACT", "Subtract", ""),
+        ("MULTIPLY", "Multiply", ""),
+        ("SCREEN", "Screen", ""),
+        ("OVERLAY", "Overlay", ""),
+        ("DIFFERENCE", "Difference", ""),
+        ("DIVIDE", "Divide", ""),
+        ("DARKEN", "Darken", ""),
+        ("LIGHTEN", "Lighten", ""),
+        ("HUE", "Hue", ""),
+        ("SATURATION", "Saturation", ""),
+        ("VALUE", "Value", ""),
+        ("COLOR", "Color", ""),
+        ("SOFT_LIGHT", "Soft Light", ""),
+        ("LINEAR_LIGHT", "Linear Light", ""),
+        ("DODGE", "Dodge", ""),
+        ("BURN", "Burn", ""),
+    ]
 
+    if is_bl_newer_than(3, 5):
+        items.append(("EXCLUSION", "Exclusion", ""))
 
-mask_blend_type_items = (
-    ("MIX", "Replace", ""),
-    ("ADD", "Add", ""),
-    ("SUBTRACT", "Subtract", ""),
-    ("MULTIPLY", "Multiply", ""),
-    ("SCREEN", "Screen", ""),
-    ("OVERLAY", "Overlay", ""),
-    ("DIFFERENCE", "Difference", ""),
-    ("DIVIDE", "Divide", ""),
-    ("DARKEN", "Darken", ""),
-    ("LIGHTEN", "Lighten", ""),
-    ("HUE", "Hue", ""),
-    ("SATURATION", "Saturation", ""),
-    ("VALUE", "Value", ""),
-    ("COLOR", "Color", ""),
-    ("SOFT_LIGHT", "Soft Light", ""),
-    ("LINEAR_LIGHT", "Linear Light", ""),
-    ("DODGE", "Dodge", ""),
-    ("BURN", "Burn", "")
-)
+    return items
+
+def mask_blend_type_items(self, context):
+    items = [
+        ("MIX", "Replace", ""),
+        ("ADD", "Add", ""),
+        ("SUBTRACT", "Subtract", ""),
+        ("MULTIPLY", "Multiply", ""),
+        ("SCREEN", "Screen", ""),
+        ("OVERLAY", "Overlay", ""),
+        ("DIFFERENCE", "Difference", ""),
+        ("DIVIDE", "Divide", ""),
+        ("DARKEN", "Darken", ""),
+        ("LIGHTEN", "Lighten", ""),
+        ("HUE", "Hue", ""),
+        ("SATURATION", "Saturation", ""),
+        ("VALUE", "Value", ""),
+        ("COLOR", "Color", ""),
+        ("SOFT_LIGHT", "Soft Light", ""),
+        ("LINEAR_LIGHT", "Linear Light", ""),
+        ("DODGE", "Dodge", ""),
+        ("BURN", "Burn", ""),
+    ]
+
+    if is_bl_newer_than(3, 5):
+        items.append(("EXCLUSION", "Exclusion", ""))
+
+    return items
 
 voronoi_feature_items = (
     ("F1", "F1", "Compute and return the distance to the closest feature point as well as its position and color"),
@@ -109,26 +120,29 @@ def entity_input_items(self, context):
     items = []
 
     if entity.type not in layer_type_labels:
-        items.append(('RGB', 'RGB',  ''))
-        items.append(('ALPHA', 'Alpha',  ''))
+        items.append(('RGB', 'RGB', ''))
+        items.append(('ALPHA', 'Alpha', ''))
     else:
         label = layer_type_labels[entity.type]
 
         if is_bl_newer_than(2, 81) and entity.type == 'VORONOI':
-            items.append(('RGB', label + ' Color',  ''))
-            items.append(('ALPHA', label + ' Distance',  ''))
+            items.append(('RGB', label + ' Color', ''))
+            items.append(('ALPHA', label + ' Distance', ''))
         elif entity.type == 'GABOR':
-            items.append(('RGB', label + ' Value',  ''))
-            items.append(('ALPHA', label + ' Phase',  ''))
+            items.append(('RGB', label + ' Value', ''))
+            items.append(('ALPHA', label + ' Phase', ''))
         elif entity.type == 'VCOL':
-            items.append(('RGB', label,  ''))
-            items.append(('ALPHA', label + ' Alpha',  ''))
+            items.append(('RGB', label, ''))
+            items.append(('ALPHA', label + ' Alpha', ''))
+            items.append(('R', label + ' Red', ''))
+            items.append(('G', label + ' Green', ''))
+            items.append(('B', label + ' Blue', ''))
         elif entity.type == 'IMAGE':
-            items.append(('RGB', label + ' Color',  ''))
-            items.append(('ALPHA', label + ' Alpha',  ''))
+            items.append(('RGB', label + ' Color', ''))
+            items.append(('ALPHA', label + ' Alpha', ''))
         else:
-            items.append(('RGB', label + ' Color',  ''))
-            items.append(('ALPHA', label + ' Factor',  ''))
+            items.append(('RGB', label + ' Color', ''))
+            items.append(('ALPHA', label + ' Factor', ''))
         
     return items
 
@@ -230,7 +244,7 @@ layer_type_labels = {
     'VCOL' : 'Vertex Color',
     'BACKGROUND' : 'Background',
     'COLOR' : 'Solid Color',
-    'GROUP' : 'Layer Group',
+    'GROUP' : 'Group',
     'HEMI' : 'Fake Lighting',
     'GABOR' : 'Gabor',
 }
@@ -4467,6 +4481,12 @@ def set_active_vertex_color(obj, vcol):
             if obj.data.vertex_colors.active != vcol:
                 obj.data.vertex_colors.active = vcol
     except Exception as e: print(e)
+
+def set_active_vertex_color_by_name(obj, vcol_name):
+    vcols = get_vertex_colors(obj)
+    if vcols: 
+        vcol = vcols.get(vcol_name)
+        if vcol: set_active_vertex_color(obj, vcol)
 
 def new_vertex_color(obj, name, data_type='BYTE_COLOR', domain='CORNER'):
     if not obj or obj.type != 'MESH': return None

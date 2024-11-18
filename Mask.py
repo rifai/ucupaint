@@ -191,6 +191,7 @@ def remove_mask(layer, mask, obj):
     remove_node(tree, mask, 'source')
     remove_node(tree, mask, 'baked_source')
     remove_node(tree, mask, 'blur_vector')
+    remove_node(tree, mask, 'separate_color_channels')
     remove_node(tree, mask, 'mapping')
     remove_node(tree, mask, 'texcoord')
     remove_node(tree, mask, 'baked_mapping')
@@ -273,7 +274,7 @@ class YNewLayerMask(bpy.types.Operator):
         name = 'Blend',
         description = 'Blend type',
         items = mask_blend_type_items,
-        default = 'MULTIPLY'
+        default = 3 if is_bl_newer_than(2, 90) else None,
     )
 
     color_option : EnumProperty(
@@ -579,7 +580,7 @@ class YNewLayerMask(bpy.types.Operator):
             col.prop(self, 'blend_type', text='')
 
     def execute(self, context):
-        if self.auto_cancel: return {'CANCELLED'}
+        if hasattr(self, 'auto_cancel') and self.auto_cancel: return {'CANCELLED'}
 
         obj = context.object
         mat = obj.active_material
@@ -768,7 +769,7 @@ class YOpenImageAsMask(bpy.types.Operator, ImportHelper):
         name = 'Blend',
         description = 'Blend type',
         items = mask_blend_type_items,
-        default = 'MULTIPLY'
+        default = 3 if is_bl_newer_than(2, 90) else None,
     )
 
     source_input : EnumProperty(
@@ -1031,7 +1032,7 @@ class YOpenAvailableDataAsMask(bpy.types.Operator):
         name = 'Blend',
         description = 'Blend type',
         items = mask_blend_type_items,
-        default = 'MULTIPLY'
+        default = 3 if is_bl_newer_than(2, 90) else None,
     )
 
     @classmethod
@@ -1823,11 +1824,25 @@ def update_mask_source_input(self, context):
     match = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]', self.path_from_id())
     layer = yp.layers[int(match.group(1))]
 
+    mask = self
+    tree = get_mask_tree(mask)
+
+    if mask.source_input in {'R', 'G', 'B'}:
+        check_new_node(tree, mask, 'separate_color_channels', 'ShaderNodeSeparateXYZ', 'Separate Color')
+    else:
+        remove_node(tree, mask, 'separate_color_channels')
+
     # Reconnect nodes
     reconnect_layer_nodes(layer)
+    rearrange_layer_nodes(layer)
 
 class YLayerMaskChannel(bpy.types.PropertyGroup):
-    enable : BoolProperty(default=True, update=update_layer_mask_channel_enable)
+    enable : BoolProperty(
+        name = 'Enable Mask Channel',
+        description = 'Mask will affect this channel',
+        default = True, 
+        update = update_layer_mask_channel_enable
+    )
 
     # Multiply between mask channels
     mix : StringProperty(default='')
@@ -1974,7 +1989,7 @@ class YLayerMask(bpy.types.PropertyGroup):
     blend_type : EnumProperty(
         name = 'Blend',
         items = mask_blend_type_items,
-        default = 'MULTIPLY',
+        default = 3 if is_bl_newer_than(2, 90) else None,
         update = update_mask_blend_type
     )
 
@@ -2113,6 +2128,7 @@ class YLayerMask(bpy.types.PropertyGroup):
     mapping : StringProperty(default='')
     baked_mapping : StringProperty(default='')
     blur_vector : StringProperty(default='')
+    separate_color_channels : StringProperty(default='')
 
     enable_uniform_scale : BoolProperty(
         name = 'Enable Uniform Scale', 

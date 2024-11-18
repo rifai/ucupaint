@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Ucupaint",
     "author": "Yusuf Umar, Agni Rakai Sahakarya, Jan Bláha, Ahmad Rifai, morirain, Patrick W. Crawford, neomonkeus, Kareem Haddad, passivestar",
-    "version": (2, 1, 3),
+    "version": (2, 1, 4),
     "blender": (2, 80, 0),
     "location": "Node Editor > Properties > Ucupaint",
     "warning": "",
@@ -45,12 +45,14 @@ if "bpy" in locals():
     imp.reload(Exporter)
     imp.reload(versioning)
     imp.reload(addon_updater_ops)
+    imp.reload(Test)
 else:
     from . import Localization
     from . import image_ops, common, bake_common, modifier_common, lib, ui, subtree, transition_common, input_outputs, node_arrangements, node_connections, preferences
     from . import vector_displacement_lib, vector_displacement
     from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, NormalMapModifier, Layer, Bake, BakeToLayer, Root, Exporter, versioning
     from . import addon_updater_ops
+    from . import Test
 
 import bpy 
 
@@ -79,6 +81,7 @@ def register():
     Exporter.register()
     versioning.register()
     addon_updater_ops.register()
+    Test.register()
 
     print('INFO: ' + common.get_addon_title() + ' ' + common.get_current_version_str() + ' is registered!')
 
@@ -107,6 +110,7 @@ def unregister():
     Exporter.unregister()
     versioning.unregister()
     addon_updater_ops.unregister()
+    Test.unregister()
 
     print('INFO: ' + common.get_addon_title() + ' ' + common.get_current_version_str() + ' is unregistered!')
 

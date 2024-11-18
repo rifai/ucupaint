@@ -71,7 +71,7 @@ class YToggleEraser(bpy.types.Operator):
         else:
             self.report({'ERROR'}, "There's no need to use this operator in this blender version!")
             return {'CANCELLED'}
-
+        
         # Get eraser brush
         eraser_name = eraser_names[mode]
         eraser_brush = bpy.data.brushes.get(eraser_name)
@@ -134,10 +134,13 @@ class YToggleEraser(bpy.types.Operator):
             new_brush = eraser_brush
 
         if new_brush:
+
             if mode == 'TEXTURE_PAINT':
                 context.tool_settings.image_paint.brush = new_brush
+
             elif mode == 'VERTEX_PAINT': 
                 context.tool_settings.vertex_paint.brush = new_brush
+
             elif mode == 'SCULPT': 
                 context.tool_settings.sculpt.brush = new_brush
 

@@ -780,6 +780,7 @@ class YQuickYPaintNodeSetup(bpy.types.Operator):
             if area.type == 'VIEW_3D':
                 if is_bl_newer_than(2, 80) and self.not_muted_paint_opacity and self.mute_texture_paint_overlay:
                     area.spaces[0].overlay.texture_paint_mode_opacity = 0.0
+                    area.spaces[0].overlay.vertex_paint_mode_opacity = 0.0
 
                 if self.not_on_material_view and self.switch_to_material_view:
                     if not is_bl_newer_than(2, 80):
@@ -1307,6 +1308,11 @@ class YNewYPaintChannel(bpy.types.Operator):
         # Change active channel
         last_index = len(yp.channels)-1
         group_tree.yp.active_channel_index = last_index
+
+        # Automatically enable new layer channel for group and background layers
+        for layer in yp.layers:
+            if layer.type in {'GROUP', 'BACKGROUND'}:
+                layer.channels[last_index].enable = True
 
         # Update UI
         wm.ypui.need_update = True
@@ -2555,27 +2561,11 @@ def remove_preview(mat, advanced=False):
 #    pass
 
 def layer_preview_mode_type_items(self, context):
-    #node = get_active_ypaint_node()
-    #yp = node.node_tree.yp
-
     items = (
         ('LAYER', 'Layer', '',  lib.get_icon('texture'), 0),
         ('MASK', 'Mask', '', lib.get_icon('mask'), 1),
         ('SPECIFIC_MASK', 'Specific Mask', '', lib.get_icon('mask'), 2)
     )
-
-    #for i, ch in enumerate(yp.channels):
-    #    #if hasattr(lib, 'custom_icons'):
-    #    if not is_bl_newer_than(2, 80):
-    #        icon_name = lib.channel_custom_icon_dict[ch.type]
-    #        items.append((str(i), ch.name, '', lib.custom_icons[icon_name].icon_id, i))
-    #    else: items.append((str(i), ch.name, '', lib.channel_icon_dict[ch.type], i))
-
-    ##if hasattr(lib, 'custom_icons'):
-    #if not is_bl_newer_than(2, 80):
-    #    items.append(('-1', 'All Channels', '', lib.custom_icons['channels'].icon_id, len(items)))
-    #else: items.append(('-1', 'All Channels', '', 'GROUP_VERTEX', len(items)))
-
     return items
 
 def update_layer_preview_mode(self, context):
@@ -3965,6 +3955,10 @@ class YPaintWMProps(bpy.types.PropertyGroup):
 
     custom_srgb_name : StringProperty(default='')
     custom_noncolor_name : StringProperty(default='')
+
+    test_result_run : IntProperty(default=0)
+    test_result_error : IntProperty(default=0)
+    test_result_failed : IntProperty(default=0)
 
 class YPaintSceneProps(bpy.types.PropertyGroup):
     ori_display_device : StringProperty(default='')

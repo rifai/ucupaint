@@ -250,7 +250,6 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
     blend_type : EnumProperty(
         name = 'Blend',
         items = blend_type_items,
-        default = 'MIX'
     )
 
     normal_blend_type : EnumProperty(
@@ -917,7 +916,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                                 other_objs.append(o)
 
             if self.type == 'OTHER_OBJECT_CHANNELS':
-                ch_other_objects, ch_other_mats, ch_other_sockets, ch_other_defaults, ori_mat_no_nodes = prepare_other_objs_channels(yp, other_objs)
+                ch_other_objects, ch_other_mats, ch_other_sockets, ch_other_defaults, ch_other_alpha_sockets, ch_other_alpha_defaults, ori_mat_no_nodes = prepare_other_objs_channels(yp, other_objs)
 
             if not other_objs:
                 if overwrite_img:
@@ -981,7 +980,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                 tanimage, bitimage = vector_displacement.get_tangent_bitangent_images(objs[0], self.uv_map)
 
                 # Duplicate object
-                objs = temp_objs = [get_merged_mesh_objects(scene, objs, True)]
+                objs = temp_objs = [get_merged_mesh_objects(scene, objs, True, disable_problematic_modifiers=False)]
 
                 # Use VDM loader geometry nodes
                 # NOTE: Geometry nodes currently does not support UDIM, so using UDIM will cause wrong bake result
@@ -1210,6 +1209,9 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
         ori_loop_locs = {}
         ori_multires_levels = {}
 
+        # Do not disable modifiers for surface based bake types
+        disable_problematic_modifiers = self.type not in {'CAVITY', 'POINTINESS', 'BEVEL_NORMAL', 'BEVEL_MASK'}
+
         for obj in objs:
 
             # Disable few modifiers
@@ -1224,7 +1226,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                         if i > multires_index: 
                             m.show_render = False
                             m.show_viewport = False
-            elif obj not in other_objs:
+            elif disable_problematic_modifiers and obj not in other_objs:
                 for m in get_problematic_modifiers(obj):
                     m.show_render = False
 
@@ -1493,6 +1495,10 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL'}:
                 colorspace = get_noncolor_name()
 
+            # Using float image will always make the image linear/non-color
+            if self.hdr:
+                colorspace = get_noncolor_name() 
+
             # Base color of baked image
             if self.type == 'AO':
                 color = [1.0, 1.0, 1.0, 1.0] 
@@ -1586,46 +1592,78 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
 
             if use_fxaa: fxaa_image(image, False, bake_device=self.bake_device)
 
-            # Bake alpha if baking other objects normal
-            #if self.type.startswith('OTHER_OBJECT_'):
-            if self.type == 'OTHER_OBJECT_NORMAL':
-                temp_img = image.copy()
-                temp_img.colorspace_settings.name = get_noncolor_name()
-                tex.image = temp_img
+            # Bake other object alpha
+            if self.type in {'OTHER_OBJECT_NORMAL', 'OTHER_OBJECT_CHANNELS'}:
+                
+                alpha_found = False
+                if self.type == 'OTHER_OBJECT_CHANNELS':
 
-                # Set temp filepath
-                if image.source == 'TILED':
-                    temp_img.name = '__TEMP__'
-                    UDIM.initial_pack_udim(temp_img)
+                    # Set emission connection
+                    for j, m in enumerate(ch_other_mats[idx]):
+                        alpha_default = ch_other_alpha_defaults[idx][j]
+                        alpha_socket = ch_other_alpha_sockets[idx][j]
 
-                # Need to use clear so there's alpha on the baked image
-                scene.render.bake.use_clear = True
+                        temp_emi = m.node_tree.nodes.get(TEMP_EMISSION)
+                        if not temp_emi: continue
 
-                # Bake emit can will create alpha image
-                bpy.ops.object.bake(type='EMIT')
+                        if alpha_default != 1.0:
+                            alpha_found = True
+                            # Set alpha_default
+                            if type(alpha_default) == float:
+                                temp_emi.inputs[0].default_value = (alpha_default, alpha_default, alpha_default, 1.0)
+                            else: temp_emi.inputs[0].default_value = (alpha_default[0], alpha_default[1], alpha_default[2], 1.0)
 
-                # Set tile pixels
-                for tilenum in tilenums:
+                            # Break link
+                            for l in temp_emi.inputs[0].links:
+                                m.node_tree.links.remove(l)
+                        elif alpha_socket:
+                            alpha_found = True
+                            m.node_tree.links.new(alpha_socket, temp_emi.inputs[0])
+                else:
+                    alpha_found = True
 
-                    # Swap tile
-                    if tilenum != 1001:
-                        UDIM.swap_tile(image, 1001, tilenum)
-                        UDIM.swap_tile(temp_img, 1001, tilenum)
+                if alpha_found:
 
-                    # Copy alpha to RGB channel, so it can be fxaa-ed
-                    copy_image_channel_pixels(temp_img, temp_img, 3, 0)
-                    fxaa_image(temp_img, False, self.bake_device, first_tile_only=True)
+                    temp_img = image.copy()
+                    temp_img.colorspace_settings.name = get_noncolor_name()
+                    tex.image = temp_img
 
-                    # Copy alpha to actual image
-                    copy_image_channel_pixels(temp_img, image, 0, 3)
+                    # Set temp filepath
+                    if image.source == 'TILED':
+                        temp_img.name = '__TEMP__'
+                        UDIM.initial_pack_udim(temp_img)
 
-                    # Swap tile again to recover
-                    if tilenum != 1001:
-                        UDIM.swap_tile(image, 1001, tilenum)
-                        UDIM.swap_tile(temp_img, 1001, tilenum)
+                    # Need to use clear so there's alpha on the baked image
+                    scene.render.bake.use_clear = True
 
-                # Remove temp image
-                remove_datablock(bpy.data.images, temp_img, user=tex, user_prop='image')
+                    # Bake emit can will create alpha image
+                    bpy.ops.object.bake(type='EMIT')
+
+                    # Set tile pixels
+                    for tilenum in tilenums:
+
+                        # Swap tile
+                        if tilenum != 1001:
+                            UDIM.swap_tile(image, 1001, tilenum)
+                            UDIM.swap_tile(temp_img, 1001, tilenum)
+
+                        # Copy alpha to RGB channel, so it can be fxaa-ed
+                        if self.type == 'OTHER_OBJECT_NORMAL':
+                            copy_image_channel_pixels(temp_img, temp_img, 3, 0)
+
+                        # FXAA alpha
+                        fxaa_image(temp_img, False, self.bake_device, first_tile_only=True)
+
+                        # Copy alpha to actual image
+                        copy_image_channel_pixels(temp_img, image, 0, 3)
+
+                        # Swap tile again to recover
+                        if tilenum != 1001:
+                            UDIM.swap_tile(image, 1001, tilenum)
+                            UDIM.swap_tile(temp_img, 1001, tilenum)
+
+                    # Remove temp image
+                    remove_datablock(bpy.data.images, temp_img, user=tex, user_prop='image')
 
             # Back to original size if using SSA
             if use_ssaa:

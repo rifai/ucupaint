@@ -509,12 +509,9 @@ def check_mask_texcoord_nodes(layer, mask, tree=None):
 
         # Set image extension type to clip
         image = None
-        if mask.type == 'IMAGE':
-            source = get_mask_source(mask)
-            if source:
-                mask.original_image_extension = source.extension
-                source.extension = 'CLIP'
-                image = source.image
+        source = get_mask_source(mask)
+        if mask.type == 'IMAGE' and source:
+            image = source.image
 
         # Create new empty object if there's no texcoord yet
         if not texcoord:
@@ -526,6 +523,11 @@ def check_mask_texcoord_nodes(layer, mask, tree=None):
         if not decal_process:
             decal_process = new_node(tree, mask, 'decal_process', 'ShaderNodeGroup', 'Decal Process')
             decal_process.node_tree = get_node_tree_lib(lib.DECAL_PROCESS)
+
+            # Set image extension only after decal process node is initialized
+            if image and source:
+                mask.original_image_extension = source.extension
+                source.extension = 'CLIP'
 
         # Set decal aspect ratio
         if image:
@@ -577,12 +579,9 @@ def check_layer_texcoord_nodes(layer, tree=None):
 
         # Set image extension type to clip
         image = None
-        if layer.type == 'IMAGE':
-            source = get_layer_source(layer)
-            if source:
-                layer.original_image_extension = source.extension
-                source.extension = 'CLIP'
-                image = source.image
+        source = get_layer_source(layer)
+        if layer.type == 'IMAGE' and source:
+            image = source.image
 
         # Create new empty object if there's no texcoord yet
         if not texcoord:
@@ -594,6 +593,11 @@ def check_layer_texcoord_nodes(layer, tree=None):
         if not decal_process:
             decal_process = new_node(tree, layer, 'decal_process', 'ShaderNodeGroup', 'Decal Process')
             decal_process.node_tree = get_node_tree_lib(lib.DECAL_PROCESS)
+
+            # Set image extension only after decal process node is initialized
+            if image and source:
+                layer.original_image_extension = source.extension
+                source.extension = 'CLIP'
 
         # Set decal aspect ratio
         if image:
@@ -681,6 +685,9 @@ def check_all_layer_channel_io_and_nodes(layer, tree=None, specific_ch=None, do_
     # Check the need of divider alpha
     check_layer_divider_alpha(layer)
 
+    # Check the need of flip y
+    check_entity_image_flip_y(layer)
+
     # Update transition related nodes
     height_ch = get_height_channel(layer)
     if height_ch:
@@ -697,6 +704,11 @@ def check_all_layer_channel_io_and_nodes(layer, tree=None, specific_ch=None, do_
         if root_ch.type != 'NORMAL': # Because normal map related nodes should already created
             # Check mask mix nodes
             check_mask_mix_nodes(layer, tree, specific_ch=ch)
+
+        else:
+            # Check flip y
+            if ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}:
+                check_entity_image_flip_y(ch)
 
     # Mask nodes
     for mask in layer.masks:
