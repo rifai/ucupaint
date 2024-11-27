@@ -82,6 +82,8 @@ class YExporter(Operator):
 		print("file format ", settings.file_format)
 		format_ext = "."+settings.file_format.lower()
 
+		flat_layers = []
+
 		for layer_idx, layer in enumerate(yp.layers):
 			if layer.enable:
 				print("layer=", layer.type, " name=", layer.name, "parent index=", layer.parent_idx)
@@ -90,6 +92,8 @@ class YExporter(Operator):
 				layer_data = {
 					"intensity_value": intensity_layer,
 					"masks": [],
+					"id": layer_idx,
+					"name": layer.name,
                 }
 				source = get_layer_source(layer)
 				channels_data = {}
@@ -305,10 +309,15 @@ class YExporter(Operator):
 
 				if layer.parent_idx != -1:
 					print("add layer to parent ", layer.parent_idx)
-					data["layers"][layer.parent_idx]["layers"].append(layer_data)
+					for l in flat_layers:
+						if l["id"] == layer.parent_idx:
+							l["layers"].append(layer_data)
+							print("add layer to parent ", layer.parent_idx)
+							break
 				else:
 					data["layers"].append(layer_data)
 
+				flat_layers.append(layer_data)
 		# data["copying_files"] = copying_files
 		# Save data to JSON file
 		with open(self.filepath, 'w') as json_file:
