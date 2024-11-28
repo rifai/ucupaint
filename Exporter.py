@@ -298,7 +298,7 @@ class YExporter(Operator):
 
 					elif mask_type == "COLOR_ID":
 						colorid_col = get_mask_color_id_color(msk)
-						mask_data["color"] = [colorid_col[0], colorid_col[1], colorid_col[2]]
+						mask_data["color"] = [colorid_col[0], colorid_col[1], colorid_col[2], 1.0]
 						self.export_gltf = True
 					
 					mask_data["intensity_value"] = intensity_mask
