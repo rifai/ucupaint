@@ -272,6 +272,9 @@ class YExporter(Operator):
 					layer_data["channels"] = channels_data
 				msk:Mask.YLayerMask
 				for idx, msk in enumerate(layer.masks):
+					if not msk.enable:
+						continue
+					
 					mask_type = msk.type
 					print("mask type ", mask_type)
 					mask_data = {
