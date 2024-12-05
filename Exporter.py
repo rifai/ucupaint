@@ -40,6 +40,48 @@ class YExporter(Operator):
 
 		return retval
 	
+	def get_modifiers(self, modifiers):
+		ret_modifiers = []
+		for m in modifiers:
+			if not m.enable:
+				continue
+			new_mod = {
+				"type": m.type,
+			}
+
+			mod_tree = get_mod_tree(m)
+
+			if m.type == "INVERT":
+				new_mod["r"] = m.invert_r_enable
+				new_mod["g"] = m.invert_g_enable
+				new_mod["b"] = m.invert_b_enable
+				new_mod["a"] = m.invert_a_enable
+			elif m.type == "MATH":
+				math = mod_tree.nodes.get(m.math)
+
+				# print("math inputs ", math.inputs[0], math.inputs[1], math.inputs[2], math.inputs[3], math.inputs[4], math.inputs[5])
+
+				new_mod["r"] = math.inputs[2].default_value
+				new_mod["g"] = math.inputs[3].default_value
+				new_mod["b"] = math.inputs[4].default_value
+				new_mod["a"] = math.inputs[5].default_value
+				new_mod["method"] = m.math_meth
+				new_mod["affect_alpha"] = m.affect_alpha
+
+			elif m.type == "BRIGHT_CONTRAST":
+				brightcon = mod_tree.nodes.get(m.brightcon)
+				new_mod["brightness"] = brightcon.inputs[1].default_value
+				new_mod["contrast"] = brightcon.inputs[2].default_value
+			elif m.type == "HUE_SATURATION":
+				huesat = mod_tree.nodes.get(m.huesat)
+				
+				new_mod["hue"] = huesat.inputs[0].default_value
+				new_mod["saturation"] = huesat.inputs[1].default_value
+				new_mod["value"] = huesat.inputs[2].default_value
+
+			ret_modifiers.append(new_mod)
+		return ret_modifiers
+	
 	def execute(self, context):
 		node = get_active_ypaint_node()
 		yp = node.node_tree.yp
@@ -95,6 +137,10 @@ class YExporter(Operator):
 					"id": layer_idx,
 					"name": layer.name,
                 }
+
+				mods = self.get_modifiers(layer.modifiers)
+				layer_data["modifiers"] = mods
+
 				source = get_layer_source(layer)
 				channels_data = {}
 
@@ -203,6 +249,9 @@ class YExporter(Operator):
 							"intensity_value" : intensity_channel,
 							"blend" : channel.blend_type,
 						}
+
+						chan_mods = self.get_modifiers(channel.modifiers)
+						channel_info["modifiers"] = chan_mods
 
 						is_normal = ch_name == "Normal"
 						normal_type = channel.normal_map_type.lower()
