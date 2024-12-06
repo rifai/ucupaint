@@ -353,6 +353,18 @@ class YExporter(Operator):
 						mask_data["color"] = [colorid_col[0], colorid_col[1], colorid_col[2], 1.0]
 						self.export_gltf = True
 					
+					mask_mods = []
+					for md in msk.modifiers:
+						if not md.enable:
+							continue
+
+						new_mod = {
+							"type": md.type,
+						}
+						mask_mods.append(new_mod)
+
+					mask_data["modifiers"] = mask_mods
+
 					mask_data["intensity_value"] = intensity_mask
 					mask_data["blend"] = msk.blend_type
 					layer_data["masks"].append(mask_data)
