@@ -48,48 +48,59 @@ COLOR_ID_VCOL_NAME = '__yp_color_id'
 
 BUMP_MULTIPLY_TWEAK = 5
 
-blend_type_items = (
-    ("MIX", "Mix", ""),
-    ("ADD", "Add", ""),
-    ("SUBTRACT", "Subtract", ""),
-    ("MULTIPLY", "Multiply", ""),
-    ("SCREEN", "Screen", ""),
-    ("OVERLAY", "Overlay", ""),
-    ("DIFFERENCE", "Difference", ""),
-    ("DIVIDE", "Divide", ""),
-    ("DARKEN", "Darken", ""),
-    ("LIGHTEN", "Lighten", ""),
-    ("HUE", "Hue", ""),
-    ("SATURATION", "Saturation", ""),
-    ("VALUE", "Value", ""),
-    ("COLOR", "Color", ""),
-    ("SOFT_LIGHT", "Soft Light", ""),
-    ("LINEAR_LIGHT", "Linear Light", ""),
-    ("DODGE", "Dodge", ""),
-    ("BURN", "Burn", "")
-)
+def blend_type_items(self, context):
+    items = [
+        ("MIX", "Mix", ""),
+        ("ADD", "Add", ""),
+        ("SUBTRACT", "Subtract", ""),
+        ("MULTIPLY", "Multiply", ""),
+        ("SCREEN", "Screen", ""),
+        ("OVERLAY", "Overlay", ""),
+        ("DIFFERENCE", "Difference", ""),
+        ("DIVIDE", "Divide", ""),
+        ("DARKEN", "Darken", ""),
+        ("LIGHTEN", "Lighten", ""),
+        ("HUE", "Hue", ""),
+        ("SATURATION", "Saturation", ""),
+        ("VALUE", "Value", ""),
+        ("COLOR", "Color", ""),
+        ("SOFT_LIGHT", "Soft Light", ""),
+        ("LINEAR_LIGHT", "Linear Light", ""),
+        ("DODGE", "Dodge", ""),
+        ("BURN", "Burn", ""),
+    ]
 
+    if is_bl_newer_than(3, 5):
+        items.append(("EXCLUSION", "Exclusion", ""))
 
-mask_blend_type_items = (
-    ("MIX", "Replace", ""),
-    ("ADD", "Add", ""),
-    ("SUBTRACT", "Subtract", ""),
-    ("MULTIPLY", "Multiply", ""),
-    ("SCREEN", "Screen", ""),
-    ("OVERLAY", "Overlay", ""),
-    ("DIFFERENCE", "Difference", ""),
-    ("DIVIDE", "Divide", ""),
-    ("DARKEN", "Darken", ""),
-    ("LIGHTEN", "Lighten", ""),
-    ("HUE", "Hue", ""),
-    ("SATURATION", "Saturation", ""),
-    ("VALUE", "Value", ""),
-    ("COLOR", "Color", ""),
-    ("SOFT_LIGHT", "Soft Light", ""),
-    ("LINEAR_LIGHT", "Linear Light", ""),
-    ("DODGE", "Dodge", ""),
-    ("BURN", "Burn", "")
-)
+    return items
+
+def mask_blend_type_items(self, context):
+    items = [
+        ("MIX", "Replace", ""),
+        ("ADD", "Add", ""),
+        ("SUBTRACT", "Subtract", ""),
+        ("MULTIPLY", "Multiply", ""),
+        ("SCREEN", "Screen", ""),
+        ("OVERLAY", "Overlay", ""),
+        ("DIFFERENCE", "Difference", ""),
+        ("DIVIDE", "Divide", ""),
+        ("DARKEN", "Darken", ""),
+        ("LIGHTEN", "Lighten", ""),
+        ("HUE", "Hue", ""),
+        ("SATURATION", "Saturation", ""),
+        ("VALUE", "Value", ""),
+        ("COLOR", "Color", ""),
+        ("SOFT_LIGHT", "Soft Light", ""),
+        ("LINEAR_LIGHT", "Linear Light", ""),
+        ("DODGE", "Dodge", ""),
+        ("BURN", "Burn", ""),
+    ]
+
+    if is_bl_newer_than(3, 5):
+        items.append(("EXCLUSION", "Exclusion", ""))
+
+    return items
 
 voronoi_feature_items = (
     ("F1", "F1", "Compute and return the distance to the closest feature point as well as its position and color"),
@@ -109,26 +120,29 @@ def entity_input_items(self, context):
     items = []
 
     if entity.type not in layer_type_labels:
-        items.append(('RGB', 'RGB',  ''))
-        items.append(('ALPHA', 'Alpha',  ''))
+        items.append(('RGB', 'RGB', ''))
+        items.append(('ALPHA', 'Alpha', ''))
     else:
         label = layer_type_labels[entity.type]
 
         if is_bl_newer_than(2, 81) and entity.type == 'VORONOI':
-            items.append(('RGB', label + ' Color',  ''))
-            items.append(('ALPHA', label + ' Distance',  ''))
+            items.append(('RGB', label + ' Color', ''))
+            items.append(('ALPHA', label + ' Distance', ''))
         elif entity.type == 'GABOR':
-            items.append(('RGB', label + ' Value',  ''))
-            items.append(('ALPHA', label + ' Phase',  ''))
+            items.append(('RGB', label + ' Value', ''))
+            items.append(('ALPHA', label + ' Phase', ''))
         elif entity.type == 'VCOL':
-            items.append(('RGB', label,  ''))
-            items.append(('ALPHA', label + ' Alpha',  ''))
+            items.append(('RGB', label, ''))
+            items.append(('ALPHA', label + ' Alpha', ''))
+            items.append(('R', label + ' Red', ''))
+            items.append(('G', label + ' Green', ''))
+            items.append(('B', label + ' Blue', ''))
         elif entity.type == 'IMAGE':
-            items.append(('RGB', label + ' Color',  ''))
-            items.append(('ALPHA', label + ' Alpha',  ''))
+            items.append(('RGB', label + ' Color', ''))
+            items.append(('ALPHA', label + ' Alpha', ''))
         else:
-            items.append(('RGB', label + ' Color',  ''))
-            items.append(('ALPHA', label + ' Factor',  ''))
+            items.append(('RGB', label + ' Color', ''))
+            items.append(('ALPHA', label + ' Factor', ''))
         
     return items
 
@@ -144,6 +158,14 @@ normal_blend_items = (
     ('MIX', 'Mix', ''),
     ('OVERLAY', 'Add', ''),
     ('COMPARE', 'Compare Height', '')
+)
+
+normal_space_items = (
+    ('TANGENT', 'Tangent Space', 'Tangent space normal mapping'),
+    ('OBJECT', 'Object Space', 'Object space normal mapping'),
+    ('WORLD', 'World Space', 'World space normal mapping'),
+    ('BLENDER_OBJECT', 'Blender Object Space', 'Object space normal mapping, compatible with Blender render baking'),
+    ('BLENDER_WORLD', 'Blender World Space', 'World space normal mapping, compatible with Blender render baking'),
 )
 
 height_blend_items = (
@@ -230,7 +252,7 @@ layer_type_labels = {
     'VCOL' : 'Vertex Color',
     'BACKGROUND' : 'Background',
     'COLOR' : 'Solid Color',
-    'GROUP' : 'Layer Group',
+    'GROUP' : 'Group',
     'HEMI' : 'Fake Lighting',
     'GABOR' : 'Gabor',
 }
@@ -255,6 +277,8 @@ bake_type_items = (
     ('SELECTED_VERTICES', 'Selected Vertices/Edges/Faces', ''),
 
     ('FLOW', 'Flow Map based on straight UVMap', ''),
+
+    ('OBJECT_SPACE_NORMAL', 'Object Space Normal', ''),
 )
 
 image_resolution_items = (
@@ -299,7 +323,9 @@ bake_type_labels = {
 
     'SELECTED_VERTICES': 'Selected Vertices',
 
-    'FLOW': 'Flow'
+    'FLOW': 'Flow',
+
+    'OBJECT_SPACE_NORMAL' : 'Object Space Normal'
 }
 
 bake_type_suffixes = {
@@ -321,7 +347,9 @@ bake_type_suffixes = {
 
     'SELECTED_VERTICES': 'Selected Vertices',
 
-    'FLOW': 'Flow'
+    'FLOW': 'Flow',
+
+    'OBJECT_SPACE_NORMAL' : 'Object Space Normal'
 }
 
 texcoord_lists = [
@@ -2068,6 +2096,22 @@ def get_mask_source(mask, get_baked=False):
 def get_mask_mapping(mask, get_baked=False):
     tree = get_mask_tree(mask, True)
     return tree.nodes.get(mask.mapping) if not get_baked else tree.nodes.get(mask.baked_mapping)
+
+def get_image_mask_base_color(mask, image, mask_index):
+
+    color = (0, 0, 0, 1)
+    if is_bl_newer_than(2, 83):
+        # Check average value of the image using numpy
+        pxs = numpy.empty(shape=image.size[0] * image.size[1] * 4, dtype=numpy.float32)
+        image.pixels.foreach_get(pxs)
+        if numpy.average(pxs) > 0.5:
+            color = (1, 1, 1, 1)
+    else:
+        # Set Mask color based on the index and blend type
+        if mask_index > 0 and mask.blend_type not in {'ADD'}:
+            color = (1, 1, 1, 1)
+    
+    return color
 
 def get_channel_source_tree(ch, layer=None, tree=None):
     yp = ch.id_data.yp
@@ -4468,6 +4512,12 @@ def set_active_vertex_color(obj, vcol):
                 obj.data.vertex_colors.active = vcol
     except Exception as e: print(e)
 
+def set_active_vertex_color_by_name(obj, vcol_name):
+    vcols = get_vertex_colors(obj)
+    if vcols: 
+        vcol = vcols.get(vcol_name)
+        if vcol: set_active_vertex_color(obj, vcol)
+
 def new_vertex_color(obj, name, data_type='BYTE_COLOR', domain='CORNER'):
     if not obj or obj.type != 'MESH': return None
 
@@ -4833,7 +4883,7 @@ def is_entity_need_tangent_input(entity, uv_name):
                     return True
 
                 # Overlay blend and transition bump need tangent
-                if height_ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'} and (height_ch.normal_blend_type == 'OVERLAY' or height_ch.enable_transition_bump):
+                if height_ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'} and (height_ch.normal_blend_type == 'OVERLAY' or (height_ch.enable_transition_bump and height_root_ch.enable_smooth_bump)):
                     return True
 
                 # Main UV Tangent is needed if smooth bump is on and entity is using non-uv texcoord or have different UV

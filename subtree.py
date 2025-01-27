@@ -7,13 +7,40 @@ from .node_connections import *
 def check_layer_divider_alpha(layer, tree=None):
     if not tree: tree = get_source_tree(layer)
 
-    if layer.divide_rgb_by_alpha:
+    if layer.divide_rgb_by_alpha and layer.type in {'IMAGE', 'VCOL'}:
         divider_alpha = check_new_mix_node(tree, layer, 'divider_alpha', 'Spread Fix')
         divider_alpha.blend_type = 'DIVIDE'
         divider_alpha.inputs[0].default_value = 1.0
         set_mix_clamp(divider_alpha, True)
     else:
         remove_node(tree, layer, 'divider_alpha')
+
+def check_entity_image_flip_y(entity):
+    yp = entity.id_data.yp
+
+    m1 = re.match(r'yp\.layers\[(\d+)\]$', entity.path_from_id())
+    m2 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', entity.path_from_id())
+
+    if m1:
+        layer = entity
+        tree = get_source_tree(layer)
+        flip_y_needed = layer.image_flip_y and layer.type == 'IMAGE'
+
+    elif m2:
+        layer = yp.layers[int(m2.group(1))]
+        ch = entity
+        tree = get_tree(layer)
+        flip_y_needed = ch.image_flip_y and ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'} and ch.override_1 and ch.override_1_type == 'IMAGE'
+    else:
+        return None
+
+    if flip_y_needed:
+        flip_y = check_new_node(tree, entity, 'flip_y', 'ShaderNodeGroup', 'Flip Y')
+        flip_y.node_tree = lib.get_node_tree_lib(lib.FLIP_Y)
+    else:
+        remove_node(tree, entity, 'flip_y')
+
+    return layer
 
 def move_mod_group(layer, from_tree, to_tree):
     mod_group = from_tree.nodes.get(layer.mod_group)
@@ -1727,10 +1754,6 @@ def remove_layer_normal_channel_nodes(root_ch, layer, ch, tree=None):
             disable_channel_source_tree(layer, root_ch, ch, False)
 
     remove_node(tree, ch, 'spread_alpha')
-    #remove_node(tree, ch, 'spread_alpha_n')
-    #remove_node(tree, ch, 'spread_alpha_s')
-    #remove_node(tree, ch, 'spread_alpha_e')
-    #remove_node(tree, ch, 'spread_alpha_w')
 
     remove_node(tree, ch, 'tb_distance_flipper')
     remove_node(tree, ch, 'tb_delta_calc')
@@ -1738,11 +1761,8 @@ def remove_layer_normal_channel_nodes(root_ch, layer, ch, tree=None):
 
     remove_node(tree, ch, 'height_proc')
     remove_node(tree, ch, 'height_blend')
-    #remove_node(tree, ch, 'height_blend_n')
-    #remove_node(tree, ch, 'height_blend_s')
-    #remove_node(tree, ch, 'height_blend_e')
-    #remove_node(tree, ch, 'height_blend_w')
 
+    remove_node(tree, ch, 'normal_map_proc')
     remove_node(tree, ch, 'normal_proc')
     remove_node(tree, ch, 'normal_flip')
 
@@ -2020,64 +2040,59 @@ def check_channel_normal_map_nodes(tree, layer, root_ch, ch, need_reconnect=Fals
 
         if layer.type == 'GROUP':
             if root_ch.enable_smooth_bump:
-                lib_name = lib.NORMAL_PROCESS_SMOOTH_GROUP
-            else:
-                lib_name = lib.NORMAL_PROCESS_GROUP
+                lib_name = lib.GROUP_BUMP_2_NORMAL_SMOOTH
+            else: lib_name = lib.GROUP_BUMP_2_NORMAL
 
         elif ch.normal_map_type == 'NORMAL_MAP':
             if ch.enable_transition_bump:
                 if root_ch.enable_smooth_bump:
-                    lib_name = lib.NORMAL_MAP_PROCESS_SMOOTH_TRANSITION
-                else: lib_name = lib.NORMAL_MAP_PROCESS_TRANSITION
+                    lib_name = lib.BUMP_2_NORMAL_SMOOTH
+                else: lib_name = lib.BUMP_2_NORMAL
             elif is_parallax_enabled(root_ch):
                 lib_name = lib.NORMAL_MAP
 
         elif ch.normal_map_type == 'BUMP_MAP':
             if root_ch.enable_smooth_bump:
-                lib_name = lib.NORMAL_PROCESS_SMOOTH
-            else:
-                lib_name = lib.NORMAL_PROCESS
+                lib_name = lib.BUMP_2_NORMAL_SMOOTH
+            else: lib_name = lib.BUMP_2_NORMAL
 
         elif ch.normal_map_type == 'BUMP_NORMAL_MAP':
             if not ch.write_height:
                 if root_ch.enable_smooth_bump:
-                    if ch.enable_transition_bump:
-                        lib_name = lib.NORMAL_MAP_PROCESS_SMOOTH_TRANSITION
-                    else:
-                        lib_name = lib.NORMAL_MAP_PROCESS_SMOOTH
-                else:
-                    if ch.enable_transition_bump:
-                        lib_name = lib.NORMAL_MAP_PROCESS_TRANSITION
-                    else:
-                        lib_name = lib.NORMAL_MAP_PROCESS
+                    lib_name = lib.BUMP_2_NORMAL_SMOOTH
+                else: lib_name = lib.BUMP_2_NORMAL
             elif is_parallax_enabled(root_ch):
                 lib_name = lib.NORMAL_MAP
 
-        if lib_name == '':
-            normal_proc, need_reconnect = replace_new_node(
-                tree, ch, 'normal_proc', 'ShaderNodeNormalMap', 'Normal Process', 
-                return_status=True, hard_replace=True, dirty=need_reconnect
-            )
-
-            normal_proc.uv_map = layer.uv_name
+        # Normal map
+        if ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}:
+            normal_map_proc, need_reconnect = check_new_node(tree, ch, 'normal_map_proc', 'ShaderNodeNormalMap', 'Normal Map Process', True)
+            normal_map_proc.uv_map = layer.uv_name
+            normal_map_proc.space = ch.normal_space
         else:
+            if remove_node(tree, ch, 'normal_map_proc'): need_reconnect = True
+
+        # Normal from bump
+        if lib_name != '':
             normal_proc, need_reconnect = replace_new_node(
-                tree, ch, 'normal_proc', 'ShaderNodeGroup', 'Normal Process', 
+                tree, ch, 'normal_proc', 'ShaderNodeGroup', 'Bump to Normal', 
                 lib_name, return_status=True, hard_replace=True, dirty=need_reconnect
             )
 
-        if 'Max Height' in normal_proc.inputs:
-            normal_proc.inputs['Max Height'].default_value = max_height
-        if root_ch.enable_smooth_bump:
-            if 'Bump Height Scale' in normal_proc.inputs:
-                normal_proc.inputs['Bump Height Scale'].default_value = get_fine_bump_distance(max_height)
+            if 'Max Height' in normal_proc.inputs:
+                normal_proc.inputs['Max Height'].default_value = max_height
+            if root_ch.enable_smooth_bump:
+                if 'Bump Height Scale' in normal_proc.inputs:
+                    normal_proc.inputs['Bump Height Scale'].default_value = get_fine_bump_distance(max_height)
 
-        if 'Intensity' in normal_proc.inputs:
-            #normal_proc.inputs['Intensity'].default_value = 0.0 if mute else ch.intensity_value
-            normal_proc.inputs['Intensity'].default_value = ch.intensity_value
+            if 'Intensity' in normal_proc.inputs:
+                normal_proc.inputs['Intensity'].default_value = ch.intensity_value
 
-        if 'Strength' in normal_proc.inputs:
-            normal_proc.inputs['Strength'].default_value = ch.normal_strength
+            if 'Strength' in normal_proc.inputs:
+                normal_proc.inputs['Strength'].default_value = ch.normal_strength
+
+        else:
+            if remove_node(tree, ch, 'normal_proc'): need_reconnect = True
 
         # NOTE: Normal flip node is kinda unecessary since non smooth bump don't support backface up for now
         # Normal flip
@@ -2092,6 +2107,7 @@ def check_channel_normal_map_nodes(tree, layer, root_ch, ch, need_reconnect=Fals
         else:
             if remove_node(tree, ch, 'normal_flip'): need_reconnect = True
     else:
+        if remove_node(tree, ch, 'normal_map_proc'): need_reconnect = True
         if remove_node(tree, ch, 'normal_proc'): need_reconnect = True
         if remove_node(tree, ch, 'normal_flip'): need_reconnect = True
 

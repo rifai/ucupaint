@@ -5,6 +5,13 @@ from bpy.app.translations import pgettext_iface
 from . import lib, Modifier, MaskModifier, UDIM
 from .common import *
 
+RGBA_CHANNEL_PREFIX = {
+    'ALPHA' : 'alpha_',
+    'R' : 'r_',
+    'G' : 'g_',
+    'B' : 'b_',
+}
+
 def update_yp_ui():
 
     # Get active yp node
@@ -269,9 +276,6 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False):
             scol.label(text='Use Alpha:')
         scol.label(text='Alpha Mode:')
 
-    if entity and hasattr(entity, 'image_flip_y') and show_flip_y:
-        scol.label(text='Flip Y:')
-
     scol.label(text='Interpolation:')
 
     scol.label(text='Extension:')
@@ -287,15 +291,17 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False):
             scol.prop(image, 'use_alpha', text='')
         scol.prop(image, 'alpha_mode', text='')
 
-    if entity and hasattr(entity, 'image_flip_y') and show_flip_y:
-        scol.prop(entity, 'image_flip_y', text='')
-
     scol.prop(source, 'interpolation', text='')
 
     scol.prop(source, 'extension', text='')
     #scol.prop(source, 'projection', text='')
     #if source.projection == 'BOX':
     #    scol.prop(entity, 'projection_blend', text='')
+
+    if entity and hasattr(entity, 'image_flip_y') and show_flip_y:
+        row = col.row(align=True)
+        row.label(text='Flip G:')
+        row.prop(entity, 'image_flip_y', text='')
 
 def draw_object_index_props(entity, layout):
     col = layout.column()
@@ -315,7 +321,9 @@ def draw_hemi_props(entity, source, layout):
 
 def draw_vcol_props(layout, vcol=None, entity=None):
     if hasattr(entity, 'divide_rgb_by_alpha'):
-        layout.prop(entity, 'divide_rgb_by_alpha')
+        row = layout.row(align=True)
+        row.label(text='Divide RGB by Alpha:')
+        row.prop(entity, 'divide_rgb_by_alpha', text='')
     else:
         layout.label(text='You can also edit vertex color in edit mode')
 
@@ -558,23 +566,13 @@ def draw_colorid_props(layer, source, layout):
     col = layout.column()
     row = col.row()
     row.label(text='Color ID:')
-    #row.prop(source.inputs[0], 'default_value', text='')
-
-    #row.prop(layer, 'color_id', text='')
     draw_input_prop(row, layer, 'color_id')
-    #row = col.row()
-    #row.label(text='Shortcut on list:')
-    #row.prop(layer, 'color_shortcut', text='')
 
 def draw_solid_color_props(layer, source, layout):
     col = layout.column()
-    #col.label(text='Ewsom')
     row = col.row()
     row.label(text='Color:')
     row.prop(source.outputs[0], 'default_value', text='')
-    row = col.row()
-    row.label(text='Shortcut on list:')
-    row.prop(layer, 'color_shortcut', text='')
 
 def draw_edge_detect_props(layer, source, layout):
     col = layout.column()
@@ -955,8 +953,6 @@ def draw_root_channels_ui(context, layout, node):
         else: icon_name = 'collapsed_' + icon_name
         icon_value = lib.get_icon(icon_name)
         row.prop(chui, 'expand_content', text='', emboss=False, icon_value=icon_value)
-        #else:
-        #    row.prop(chui, 'expand_content', text='', emboss=True, icon=lib.channel_icon_dict[channel.type])
 
         row.label(text=channel.name + ' ' + pgettext_iface('Channel'))
 
@@ -1031,9 +1027,9 @@ def draw_root_channels_ui(context, layout, node):
                     bbcol = bbox.column() #align=True)
                     bbcol.active = channel.enable_alpha
 
-                    if is_bl_newer_than(2, 80):
+                    if is_bl_newer_than(2, 80) and engine != 'HYDRA_STORM':
 
-                        if is_bl_newer_than(4, 2) and engine == 'BLENDER_EEVEE_NEXT':
+                        if is_bl_newer_than(4, 2):
                             brow = bbcol.row(align=True)
                             brow.label(text='Transparent Shadows:')
                             brow.prop(mat, 'use_transparent_shadow', text='')
@@ -1043,7 +1039,7 @@ def draw_root_channels_ui(context, layout, node):
                             brow = bbcol.row(align=True)
                             brow.label(text='Render Method:')
                             brow.prop(mat, 'surface_render_method', text='')
-                        elif engine != 'HYDRA_STORM':
+                        else:
                             brow = bbcol.row(align=True)
                             brow.label(text='Blend Mode:')
                             brow.prop(channel, 'alpha_blend_mode', text='')
@@ -1278,6 +1274,7 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
     ypui = context.window_manager.ypui
     lui = ypui.layer_ui
     scene = context.scene
+    ypup = get_user_preferences()
 
     row = layout.row(align=True)
     if image:
@@ -1395,21 +1392,28 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
             row = rcol.row(align=True)
             row.label(text='', icon='BLANK1')
             bbox = row.box()
+            bcol = bbox.column(align=False)
 
             if layer.use_temp_bake:
-                bbox.context_pointer_set('parent', layer)
-                bbox.operator('node.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
+                bcol.context_pointer_set('parent', layer)
+                bcol.operator('node.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
             elif image:
-                draw_image_props(context, source, bbox, layer, show_flip_y=True)
-                if hasattr(layer, 'divide_rgb_by_alpha'):
-                    bbox.prop(layer, 'divide_rgb_by_alpha', text='Spread Fix')
+                draw_image_props(context, source, bcol, layer, show_flip_y=True)
+
+                # NOTE: Divide rgb by alpha is mostly useless for image layer, 
+                # so it's hidden under experimental feature unless the user ever enabled it before
+                if hasattr(layer, 'divide_rgb_by_alpha') and (layer.divide_rgb_by_alpha or ypup.show_experimental):
+                    brow = bcol.row(align=True)
+                    brow.label(text='Divide RGB by Alpha:')
+                    brow.prop(layer, 'divide_rgb_by_alpha', text='')
+
             elif layer.type == 'COLOR':
-                draw_solid_color_props(layer, source, bbox)
+                draw_solid_color_props(layer, source, bcol)
             elif layer.type == 'VCOL':
-                draw_vcol_props(bbox, vcol, layer)
+                draw_vcol_props(bcol, vcol, layer)
             elif layer.type == 'HEMI':
-                draw_hemi_props(layer, source, bbox)
-            else: draw_tex_props(source, bbox, entity=layer)
+                draw_hemi_props(layer, source, bcol)
+            else: draw_tex_props(source, bcol, entity=layer)
 
         # Vector
         #if layer.type not in {'VCOL', 'COLOR', 'HEMI', 'OBJECT_INDEX'}:
@@ -1606,7 +1610,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
     if not lui.expand_channels:
         return
 
-    row.prop(ypui, 'expand_channels', text='', emboss=True, icon_value = lib.get_icon('channels'))
+    row.prop(ypui, 'expand_channels', text='', emboss=True, icon_value = lib.get_icon('checkbox'))
 
     rrow = layout.row(align=True)
     rrow.label(text='', icon='BLANK1')
@@ -1879,9 +1883,14 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                             draw_input_prop(brow, ch, 'bump_smooth_multiplier')
 
                     if ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}: 
-                        brow = cccol.row(align=True)
-                        brow.label(text='Normal Strength:') #, icon_value=lib.get_icon('input'))
+                        brow = cccol.row(align=True) if ch.normal_map_type == 'BUMP_NORMAL_MAP' else split_layout(cccol, 0.35)
+                        label = 'Normal Strength:' if ch.normal_map_type == 'BUMP_NORMAL_MAP' else 'Strength:'
+                        brow.label(text=label)
                         draw_input_prop(brow, ch, 'normal_strength')
+                        brow = cccol.row(align=True) if ch.normal_map_type == 'BUMP_NORMAL_MAP' else split_layout(cccol, 0.35)
+                        label = 'Normal Space:' if ch.normal_map_type == 'BUMP_NORMAL_MAP' else 'Space:'
+                        brow.label(text=label)
+                        brow.prop(ch, 'normal_space', text='')
                     elif ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
                         brow = cccol.row(align=True)
                         brow.label(text='Strength:') #, icon_value=lib.get_icon('input'))
@@ -2281,12 +2290,12 @@ def draw_layer_masks(context, layout, layer):
 
         if mask.enable:
             if mask.type == 'IMAGE':
-                if mask.source_input == 'ALPHA':
-                    row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon('alpha_image'))
+                if mask.source_input in {'ALPHA', 'R', 'G', 'B'}:
+                    row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(RGBA_CHANNEL_PREFIX[mask.source_input]+'image'))
                 else: row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon('image'))
             elif mask.type == 'VCOL':
-                if mask.source_input == 'ALPHA':
-                    row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon('vertex_color_alpha'))
+                if mask.source_input in {'ALPHA', 'R', 'G', 'B'}:
+                    row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(RGBA_CHANNEL_PREFIX[mask.source_input]+'vertex_color'))
                 else: row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon('vertex_color'))
             elif mask.type == 'HEMI':
                 row.prop(mask, 'active_edit', text='', toggle=True, icon_value=lib.get_icon('hemi'))
@@ -3220,6 +3229,35 @@ def draw_layers_ui(context, layout, node):
         # Masks
         draw_layer_masks(context, col, layer)
 
+def draw_test_ui(context, layout):
+    ypup = get_user_preferences()
+    if (ypup.developer_mode == True):
+        wm = context.window_manager
+        ypui = wm.ypui
+        wmyp = wm.ypprops
+
+        obj = context.object
+        mat = get_active_material()
+        node = get_active_ypaint_node()
+
+        icon = 'TRIA_DOWN' if ypui.show_test else 'TRIA_RIGHT'
+        row = layout.row(align=True)
+        row.prop(ypui, 'show_test', emboss=False, text='', icon=icon)
+        row.label(text='Test')
+
+        if (ypui.show_test):
+            box = layout.box()
+            col = box.column()
+
+            col.label(text='Run test with default cube scene!')
+            if obj and obj.name == 'Cube' and mat and mat.name == 'Material' and not node:
+                col.operator('node.y_run_automated_test')
+
+            if (wmyp.test_result_run != 0):
+                col.label(text=pgettext_iface('Test Run Count: ') + str(wmyp.test_result_run))
+                col.label(text=pgettext_iface('Test Error Count: ') + str(wmyp.test_result_error))
+                col.label(text=pgettext_iface('Test Failed Count: ') + str(wmyp.test_result_failed))
+
 def main_draw(self, context):
 
     wm = context.window_manager
@@ -3361,6 +3399,9 @@ def main_draw(self, context):
     if not node:
         layout.label(text="No active " + get_addon_title() + " node!", icon='ERROR')
         layout.operator("node.y_quick_ypaint_node_setup", icon_value=lib.get_icon('nodetree'))
+
+        # Test
+        draw_test_ui(context=context, layout=layout)
 
         return
 
@@ -3574,6 +3615,9 @@ def main_draw(self, context):
         #col.operator('node.y_new_image_atlas_segment_test', icon_value=lib.get_icon('image'))
         #col.operator('node.y_new_udim_atlas_segment_test', icon_value=lib.get_icon('image'))
         #col.operator('node.y_uv_transform_test', icon_value=lib.get_icon('uv'))
+
+    # Test
+    draw_test_ui(context=context, layout=layout)
 
 class NODE_PT_YPaint(bpy.types.Panel):
     bl_space_type = 'NODE_EDITOR'
@@ -3916,13 +3960,13 @@ class NODE_UL_YPaint_layers(bpy.types.UIList):
                         #if not src.image.preview: src.image.preview_ensure()
                         row.label(text='', icon_value=src.image.preview.icon_id)
                     else: 
-                        if m.source_input == 'ALPHA':
-                            row.label(text='', icon_value=lib.get_icon('alpha_image'))
+                        if m.source_input in {'ALPHA', 'R', 'G', 'B'}:
+                            row.label(text='', icon_value=lib.get_icon(RGBA_CHANNEL_PREFIX[m.source_input]+'image'))
                         else: row.label(text='', icon_value=lib.get_icon('image'))
                 elif m.type == 'VCOL':
                     active_vcol_mask = m
-                    if m.source_input == 'ALPHA':
-                        row.label(text='', icon_value=lib.get_icon('vertex_color_alpha'))
+                    if m.source_input in {'ALPHA', 'R', 'G', 'B'}:
+                        row.label(text='', icon_value=lib.get_icon(RGBA_CHANNEL_PREFIX[m.source_input]+'vertex_color'))
                     else: row.label(text='', icon_value=lib.get_icon('vertex_color'))
                 elif m.type == 'HEMI':
                     row.label(text='', icon_value=lib.get_icon('hemi'))
@@ -3945,12 +3989,12 @@ class NODE_UL_YPaint_layers(bpy.types.UIList):
                         #if not src.image.preview: src.image.preview_ensure()
                         row.prop(m, 'active_edit', text='', emboss=False, icon_value=src.image.preview.icon_id)
                     else: 
-                        if m.source_input == 'ALPHA':
-                            row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('alpha_image'))
+                        if m.source_input in {'ALPHA', 'R', 'G', 'B'}:
+                            row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon(RGBA_CHANNEL_PREFIX[m.source_input]+'image'))
                         else: row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('image'))
                 elif m.type == 'VCOL':
-                    if m.source_input == 'ALPHA':
-                        row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('vertex_color_alpha'))
+                    if m.source_input in {'ALPHA', 'R', 'G', 'B'}:
+                        row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon(RGBA_CHANNEL_PREFIX[m.source_input]+'vertex_color'))
                     else: row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('vertex_color'))
                 elif m.type == 'HEMI':
                     row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('hemi'))
@@ -4019,7 +4063,7 @@ class NODE_UL_YPaint_layers(bpy.types.UIList):
         # Modifier shortcut
         shortcut_found = False
 
-        if layer.type == 'COLOR' and layer.color_shortcut:
+        if layer.type == 'COLOR':
             src = get_layer_source(layer, layer_tree)
             rrow = row.row()
             rrow.prop(src.outputs[0], 'default_value', text='', icon='COLOR')
@@ -4364,13 +4408,8 @@ class YBakeTargetMenu(bpy.types.Menu):
 
         if context.image:
             if context.image.packed_file:
-                op = col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE')
-                op.unpack = True
-                op.copy = False
-            else: 
-                op = col.operator('node.y_save_as_image', text='Save As Image')
-                op.unpack = False
-                op.copy = False
+                col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
+            else: col.operator('node.y_save_as_image', text='Save As Image').copy = False
             col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
 class YNewChannelMenu(bpy.types.Menu):
@@ -4543,6 +4582,13 @@ class YNewLayerMenu(bpy.types.Menu):
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
+        # NOTE: Blender 2.76 does not bake to object space normal correctly
+        if is_bl_newer_than(2, 77):
+            c = col.operator("node.y_bake_to_layer", text='Object Space Normal')
+            c.type = 'OBJECT_SPACE_NORMAL'
+            c.target_type = 'LAYER'
+            c.overwrite_current = False
+
         if is_bl_newer_than(2, 80):
             col.separator()
 
@@ -4556,6 +4602,7 @@ class YNewLayerMenu(bpy.types.Menu):
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
+        # NOTE: Blender 2.76 currently cant bake from other objects since it has a different setup
         if is_bl_newer_than(2, 77):
             col.separator()
 
@@ -4616,13 +4663,8 @@ class YBakedImageMenu(bpy.types.Menu):
         col.operator('node.y_save_image', icon='FILE_TICK')
 
         if context.image.packed_file:
-            op = col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE')
-            op.unpack = True
-            op.copy = False
-        else: 
-            op = col.operator('node.y_save_as_image', text='Save As Image')
-            op.unpack = False
-            op.copy = False
+            col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
+        else: col.operator('node.y_save_as_image', text='Save As Image').copy = False
         col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
@@ -4700,18 +4742,11 @@ class YLayerListSpecialMenu(bpy.types.Menu):
         col.operator('node.y_pack_image', icon='PACKAGE')
         col.operator('node.y_save_image', icon='FILE_TICK')
         if hasattr(context, 'image') and context.image.packed_file:
-            op = col.operator('node.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE')
-            op.unpack = True
-            op.copy = False
+            col.operator('node.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE').copy = False
         else:
             if is_bl_newer_than(2, 80):
-                op = col.operator('node.y_save_as_image', text='Save As Image...')
-                op.unpack = False
-                op.copy = False
-            else: 
-                op = col.operator('node.y_save_as_image', text='Save As Image...', icon='SAVE_AS')
-                op.unpack = False
-                op.copy = False
+                col.operator('node.y_save_as_image', text='Save As Image...').copy = False
+            else: col.operator('node.y_save_as_image', text='Save As Image...', icon='SAVE_AS').copy = False
         col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
@@ -5941,6 +5976,12 @@ class YPaintUI(bpy.types.PropertyGroup):
     show_stats : BoolProperty(
         name = 'Stats',
         description = 'Show node stats',
+        default = False
+    )
+
+    show_test : BoolProperty(
+        name = 'Tests',
+        description = 'Show test sections',
         default = False
     )
 
