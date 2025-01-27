@@ -2478,10 +2478,16 @@ def get_preview(mat, output=None, advanced=False, normal_viewer=False):
 
         # Remember output and original bsdf
         ori_bsdf = output.inputs[0].links[0].from_node
+        ori_socket = output.inputs[0].links[0].from_socket
+        ori_bsdf_output_index = 0
+        for i, outp in enumerate(ori_bsdf.outputs):
+            if outp == ori_socket:
+                ori_bsdf_output_index = i
 
         # Only remember original BSDF if its not the preview node itself
         if ori_bsdf != preview:
             mat.yp.ori_bsdf = ori_bsdf.name
+            mat.yp.ori_bsdf_output_index = ori_bsdf_output_index
 
     return preview
 
@@ -2529,7 +2535,7 @@ def remove_preview(mat, advanced=False):
         mat.yp.ori_bsdf = ''
 
         if bsdf and output:
-            mat.node_tree.links.new(bsdf.outputs[0], output.inputs[0])
+            mat.node_tree.links.new(bsdf.outputs[mat.yp.ori_bsdf_output_index], output.inputs[0])
 
         # Recover view transform
         if scene.yp.ori_view_transform != '':
@@ -3084,12 +3090,14 @@ def update_channel_alpha(self, context):
     if not self.enable_alpha:
 
         if not any(alpha_chs):
-            # Set material to use opaque
-            if is_bl_newer_than(2, 80):
-                mat.blend_method = 'OPAQUE'
-                mat.shadow_method = 'OPAQUE'
-            else:
-                mat.game_settings.alpha_blend = 'OPAQUE'
+
+            # Set material to use opaque (only for legacy renderer)
+            if not is_bl_newer_than(4, 2):
+                if is_bl_newer_than(2, 80):
+                    mat.blend_method = 'OPAQUE'
+                    mat.shadow_method = 'OPAQUE'
+                else:
+                    mat.game_settings.alpha_blend = 'OPAQUE'
 
         node = get_active_ypaint_node()
         inp = node.inputs[self.io_index + 1]
@@ -3137,7 +3145,7 @@ def update_channel_alpha(self, context):
                 # Settings for eevee next
                 mat.use_transparent_shadow = True
 
-            if is_bl_newer_than(2, 80):
+            elif is_bl_newer_than(2, 80):
                 # Settings for eevee legacy
                 mat.blend_method = self.alpha_blend_mode
                 mat.shadow_method = self.alpha_shadow_mode
@@ -3935,6 +3943,7 @@ class YPaint(bpy.types.PropertyGroup):
 
 class YPaintMaterialProps(bpy.types.PropertyGroup):
     ori_bsdf : StringProperty(default='')
+    ori_bsdf_output_index : IntProperty(default=0)
     #ori_blend_method : StringProperty(default='')
     active_ypaint_node : StringProperty(default='')
 

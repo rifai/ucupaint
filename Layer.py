@@ -62,7 +62,8 @@ def add_new_layer(
         hemi_space='WORLD', hemi_use_prev_normal=True,
         mask_color_id=(1, 0, 1), mask_vcol_data_type='BYTE_COLOR', mask_vcol_domain='CORNER',
         use_divider_alpha=False, use_udim_for_mask=False,
-        interpolation='Linear', mask_interpolation='Linear', mask_edge_detect_radius=0.05
+        interpolation='Linear', mask_interpolation='Linear', mask_edge_detect_radius=0.05,
+        normal_space = 'TANGENT'
     ):
 
     yp = group_tree.yp
@@ -314,6 +315,7 @@ def add_new_layer(
             ch.enable = True
             if root_ch.type == 'NORMAL':
                 ch.normal_blend_type = normal_blend_type
+                ch.normal_space = normal_space
             else:
                 ch.blend_type = blend_type
         else: 
@@ -2199,7 +2201,7 @@ class BaseMultipleImagesLayer():
 
         # Remove unused images
         for image in images:
-            if image not in valid_images: # and image not in existing_images:
+            if image not in valid_images and image.users == 0: # and image not in existing_images:
                 remove_datablock(bpy.data.images, image)
 
         # Update UI
@@ -2630,6 +2632,12 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
         items = get_normal_map_type_items
     )
 
+    normal_space : EnumProperty(
+        name = 'Normal Space',
+        items = normal_space_items,
+        default = 'TANGENT'
+    )
+
     use_udim_detecting : BoolProperty(
         name = 'Detect UDIMs',
         description = 'Detect selected UDIM files and load all matching tiles.',
@@ -2701,6 +2709,8 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
         col.label(text='Channel:')
         if channel and channel.type == 'NORMAL':
             col.label(text='Type:')
+            if self.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}:
+                col.label(text='Space:')
 
         col = row.column()
         if self.file_browser_filepath != '':
@@ -2717,6 +2727,8 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
             if channel.type == 'NORMAL':
                 rrow.prop(self, 'normal_blend_type', text='')
                 col.prop(self, 'normal_map_type', text='')
+                if self.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}:
+                    col.prop(self, 'normal_space', text='')
             else: 
                 rrow.prop(self, 'blend_type', text='')
 
@@ -2768,7 +2780,7 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
             add_new_layer(
                 node.node_tree, image.name, 'IMAGE', int(self.channel_idx), self.blend_type, 
                 self.normal_blend_type, self.normal_map_type, self.texcoord_type, self.uv_map,
-                image, None, None, interpolation=self.interpolation
+                image, None, None, interpolation=self.interpolation, normal_space=self.normal_space
             )
 
         node.node_tree.yp.halt_update = False
@@ -3136,6 +3148,12 @@ class YOpenAvailableDataToLayer(bpy.types.Operator):
         description = 'Normal map type of this layer',
         items = get_normal_map_type_items
     )
+    
+    normal_space : EnumProperty(
+        name = 'Normal Space',
+        items = normal_space_items,
+        default = 'TANGENT'
+    )
 
     image_name : StringProperty(name="Image")
     image_coll : CollectionProperty(type=bpy.types.PropertyGroup)
@@ -3207,6 +3225,8 @@ class YOpenAvailableDataToLayer(bpy.types.Operator):
         col.label(text='Channel:')
         if channel and channel.type == 'NORMAL':
             col.label(text='Type:')
+            if self.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}:
+                col.label(text='Space:')
 
         col = row.column()
 
@@ -3225,6 +3245,8 @@ class YOpenAvailableDataToLayer(bpy.types.Operator):
             if channel.type == 'NORMAL':
                 rrow.prop(self, 'normal_blend_type', text='')
                 col.prop(self, 'normal_map_type', text='')
+                if self.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}:
+                    col.prop(self, 'normal_space', text='')
             else: 
                 rrow.prop(self, 'blend_type', text='')
 
@@ -3276,7 +3298,7 @@ class YOpenAvailableDataToLayer(bpy.types.Operator):
         add_new_layer(
             node.node_tree, name, self.type, int(self.channel_idx), self.blend_type, 
             self.normal_blend_type, self.normal_map_type, self.texcoord_type, self.uv_map, 
-            image, vcol, None, interpolation=self.interpolation
+            image, vcol, None, interpolation=self.interpolation, normal_space=self.normal_space
         )
 
         node.node_tree.yp.halt_update = False
@@ -3597,7 +3619,7 @@ class YMoveInOutLayerGroupMenu(bpy.types.Operator):
     bl_idname = "node.y_move_in_out_layer_group_menu"
     bl_label = "Move In/Out Layer Group"
     bl_description = "Move inside or outside layer group"
-    #bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'UNDO'}
 
     direction : EnumProperty(
         name = 'Direction',
@@ -4703,17 +4725,7 @@ def duplicate_layer_nodes_and_images(tree, specific_layer=None, packed_duplicate
                     mask_idx = int(m.group(2))
                     mask = img_users[i]
 
-                    color = (0, 0, 0, 1)
-                    if is_bl_newer_than(2, 83):
-                        # Check average value of the image using numpy
-                        pxs = numpy.empty(shape=img.size[0] * img.size[1] * 4, dtype=numpy.float32)
-                        img.pixels.foreach_get(pxs)
-                        if numpy.average(pxs) > 0.5:
-                            color = (1, 1, 1, 1)
-                    else:
-                        # Set Mask color based on the index and blend type
-                        if mask_idx > 0 and mask.blend_type not in {'ADD'}:
-                            color = (1, 1, 1, 1)
+                    color = get_image_mask_base_color(mask, img, mask_idx)
                 else: color = (0, 0, 0, 0)
 
                 img_name = get_unique_name(img.name, bpy.data.images)
@@ -5383,12 +5395,19 @@ def update_normal_map_type(self, context):
 
     check_layer_tree_ios(layer, tree)
 
-    #if not yp.halt_reconnect:
-    reconnect_layer_nodes(layer)
-    rearrange_layer_nodes(layer)
+    if yp.layer_preview_mode:
+        # Set correct active edit
+        if self.normal_map_type == 'BUMP_MAP' and self.active_edit_1:
+            self.active_edit = True
+        elif self.normal_map_type == 'NORMAL_MAP' and self.active_edit:
+            self.active_edit_1 = True
+    else:
+        #if not yp.halt_reconnect:
+        reconnect_layer_nodes(layer)
+        rearrange_layer_nodes(layer)
 
-    reconnect_yp_nodes(self.id_data)
-    rearrange_yp_nodes(self.id_data)
+        reconnect_yp_nodes(self.id_data)
+        rearrange_yp_nodes(self.id_data)
 
 def update_blend_type(self, context):
     T = time.time()
@@ -5417,6 +5436,16 @@ def update_blend_type(self, context):
 
     print('INFO: Layer', layer.name, ' blend type is changed in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
     wm.yptimer.time = str(time.time())
+
+def update_normal_space(self, context):
+    yp = self.id_data.yp
+    m = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]', self.path_from_id())
+    layer = yp.layers[int(m.group(1))]
+    tree = get_tree(layer)
+
+    normal_map_proc = tree.nodes.get(self.normal_map_proc)
+    if normal_map_proc:
+        normal_map_proc.space = self.normal_space
 
 def update_flip_backface_normal(self, context):
     yp = self.id_data.yp
@@ -5900,6 +5929,14 @@ class YLayerChannel(bpy.types.PropertyGroup):
         update = update_blend_type
     )
 
+    normal_space : EnumProperty(
+        name = 'Normal Space',
+        description = 'Space of the normal map',
+        items = normal_space_items,
+        default = 'TANGENT',
+        update = update_normal_space
+    )
+
     height_blend_type : EnumProperty(
         name = 'Height Blend Type',
         items = normal_blend_items,
@@ -6033,7 +6070,8 @@ class YLayerChannel(bpy.types.PropertyGroup):
     height_alpha_group_unpack : StringProperty(default='')
 
     # Normal related
-    normal_proc : StringProperty(default='')
+    normal_proc : StringProperty(default='') # For converting bump to normal
+    normal_map_proc : StringProperty(default='') # For processing normal map
     #normal_blend : StringProperty(default='')
     normal_flip : StringProperty(default='')
 

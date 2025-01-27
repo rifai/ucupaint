@@ -160,6 +160,14 @@ normal_blend_items = (
     ('COMPARE', 'Compare Height', '')
 )
 
+normal_space_items = (
+    ('TANGENT', 'Tangent Space', 'Tangent space normal mapping'),
+    ('OBJECT', 'Object Space', 'Object space normal mapping'),
+    ('WORLD', 'World Space', 'World space normal mapping'),
+    ('BLENDER_OBJECT', 'Blender Object Space', 'Object space normal mapping, compatible with Blender render baking'),
+    ('BLENDER_WORLD', 'Blender World Space', 'World space normal mapping, compatible with Blender render baking'),
+)
+
 height_blend_items = (
     ('REPLACE', 'Replace', ''),
     ('COMPARE', 'Compare', ''),
@@ -269,6 +277,8 @@ bake_type_items = (
     ('SELECTED_VERTICES', 'Selected Vertices/Edges/Faces', ''),
 
     ('FLOW', 'Flow Map based on straight UVMap', ''),
+
+    ('OBJECT_SPACE_NORMAL', 'Object Space Normal', ''),
 )
 
 image_resolution_items = (
@@ -313,7 +323,9 @@ bake_type_labels = {
 
     'SELECTED_VERTICES': 'Selected Vertices',
 
-    'FLOW': 'Flow'
+    'FLOW': 'Flow',
+
+    'OBJECT_SPACE_NORMAL' : 'Object Space Normal'
 }
 
 bake_type_suffixes = {
@@ -335,7 +347,9 @@ bake_type_suffixes = {
 
     'SELECTED_VERTICES': 'Selected Vertices',
 
-    'FLOW': 'Flow'
+    'FLOW': 'Flow',
+
+    'OBJECT_SPACE_NORMAL' : 'Object Space Normal'
 }
 
 texcoord_lists = [
@@ -2082,6 +2096,22 @@ def get_mask_source(mask, get_baked=False):
 def get_mask_mapping(mask, get_baked=False):
     tree = get_mask_tree(mask, True)
     return tree.nodes.get(mask.mapping) if not get_baked else tree.nodes.get(mask.baked_mapping)
+
+def get_image_mask_base_color(mask, image, mask_index):
+
+    color = (0, 0, 0, 1)
+    if is_bl_newer_than(2, 83):
+        # Check average value of the image using numpy
+        pxs = numpy.empty(shape=image.size[0] * image.size[1] * 4, dtype=numpy.float32)
+        image.pixels.foreach_get(pxs)
+        if numpy.average(pxs) > 0.5:
+            color = (1, 1, 1, 1)
+    else:
+        # Set Mask color based on the index and blend type
+        if mask_index > 0 and mask.blend_type not in {'ADD'}:
+            color = (1, 1, 1, 1)
+    
+    return color
 
 def get_channel_source_tree(ch, layer=None, tree=None):
     yp = ch.id_data.yp
@@ -4853,7 +4883,7 @@ def is_entity_need_tangent_input(entity, uv_name):
                     return True
 
                 # Overlay blend and transition bump need tangent
-                if height_ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'} and (height_ch.normal_blend_type == 'OVERLAY' or height_ch.enable_transition_bump):
+                if height_ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'} and (height_ch.normal_blend_type == 'OVERLAY' or (height_ch.enable_transition_bump and height_root_ch.enable_smooth_bump)):
                     return True
 
                 # Main UV Tangent is needed if smooth bump is on and entity is using non-uv texcoord or have different UV

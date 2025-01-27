@@ -57,6 +57,41 @@ def search_join_problematic_texcoord(tree, node):
 
     return False
 
+def is_there_any_missmatched_attribute_types(objs):
+    # Get number of attributes founds
+    attr_counts = {}
+    for obj in objs:
+        for attr in obj.data.attributes:
+            if attr.name not in attr_counts:
+                attr_counts[attr.name] = 1
+            else:
+                attr_counts[attr.name] += 1
+    
+    # Get the same attribute used in all objects
+    same_attrs = []
+    for name, count in attr_counts.items():
+        if count == len(objs):
+            same_attrs.append(name)
+            
+    # Is there any missmatched type data
+    for name in same_attrs:
+        data_type = ''
+        domain = ''
+        for obj in objs:
+            attr = obj.data.attributes[name]
+            
+            if data_type == '':
+                data_type = attr.data_type
+            elif data_type != attr.data_type:
+                return True
+            
+            if domain == '':
+                domain = attr.domain
+            elif domain != attr.domain:
+                return True
+
+    return False
+
 def is_join_objects_problematic(yp, mat=None):
     for layer in yp.layers:
 
@@ -64,17 +99,27 @@ def is_join_objects_problematic(yp, mat=None):
             if mask.type in {'VCOL', 'HEMI', 'COLOR_ID'}: 
                 continue
             if mask.texcoord_type in JOIN_PROBLEMATIC_TEXCOORDS or mask.type in {'OBJECT_INDEX'}:
+                print('INFO: Merged bake is not happening because there\'s object index mask')
                 return True
 
         if layer.type in {'VCOL', 'COLOR', 'BACKGROUND', 'HEMI', 'GROUP'}: 
             continue
         if layer.texcoord_type in JOIN_PROBLEMATIC_TEXCOORDS:
+            print('INFO: Merged bake is not happening because there\'s problematic texcoord used')
             return True
 
     if mat:
         output = get_material_output(mat)
         if output: 
             if search_join_problematic_texcoord(mat.node_tree, output):
+                print('INFO: Merged bake is not happening because there\'s problematic texcoord used outside node')
+                return True
+
+        # Check for missmatched color attribute data
+        if is_bl_newer_than(3, 2):
+            objs = get_all_objects_with_same_materials(mat, True)
+            if is_there_any_missmatched_attribute_types(objs):
+                print('INFO: Merged bake is not happening because there\'s missmatched attribute data types')
                 return True
 
     return False
@@ -394,7 +439,8 @@ def prepare_bake_settings(
         disable_problematic_modifiers=False, hide_other_objs=True, bake_from_multires=False, 
         tile_x=64, tile_y=64, use_selected_to_active=False, max_ray_distance=0.0, cage_extrusion=0.0,
         bake_target = 'IMAGE_TEXTURES',
-        source_objs=[], bake_device='CPU', use_denoising=False, margin_type='ADJACENT_FACES', cage_object_name=''
+        source_objs=[], bake_device='CPU', use_denoising=False, margin_type='ADJACENT_FACES', cage_object_name='', 
+        normal_space='TANGENT',
     ):
 
     scene = bpy.context.scene
@@ -460,7 +506,7 @@ def prepare_bake_settings(
         bpy.context.preferences.addons['cycles'].preferences['compute_device_type'] = 1
 
     if bake_type == 'NORMAL':
-        scene.render.bake.normal_space = 'TANGENT'
+        scene.render.bake.normal_space = normal_space
 
     # Disable other object selections and select only active object
     if is_bl_newer_than(2, 80):
@@ -623,6 +669,7 @@ def recover_bake_settings(book, yp=None, recover_active_uv=False, mat=None):
     scene.render.threads_mode = book['ori_threads_mode']
     scene.render.bake.margin = book['ori_margin']
     scene.render.bake.use_clear = book['ori_use_clear']
+    scene.render.bake.normal_space = book['ori_normal_space']
     scene.render.use_simplify = book['ori_simplify']
     scene.cycles.device = book['ori_device']
     if hasattr(scene.render.bake, 'use_pass_direct'): scene.render.bake.use_pass_direct = book['ori_use_pass_direct']

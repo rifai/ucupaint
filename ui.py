@@ -1027,9 +1027,9 @@ def draw_root_channels_ui(context, layout, node):
                     bbcol = bbox.column() #align=True)
                     bbcol.active = channel.enable_alpha
 
-                    if is_bl_newer_than(2, 80):
+                    if is_bl_newer_than(2, 80) and engine != 'HYDRA_STORM':
 
-                        if is_bl_newer_than(4, 2) and engine == 'BLENDER_EEVEE_NEXT':
+                        if is_bl_newer_than(4, 2):
                             brow = bbcol.row(align=True)
                             brow.label(text='Transparent Shadows:')
                             brow.prop(mat, 'use_transparent_shadow', text='')
@@ -1039,7 +1039,7 @@ def draw_root_channels_ui(context, layout, node):
                             brow = bbcol.row(align=True)
                             brow.label(text='Render Method:')
                             brow.prop(mat, 'surface_render_method', text='')
-                        elif engine != 'HYDRA_STORM':
+                        else:
                             brow = bbcol.row(align=True)
                             brow.label(text='Blend Mode:')
                             brow.prop(channel, 'alpha_blend_mode', text='')
@@ -1883,9 +1883,14 @@ def draw_layer_channels(context, layout, layer, layer_tree, image):
                             draw_input_prop(brow, ch, 'bump_smooth_multiplier')
 
                     if ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'}: 
-                        brow = cccol.row(align=True)
-                        brow.label(text='Normal Strength:') #, icon_value=lib.get_icon('input'))
+                        brow = cccol.row(align=True) if ch.normal_map_type == 'BUMP_NORMAL_MAP' else split_layout(cccol, 0.35)
+                        label = 'Normal Strength:' if ch.normal_map_type == 'BUMP_NORMAL_MAP' else 'Strength:'
+                        brow.label(text=label)
                         draw_input_prop(brow, ch, 'normal_strength')
+                        brow = cccol.row(align=True) if ch.normal_map_type == 'BUMP_NORMAL_MAP' else split_layout(cccol, 0.35)
+                        label = 'Normal Space:' if ch.normal_map_type == 'BUMP_NORMAL_MAP' else 'Space:'
+                        brow.label(text=label)
+                        brow.prop(ch, 'normal_space', text='')
                     elif ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
                         brow = cccol.row(align=True)
                         brow.label(text='Strength:') #, icon_value=lib.get_icon('input'))
@@ -4403,13 +4408,8 @@ class YBakeTargetMenu(bpy.types.Menu):
 
         if context.image:
             if context.image.packed_file:
-                op = col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE')
-                op.unpack = True
-                op.copy = False
-            else: 
-                op = col.operator('node.y_save_as_image', text='Save As Image')
-                op.unpack = False
-                op.copy = False
+                col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
+            else: col.operator('node.y_save_as_image', text='Save As Image').copy = False
             col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
 class YNewChannelMenu(bpy.types.Menu):
@@ -4582,6 +4582,13 @@ class YNewLayerMenu(bpy.types.Menu):
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
+        # NOTE: Blender 2.76 does not bake to object space normal correctly
+        if is_bl_newer_than(2, 77):
+            c = col.operator("node.y_bake_to_layer", text='Object Space Normal')
+            c.type = 'OBJECT_SPACE_NORMAL'
+            c.target_type = 'LAYER'
+            c.overwrite_current = False
+
         if is_bl_newer_than(2, 80):
             col.separator()
 
@@ -4595,6 +4602,7 @@ class YNewLayerMenu(bpy.types.Menu):
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
+        # NOTE: Blender 2.76 currently cant bake from other objects since it has a different setup
         if is_bl_newer_than(2, 77):
             col.separator()
 
@@ -4655,13 +4663,8 @@ class YBakedImageMenu(bpy.types.Menu):
         col.operator('node.y_save_image', icon='FILE_TICK')
 
         if context.image.packed_file:
-            op = col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE')
-            op.unpack = True
-            op.copy = False
-        else: 
-            op = col.operator('node.y_save_as_image', text='Save As Image')
-            op.unpack = False
-            op.copy = False
+            col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
+        else: col.operator('node.y_save_as_image', text='Save As Image').copy = False
         col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
@@ -4739,18 +4742,11 @@ class YLayerListSpecialMenu(bpy.types.Menu):
         col.operator('node.y_pack_image', icon='PACKAGE')
         col.operator('node.y_save_image', icon='FILE_TICK')
         if hasattr(context, 'image') and context.image.packed_file:
-            op = col.operator('node.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE')
-            op.unpack = True
-            op.copy = False
+            col.operator('node.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE').copy = False
         else:
             if is_bl_newer_than(2, 80):
-                op = col.operator('node.y_save_as_image', text='Save As Image...')
-                op.unpack = False
-                op.copy = False
-            else: 
-                op = col.operator('node.y_save_as_image', text='Save As Image...', icon='SAVE_AS')
-                op.unpack = False
-                op.copy = False
+                col.operator('node.y_save_as_image', text='Save As Image...').copy = False
+            else: col.operator('node.y_save_as_image', text='Save As Image...', icon='SAVE_AS').copy = False
         col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()

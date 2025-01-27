@@ -411,7 +411,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
 
             self.margin = 0
 
-        elif self.type == 'OTHER_OBJECT_NORMAL':
+        elif self.type in {'OTHER_OBJECT_NORMAL', 'OBJECT_SPACE_NORMAL'}:
             self.subsurf_influence = False
 
             if height_root_ch:
@@ -419,7 +419,8 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                 self.normal_map_type = 'NORMAL_MAP'
                 self.normal_blend_type = 'OVERLAY'
 
-            self.margin = 0
+            if self.type == 'OTHER_OBJECT_NORMAL':
+                self.margin = 0
 
         elif self.type == 'OTHER_OBJECT_CHANNELS':
             self.subsurf_influence = False
@@ -1076,7 +1077,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             bake_type = 'NORMALS'
         elif self.type == 'MULTIRES_DISPLACEMENT':
             bake_type = 'DISPLACEMENT'
-        elif self.type == 'OTHER_OBJECT_NORMAL':
+        elif self.type in {'OTHER_OBJECT_NORMAL', 'OBJECT_SPACE_NORMAL'}:
             bake_type = 'NORMAL'
         else: 
             bake_type = 'EMIT'
@@ -1103,7 +1104,8 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             use_selected_to_active=self.type.startswith('OTHER_OBJECT_'),
             max_ray_distance=self.max_ray_distance, cage_extrusion=self.cage_extrusion,
             source_objs=other_objs, use_denoising=False, margin_type=self.margin_type,
-            cage_object_name = cage_object_name
+            cage_object_name = cage_object_name,
+            normal_space = 'OBJECT' if self.type == 'OBJECT_SPACE_NORMAL' else 'TANGENT'
         )
 
         # Set multires level
@@ -1492,7 +1494,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
 
                 colorspace = get_noncolor_name() if root_ch.colorspace == 'LINEAR' else get_srgb_name()
 
-            elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL'}:
+            elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL', 'OBJECT_SPACE_NORMAL'}:
                 colorspace = get_noncolor_name()
 
             # Using float image will always make the image linear/non-color
@@ -1502,7 +1504,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             # Base color of baked image
             if self.type == 'AO':
                 color = [1.0, 1.0, 1.0, 1.0] 
-            elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL'}:
+            elif self.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL', 'OBJECT_SPACE_NORMAL'}:
                 if self.hdr:
                     color = [0.7354, 0.7354, 1.0, 1.0]
                 else:
@@ -1785,7 +1787,8 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                     layer = Layer.add_new_layer(
                         node.node_tree, layer_name, 'IMAGE', channel_idx, self.blend_type, 
                         self.normal_blend_type, self.normal_map_type, 'UV', self.uv_map, image, None, segment,
-                        interpolation = self.interpolation
+                        interpolation = self.interpolation,
+                        normal_space = 'OBJECT' if self.type == 'OBJECT_SPACE_NORMAL' else 'TANGENT'
                     )
                     yp.halt_update = False
                     active_id = yp.active_layer_index

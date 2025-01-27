@@ -85,11 +85,8 @@ def transfer_uv(objs, mat, entity, uv_map, is_entity_baked=False):
             col = (0.73, 0.73, 0.73, 1.0)
         elif 'AO' in image.name:
             col = (1.0, 1.0, 1.0, 1.0)
-        elif m2: # Possible mask base color
-            if index == 0:
-                col = (0.0, 0.0, 0.0, 1.0)
-            else:
-                col = (1.0, 1.0, 1.0, 1.0)
+        elif m2: 
+            col = get_image_mask_base_color(entity, image, index)
         else:
             col = (0.0, 0.0, 0.0, 0.0)
             use_alpha = True
@@ -1516,6 +1513,12 @@ class YBakeChannels(bpy.types.Operator, BaseBakeOperator):
             self.report({'ERROR'}, "No valid objects to bake!")
             return {'CANCELLED'}
 
+        # UV data should be accessible when there's multiple materials in single object, so object mode is necessary
+        ori_edit_mode = False
+        if len(obj.data.materials) > 1 and obj.mode == 'EDIT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+            ori_edit_mode = True
+
         book = remember_before_bake(yp)
 
         height_ch = get_root_height_channel(yp)
@@ -1549,15 +1552,15 @@ class YBakeChannels(bpy.types.Operator, BaseBakeOperator):
         ori_loop_locs = {}
         for ob in objs:
 
-            # Get uv map
-            uv_layers = get_uv_layers(ob)
-            uvl = uv_layers.get(self.uv_map)
-
             # Need to assign all polygon to active material if there are multiple materials
             ori_mat_ids[ob.name] = []
             ori_loop_locs[ob.name] = []
 
             if len(ob.data.materials) > 1:
+
+                # Get uv map
+                uv_layers = get_uv_layers(ob)
+                uvl = uv_layers.get(self.uv_map)
 
                 active_mat_id = [i for i, m in enumerate(ob.data.materials) if m == mat][0]
                 for p in ob.data.polygons:
@@ -1576,7 +1579,6 @@ class YBakeChannels(bpy.types.Operator, BaseBakeOperator):
                     ori_mat_ids[ob.name].append(p.material_index)
                     p.material_index = active_mat_id
 
-        
         # Check if any objects use geometry nodes to output uv
         any_uv_geonodes = False
         for o in objs:
@@ -1871,7 +1873,6 @@ class YBakeChannels(bpy.types.Operator, BaseBakeOperator):
                 if uvl:
                     for i, p in enumerate(ob.data.polygons):
                         for j, li in enumerate(p.loop_indices):
-                            #print(ori_loop_locs[ob.name][i][j])
                             uvl.data[li].uv = ori_loop_locs[ob.name][i][j]
 
         # Bake vcol
@@ -1977,6 +1978,10 @@ class YBakeChannels(bpy.types.Operator, BaseBakeOperator):
         reconnect_yp_nodes(tree)
         rearrange_yp_nodes(tree)
 
+        # Revert back to edit mode
+        if ori_edit_mode:
+            bpy.ops.object.mode_set(mode='EDIT')
+        
         # Refresh active channel index
         yp.active_channel_index = yp.active_channel_index
 
