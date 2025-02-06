@@ -51,7 +51,7 @@ else:
     from . import Localization
     from . import image_ops, common, bake_common, modifier_common, lib, ui, subtree, transition_common, input_outputs, node_arrangements, node_connections, preferences
     from . import vector_displacement_lib, vector_displacement
-    from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, NormalMapModifier, Layer, ListItem, Bake, BakeToLayer, Root, versioning
+    from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, NormalMapModifier, Layer, ListItem, Bake, BakeToLayer, Root, Exporter, versioning
     from . import addon_updater_ops
     from . import Test
 
