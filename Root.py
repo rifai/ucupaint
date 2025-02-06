@@ -5,7 +5,7 @@ from .common import *
 from .subtree import *
 from .node_arrangements import *
 from .node_connections import *
-from . import lib, Modifier, Layer, Mask, transition, Bake, BakeTarget
+from . import lib, Modifier, Layer, Mask, transition, Bake, BakeTarget, ListItem
 from .input_outputs import *
 
 YP_GROUP_SUFFIX = ' ' + get_addon_title()
@@ -2349,6 +2349,11 @@ class YCleanYPCaches(bpy.types.Operator):
                     if prop.startswith('cache_'):
                         remove_node(layer_tree, ch, prop)
 
+            for mask in layer.masks:
+                for prop in dir(mask):
+                    if prop.startswith('cache_'):
+                        remove_node(layer_tree, mask, prop)
+
         # Remove tangent and bitangent images
         for image in reversed(bpy.data.images):
             if image.name.endswith(CACHE_TANGENT_IMAGE_SUFFIX) or image.name.endswith(CACHE_BITANGENT_IMAGE_SUFFIX):
@@ -2502,6 +2507,9 @@ def set_srgb_view_transform():
         scene.yp.ori_look = scene.view_settings.look
         scene.view_settings.look = 'None'
 
+        scene.yp.ori_use_compositing = scene.use_nodes
+        scene.use_nodes = False
+
         scene.yp.ori_view_transform = scene.view_settings.view_transform
         if is_bl_newer_than(2, 80):
             try: scene.view_settings.view_transform = 'Standard'
@@ -2547,6 +2555,7 @@ def remove_preview(mat, advanced=False):
             scene.view_settings.exposure = scene.yp.ori_exposure
             scene.view_settings.gamma = scene.yp.ori_gamma
             scene.view_settings.use_curve_mapping = scene.yp.ori_use_curve_mapping
+            scene.use_nodes = scene.yp.ori_use_compositing
 
 #def update_merge_mask_mode(self, context):
 #    if not self.layer_preview_mode:
@@ -2595,7 +2604,6 @@ def update_layer_preview_mode(self, context):
 
     if yp.preview_mode and yp.layer_preview_mode:
         yp.preview_mode = False
-
 
     # Get preview node
     if yp.layer_preview_mode:
@@ -3784,6 +3792,29 @@ class YPaint(bpy.types.PropertyGroup):
         update = update_layer_index
     )
 
+    # List Items
+    list_items : CollectionProperty(type=ListItem.YListItem)
+
+    active_item_index : IntProperty(
+        name = 'Active Item Index',
+        description = 'Active item index',
+        default = 0,
+        update = ListItem.update_list_item_index
+    )
+
+    enable_expandable_subitems : BoolProperty(
+        name = 'Expandable Subitems',
+        description = 'Subitems (masks and editable custom layer inputs) can have their own item entries',
+        default = False,
+        update = ListItem.update_expand_subitems
+    )
+
+    enable_inline_subitems : BoolProperty(
+        name = 'Inline Subitems',
+        description = 'Subitems (masks and editable custom layer inputs) will have their icons beside layer icon',
+        default = True,
+    )
+
     # UVs
     uvs : CollectionProperty(type=YPaintUV)
 
@@ -3976,6 +4007,7 @@ class YPaintSceneProps(bpy.types.PropertyGroup):
     ori_gamma : FloatProperty(default=1.0)
     ori_look : StringProperty(default='')
     ori_use_curve_mapping : BoolProperty(default=False)
+    ori_use_compositing : BoolProperty(default=False)
 
 class YPaintObjectProps(bpy.types.PropertyGroup):
     ori_subsurf_render_levels : IntProperty(default=1)
