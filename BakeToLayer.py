@@ -464,7 +464,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                         source = get_layer_source(layer)
                         if source.image:
                             img = source.image
-                            if img.y_bake_info.is_baked and img.y_bake_info.bake_type == self.type:
+                            if img.y_bake_info.is_baked and not img.y_bake_info.is_baked_channel and img.y_bake_info.bake_type == self.type:
                                 self.overwrite_coll.add().name = layer.name
                             elif img.yia.is_image_atlas or img.yua.is_udim_atlas:
                                 if img.yia.is_image_atlas:
@@ -481,7 +481,7 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
                         source = get_mask_source(mask)
                         if source.image:
                             img = source.image
-                            if img.y_bake_info.is_baked and img.y_bake_info.bake_type == self.type:
+                            if img.y_bake_info.is_baked and not img.y_bake_info.is_baked_channel and img.y_bake_info.bake_type == self.type:
                                 self.overwrite_coll.add().name = mask.name
                             elif img.yia.is_image_atlas or img.yua.is_udim_atlas:
                                 if img.yia.is_image_atlas:
@@ -774,6 +774,8 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             ccol.prop(self, 'use_image_atlas')
 
     def execute(self, context):
+        if not self.is_cycles_exist(context): return {'CANCELLED'}
+
         T = time.time()
         mat = get_active_material()
         node = get_active_ypaint_node()
@@ -2571,6 +2573,7 @@ class YBakeEntityToImage(bpy.types.Operator, BaseBakeOperator):
         return segment
 
     def execute(self, context):
+        if not self.is_cycles_exist(context): return {'CANCELLED'}
 
         if not self.layer:
             self.report({'ERROR'}, "Invalid context!")

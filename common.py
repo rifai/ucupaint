@@ -1,4 +1,4 @@
-import bpy, os, sys, re, numpy, math, pathlib
+import bpy, os, sys, re, numpy, math, pathlib, string, random
 import bpy_extras.image_utils
 from mathutils import *
 from bpy.app.handlers import persistent
@@ -74,6 +74,28 @@ def blend_type_items(self, context):
         items.append(("EXCLUSION", "Exclusion", ""))
 
     return items
+
+blend_type_labels = {
+    "MIX" : "Mix",
+    "ADD" : "Add",
+    "SUBTRACT" : "Subtract",
+    "MULTIPLY" : "Multiply",
+    "SCREEN" : "Screen",
+    "OVERLAY" : "Overlay",
+    "DIFFERENCE" : "Difference",
+    "DIVIDE" : "Divide",
+    "DARKEN" : "Darken",
+    "LIGHTEN" : "Lighten",
+    "HUE" : "Hue",
+    "SATURATION" : "Saturation",
+    "VALUE" : "Value",
+    "COLOR" : "Color",
+    "SOFT_LIGHT" : "Soft Light",
+    "LINEAR_LIGHT" : "Linear Light",
+    "DODGE" : "Dodge",
+    "BURN" : "Burn",
+    "EXCLUSION" : "Exclusion",
+}
 
 def mask_blend_type_items(self, context):
     items = [
@@ -160,6 +182,12 @@ normal_blend_items = (
     ('COMPARE', 'Compare Height', '')
 )
 
+normal_blend_labels = {
+        'MIX' : 'Mix',
+        'OVERLAY' : 'Overlay',
+        'COMPARE' : 'Compare Height',
+        }
+
 normal_space_items = (
     ('TANGENT', 'Tangent Space', 'Tangent space normal mapping'),
     ('OBJECT', 'Object Space', 'Object space normal mapping'),
@@ -173,6 +201,13 @@ height_blend_items = (
     ('COMPARE', 'Compare', ''),
     ('ADD', 'Add', ''),
 )
+
+normal_type_labels = {
+        'BUMP_MAP' : 'Bump',
+        'NORMAL_MAP' : 'Normal',
+        'BUMP_NORMAL_MAP' : 'Bump + Normal',
+        'VECTOR_DISPLACEMENT_MAP' : 'Vector Displacement',
+        }
 
 layer_type_items = (
     ('IMAGE', 'Image', ''),
@@ -257,6 +292,26 @@ layer_type_labels = {
     'GABOR' : 'Gabor',
 }
 
+mask_type_labels = {
+    'IMAGE' : 'Image',
+    'BRICK' : 'Brick',
+    'CHECKER' : 'Checker',
+    'GRADIENT' : 'Gradient',
+    'MAGIC' : 'Magic',
+    'MUSGRAVE' : 'Musgrave',
+    'NOISE' : 'Noise',
+    'VORONOI' : 'Voronoi',
+    'WAVE' : 'Wave',
+    'VCOL' : 'Vertex Color',
+    'HEMI' : 'Fake Lighting',
+    'OBJECT_INDEX' : 'Object Index',
+    'COLOR_ID' : 'Color ID',
+    'BACKFACE' : 'Backface',
+    'EDGE_DETECT' : 'Edge Detect',
+    'MODIFIER' : 'Modifier',
+    'GABOR' : 'Gabor',
+}
+
 bake_type_items = (
     ('AO', 'Ambient Occlusion', ''),
     ('POINTINESS', 'Pointiness', ''),
@@ -270,9 +325,9 @@ bake_type_items = (
     ('MULTIRES_NORMAL', 'Multires Normal', ''),
     ('MULTIRES_DISPLACEMENT', 'Multires Displacement', ''),
 
-    ('OTHER_OBJECT_NORMAL', 'Other Objects Normal', ''),
-    ('OTHER_OBJECT_EMISSION', 'Other Objects Emission', ''),
-    ('OTHER_OBJECT_CHANNELS', 'Other Objects Ucupaint Channels', ''),
+    ('OTHER_OBJECT_NORMAL', 'Other Objects Normal', 'Other object\'s normal'),
+    ('OTHER_OBJECT_EMISSION', 'Other Objects Emission', 'Other object\'s emission color'),
+    ('OTHER_OBJECT_CHANNELS', 'Other Objects Channels', 'Other object\'s Ucupaint channels'),
 
     ('SELECTED_VERTICES', 'Selected Vertices/Edges/Faces', ''),
 
@@ -319,7 +374,7 @@ bake_type_labels = {
 
     'OTHER_OBJECT_NORMAL': 'Other Objects Normal',
     'OTHER_OBJECT_EMISSION': 'Other Objects Emission',
-    'OTHER_OBJECT_CHANNELS': 'Other Objects Ucupaint Channels',
+    'OTHER_OBJECT_CHANNELS': 'Other Objects Channels',
 
     'SELECTED_VERTICES': 'Selected Vertices',
 
@@ -450,6 +505,7 @@ layer_node_bl_idnames = {
     'BACKFACE' : 'ShaderNodeNewGeometry',
     'EDGE_DETECT' : 'ShaderNodeGroup',
     'GABOR' : 'ShaderNodeTexGabor',
+    'MODIFIER' : 'ShaderNodeGroup',
 }
 
 io_suffix = {
@@ -516,6 +572,12 @@ eraser_names = {
     'VERTEX_PAINT' : 'Eraser Vcol',
     'SCULPT' : 'Eraser Paint',
 }
+
+tex_eraser_asset_names = [
+    'Erase Hard',
+    'Erase Hard Pressure',
+    'Erase Soft'
+]
 
 rgba_letters = ['r', 'g', 'b', 'a']
 nsew_letters = ['n', 's', 'e', 'w']
@@ -1658,12 +1720,18 @@ def set_default_value(node, input_name_or_index, value):
         debug_name = node.node_tree.name if node.type == 'GROUP' and node.node_tree else node.name
         print("WARNING: Input '" + str(input_name_or_index) + "' in '" + debug_name + "' is not found!")
 
+def id_generator(size=4, chars=string.ascii_uppercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
+
 def new_node(tree, entity, prop, node_id_name, label=''):
     ''' Create new node '''
     if not hasattr(entity, prop): return
     
     # Create new node
     node = tree.nodes.new(node_id_name)
+
+    # Add random chars to make sure the node is unique
+    node.name += ' ' + id_generator()
 
     # Set node name to object attribute
     setattr(entity, prop, node.name)
@@ -2334,7 +2402,7 @@ def change_layer_name(yp, obj, src, layer, texes):
                 new_mask_name = mask.name.replace(old_layer_name, layer.name)
                 if mask.type == 'IMAGE':
                     msrc = get_mask_source(mask)
-                    if msrc.image: 
+                    if msrc.image and not msrc.image.yia.is_image_atlas and not msrc.image.yua.is_udim_atlas: 
                         msrc.image.name = '___TEMP___'
                         msrc.image.name = get_unique_name(new_mask_name, bpy.data.images) 
                 elif mask.type == 'VCOL':
@@ -3878,6 +3946,13 @@ def get_layer_channel_index(layer, ch):
             return i
     return None
 
+def get_layer_channel_type(layer, ch):
+    yp = layer.id_data.yp
+    idx = get_layer_channel_index(layer, ch)
+    if idx != None:
+        return yp.channels[idx].type
+    return None
+
 def is_bump_distance_relevant(layer, ch):
     if layer.type in {'COLOR', 'BACKGROUND'} and ch.enable_transition_bump:
         return False
@@ -5178,6 +5253,12 @@ def get_layer_type_icon(layer_type):
 
     return 'TEXTURE'
 
+def load_hemi_props(layer, source):
+    norm = source.node_tree.nodes.get('Normal')
+    if norm: norm.outputs[0].default_value = layer.hemi_vector
+    trans = source.node_tree.nodes.get('Vector Transform')
+    if trans: trans.convert_from = layer.hemi_space
+
 def save_hemi_props(layer, source):
     norm = source.node_tree.nodes.get('Normal')
     if norm: layer.hemi_vector = norm.outputs[0].default_value
@@ -6055,6 +6136,37 @@ def get_action_and_driver_fcurves(obj):
 
     return fcs
 
+def get_material_fcurves(mat):
+    tree = mat.node_tree
+
+    fcurves = []
+
+    if tree.animation_data and tree.animation_data.action:
+        for fc in tree.animation_data.action.fcurves:
+            match = re.match(r'^nodes\[".+"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
+            if match:
+                fcurves.append(fc)
+
+    return fcurves
+
+def get_material_drivers(mat):
+    tree = mat.node_tree
+
+    drivers = []
+
+    if tree.animation_data:
+        for dr in tree.animation_data.drivers:
+            match = re.match(r'^nodes\[".+"\]\.inputs\[(\d+)\]\.default_value$', dr.data_path)
+            if match:
+                drivers.append(dr)
+
+    return drivers
+
+def get_material_fcurves_and_drivers(yp):
+    fcurves = get_material_fcurves(yp)
+    fcurves.extend(get_material_drivers(yp))
+    return fcurves
+
 def get_yp_fcurves(yp):
     tree = yp.id_data
 
@@ -6062,7 +6174,8 @@ def get_yp_fcurves(yp):
 
     if tree.animation_data and tree.animation_data.action:
         for fc in tree.animation_data.action.fcurves:
-            if fc.data_path.startswith('yp.'):
+            match = re.match(r'^nodes\[".+"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
+            if fc.data_path.startswith('yp.') or match:
                 fcurves.append(fc)
 
     return fcurves
@@ -6074,7 +6187,8 @@ def get_yp_drivers(yp):
 
     if tree.animation_data:
         for dr in tree.animation_data.drivers:
-            if dr.data_path.startswith('yp.'):
+            match = re.match(r'^nodes\[".+"\]\.inputs\[(\d+)\]\.default_value$', dr.data_path)
+            if dr.data_path.startswith('yp.') or match:
                 drivers.append(dr)
 
     return drivers
@@ -6105,6 +6219,9 @@ def remap_layer_fcurves(yp, index_dict):
                     swapped_fcurves.append(fc)
 
 def swap_channel_fcurves(yp, idx0, idx1):
+    if idx0 >= len(yp.channels) or idx1 >= len(yp.channels): return
+
+    # Tree fcurves 
     fcurves = get_yp_fcurves_and_drivers(yp)
 
     for fc in fcurves:
@@ -6118,21 +6235,89 @@ def swap_channel_fcurves(yp, idx0, idx1):
             elif index == idx1:
                 fc.data_path = fc.data_path.replace('yp.channels[' + str(idx1) + ']', 'yp.channels[' + str(idx0) + ']')
 
-def swap_layer_channel_fcurves(layer, idx0, idx1):
-    yp = layer.id_data.yp
-    fcurves = get_yp_fcurves_and_drivers(yp)
+    # Material fcurves 
+    node = get_active_ypaint_node()
+    mat = get_active_material()
+    fcurves = get_material_fcurves_and_drivers(mat)
+
+    ch0 = yp.channels[idx0]
+    ch1 = yp.channels[idx1]
+
+    ch0_idx = ch0.io_index
+    ch1_idx = ch1.io_index
+
+    # NOTE: This swap does not consider the alpha channel input
+    # Since it will be replaced with dedicated channel, I think it's probably fine for now
+
+    if idx0 > idx1 and ch1.enable_alpha:
+        ch1_idx += 1
+
+    if idx0 < idx1 and ch0.enable_alpha:
+        ch0_idx += 1
 
     for fc in fcurves:
-        if layer.path_from_id() not in fc.data_path: continue
-        m = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\].*', fc.data_path)
+        m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
         if m:
-            index = int(m.group(2))
+            index = int(m.group(1))
+            if index == ch0_idx:
+                fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(ch1_idx) + '].default_value'
 
-            if index == idx0:
-                fc.data_path = fc.data_path.replace('.channels[' + str(idx0) + ']', '.channels[' + str(idx1) + ']')
+            elif index == ch1_idx:
+                fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(ch0_idx) + '].default_value'
 
-            elif index == idx1:
-                fc.data_path = fc.data_path.replace('.channels[' + str(idx1) + ']', '.channels[' + str(idx0) + ']')
+def swap_layer_channel_fcurves(layer, idx0, idx1):
+    if idx0 >= len(layer.channels) or idx1 >= len(layer.channels): return
+
+    tree = layer.id_data
+    yp = tree.yp
+    fcurves = get_yp_fcurves_and_drivers(yp)
+    layer_index = get_layer_index(layer)
+    node = tree.nodes.get(layer.group_node)
+    if not node: return
+
+    for fc in fcurves:
+
+        m1 = re.match(r'yp\.layers\[' + str(layer_index) + '\]\.channels\[(\d+)\]\.(.+)', fc.data_path)
+        m2 = re.match(r'^nodes\["' + layer.group_node + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
+
+        index = -1
+        neighbor_idx = -1
+        prop_name = ''
+
+        if m1:
+            index = int(m1.group(1))
+            prop_name = m1.group(2)
+
+        elif m2:
+
+            # Get the input
+            input_index = int(m2.group(1))
+            inp = node.inputs[input_index] if input_index <= len(node.inputs) else None
+
+            if inp:
+
+                # Get the channel index from input name
+                m = re.match(r'\.channels\[(\d+)\]\.(.+)', inp.name)
+                if m:
+                    index = int(m.group(1))
+                    prop_name = m.group(2)
+
+        if index == idx0: neighbor_idx = idx1
+        elif index == idx1: neighbor_idx = idx0
+
+        if neighbor_idx != -1 and prop_name != '':
+
+            # Get neighbor layer channel input
+            neighbor_inp = get_entity_prop_input(layer.channels[neighbor_idx], prop_name)
+
+            if neighbor_inp:
+
+                # Get node input index
+                neighbor_input_idx = get_node_input_index(node, neighbor_inp)
+                fc.data_path = 'nodes["' + layer.group_node + '"].inputs[' + str(neighbor_input_idx) + '].default_value'
+
+            else:
+                fc.data_path = 'yp.layers[' + str(layer_index) + '].channels[' + str(neighbor_idx) + '].' + prop_name
 
 def swap_mask_fcurves(layer, idx0, idx1):
     yp = layer.id_data.yp
@@ -6213,23 +6398,110 @@ def remove_entity_fcurves(entity):
         if entity.path_from_id() in dr.data_path:
             tree.animation_data.drivers.remove(dr)
 
+def get_layer_from_node_name(yp, node_name):
+    layer = None
+
+    for l in yp.layers:
+        if l.group_node == node_name:
+            layer = l
+            break
+
+    return layer
+
+def get_layer_and_channel_prop_name_from_data_path(yp, channel_index, data_path):
+    tree = yp.id_data
+
+    layer = None
+    prop_name = ''
+
+    m0 = re.match(r'^nodes\["(.+)"\]\.inputs\[(\d+)\]\.default_value$', data_path)
+    m1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[' + str(channel_index) + '\]\.(.+)', data_path)
+
+    if m0:
+        # Get layer based on node name
+        layer = get_layer_from_node_name(yp, m0.group(1))
+        input_index = int(m0.group(2))
+
+        if layer:
+            # Get the input
+            node = tree.nodes.get(layer.group_node)
+            inp = node.inputs[input_index] if input_index <= len(node.inputs) else None
+
+            if inp:
+                # Get the channel index from input name
+                m = re.match(r'\.channels\[' + str(channel_index) + '\]\.(.+)', inp.name)
+                if m: prop_name = m.group(1)
+
+    elif m1:
+        try: layer = yp.layers[int(m1.group(1))]
+        except Exception as e: print(e)
+
+        if layer:
+            prop_name = m1.group(2)
+
+    return layer, prop_name
+
 def remove_channel_fcurves(root_ch):
     tree = root_ch.id_data
     yp = tree.yp
+    index = get_channel_index(root_ch)
+
+    # Tree fcurves
     fcurves = get_yp_fcurves(yp)
     drivers = get_yp_drivers(yp)
 
-    index = get_channel_index(root_ch)
-
     for fc in reversed(fcurves):
-        m = re.match(r'.*\.channels\[(\d+)\].*', fc.data_path)
-        if m and index == int(m.group(1)):
+
+        layer, prop_name = get_layer_and_channel_prop_name_from_data_path(yp, index, fc.data_path)
+        if layer and prop_name != '':
             tree.animation_data.action.fcurves.remove(fc)
 
+        else:
+            m = re.match(r'.*\.channels\[' + str(index) + '\].*', fc.data_path)
+            if m: tree.animation_data.action.fcurves.remove(fc)
+
     for dr in reversed(drivers):
-        m = re.match(r'.*\.channels\[(\d+)\].*', dr.data_path)
-        if m and index == int(m.group(1)):
+        layer, prop_name = get_layer_and_channel_prop_name_from_data_path(yp, index, dr.data_path)
+        if layer and prop_name != '':
             tree.animation_data.drivers.remove(dr)
+        else:
+            m = re.match(r'.*\.channels\[' + str(index) + '\].*', dr.data_path)
+            if m and index == int(m.group(1)):
+                tree.animation_data.drivers.remove(dr)
+
+    # Material fcurves
+    mat = get_active_material()
+    node = get_active_ypaint_node()
+
+    fcurves = get_material_fcurves(mat)
+    drivers = get_material_drivers(mat)
+
+    # Get list of channel input indices
+    indices = [root_ch.io_index]
+    if root_ch.enable_alpha:
+        indices.append(root_ch.io_index+1)
+
+    # Delete fcurves
+    fcs = []
+    for index in indices:
+        for fc in fcurves:
+            m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(index) + '\]\.default_value$', fc.data_path)
+            if m and fc not in fcs:
+                fcs.append(fc)
+
+    for fc in reversed(fcs):
+        mat.node_tree.animation_data.action.fcurves.remove(fc)
+
+    # Delete drivers
+    drs = []
+    for index in indices:
+        for dr in drivers:
+            m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(index) + '\]\.default_value$', dr.data_path)
+            if m and dr not in drs:
+                drs.append(dr)
+
+    for dr in reversed(drs):
+        mat.node_tree.animation_data.drivers.remove(dr)
 
 def shift_modifier_fcurves_down(parent):
     yp = parent.id_data.yp
@@ -6279,15 +6551,70 @@ def shift_normal_modifier_fcurves_up(parent, start_index=1):
             if m and int(m.group(1)) == i:
                 fc.data_path = fc.data_path.replace('.modifiers_1[' + str(i) + ']', '.modifiers_1[' + str(i-1) + ']')
 
-def shift_channel_fcurves_up(yp, start_index=1):
-    fcurves = get_yp_fcurves_and_drivers(yp)
+def shift_channel_fcurves(yp, start_index=1, direction='UP', remove_ch_mode=True):
+    tree = yp.id_data
 
-    for i, root_ch in enumerate(yp.channels):
-        if i < start_index: continue
-        for fc in fcurves:
-            m = re.match(r'.*\.channels\[(\d+)\].*', fc.data_path)
-            if m and int(m.group(1)) == i:
-                fc.data_path = fc.data_path.replace('.channels[' + str(i) + ']', '.channels[' + str(i-1) + ']')
+    shifter = -1 if direction == 'UP' else 1
+
+    # Tree fcurves
+    if remove_ch_mode:
+        fcurves = get_yp_fcurves_and_drivers(yp)
+
+        for i, root_ch in enumerate(yp.channels):
+            if i <= start_index: continue
+
+            for fc in fcurves:
+
+                layer, prop_name = get_layer_and_channel_prop_name_from_data_path(yp, i, fc.data_path)
+                if layer and prop_name != '':
+
+                    try: shifted_entity = layer.channels[i+shifter]
+                    except Exception as e:
+                        print(e)
+                        continue
+
+                    shifted_inp = get_entity_prop_input(shifted_entity, prop_name)
+                    if shifted_inp:
+
+                        # Get node input index
+                        node = tree.nodes.get(layer.group_node)
+                        shifted_input_idx = get_node_input_index(node, shifted_inp)
+                        fc.data_path = 'nodes["' + layer.group_node + '"].inputs[' + str(shifted_input_idx) + '].default_value'
+
+                    else:
+                        fc.data_path = 'yp.layers[' + str(get_layer_index(layer)) + '].channels[' + str(i+shifter) + '].' + prop_name
+
+                else:
+
+                    m = re.match(r'.*\.channels\[' + str(i) + '\].*', fc.data_path)
+                    if m:
+                        fc.data_path = fc.data_path.replace('.channels[' + str(i) + ']', '.channels[' + str(i+shifter) + ']')
+
+    # Material fcurves
+    node = get_active_ypaint_node()
+    mat = get_active_material()
+    fcurves = get_material_fcurves_and_drivers(mat)
+
+    if remove_ch_mode and start_index < len(yp.channels) and yp.channels[start_index].enable_alpha and shifter < 0:
+        shifter -= 1
+
+    if shifter > 0:
+
+        for i, root_ch in reversed(list(enumerate(yp.channels))):
+            if i <= start_index: continue
+            io_index = root_ch.io_index
+            for fc in fcurves:
+                m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(io_index) + '\]\.default_value$', fc.data_path)
+                if m: fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(io_index+shifter) + '].default_value'
+    else:
+
+        for i, root_ch in enumerate(yp.channels):
+            if i <= start_index: continue
+            io_index = root_ch.io_index
+            for fc in fcurves:
+                m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(io_index) + '\]\.default_value$', fc.data_path)
+                if m: fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(io_index+shifter) + '].default_value'
+
 
 def shift_mask_fcurves_up(layer, start_index=1):
     tree = layer.id_data
@@ -6733,6 +7060,18 @@ def get_mesh_hash(obj):
     vertices_np = numpy.empty(vertex_count * 3, dtype=numpy.float32)
     obj.data.vertices.foreach_get("co", vertices_np)
     h = hash(vertices_np.tobytes())
+    return str(h)
+
+def get_uv_hash(obj, uv_name):
+    if obj.type != 'MESH': return ''
+    uv_layers = get_uv_layers(obj)
+    uv = uv_layers.get(uv_name)
+
+    loop_count = len(obj.data.loops)
+    uv_np = numpy.empty(loop_count * 2, dtype=numpy.float32)
+    uv.data.foreach_get('uv', uv_np)
+
+    h = hash(uv_np.tobytes())
     return str(h)
 
 def remove_decal_object(tree, entity):
