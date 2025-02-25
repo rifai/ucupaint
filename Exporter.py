@@ -17,7 +17,7 @@ class YExporter(Operator):
 	filetype = ".ucon"
 	filetype_packed = ".ucu"
 	filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
-	export_gltf: BoolProperty(name="Export GLTF", default=False)
+	export_gltf: BoolProperty(name="Export Mesh", default=False)
 	pack_file: BoolProperty(name="Pack File", default=False)
 
 	blender_to_godot = mathutils.Matrix((
@@ -390,8 +390,14 @@ class YExporter(Operator):
 		if self.export_gltf:
 			name_asset = bpy.path.display_name_from_filepath(self.filepath)
 
-			bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
-									export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
+			# bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
+			# 						export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
+			obj = bpy.context.active_object
+			original_pos = obj.location.copy()
+			obj.location = (0, 0, 0)
+
+			bpy.ops.wm.obj_export(filepath=os.path.join(my_directory, name_asset + ".obj"), apply_modifiers=True, export_selected_objects=True, export_materials=False,export_animation=False,export_colors=True)
+			obj.location = original_pos
 		# copying all textures
 		for file in copying_files:
 			print("copying file ", file, " to ", my_directory)
