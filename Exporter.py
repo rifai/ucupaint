@@ -29,6 +29,8 @@ class YSceneExporter(Operator):
 		return {'RUNNING_MODAL'}
 		
 	def execute(self, context):
+		bpy.ops.object.select_all(action='DESELECT')
+
 		print("file path ", self.filepath)
 		my_directory = os.path.dirname(self.filepath)
 
@@ -41,7 +43,7 @@ class YSceneExporter(Operator):
 
 				print("node ", obj.name, "=", file_path)
 				# export per object
-				generate_ucupaint_data(node, file_path, False)
+				generate_ucupaint_data(obj, node, file_path, False)
 
 
 		return {'FINISHED'}
@@ -87,7 +89,7 @@ def fix_filename(filename:str):
 
 	return retval
 
-def generate_ucupaint_data(node, file_path, pack_file):
+def generate_ucupaint_data(obj, node, file_path, pack_file):
 	print("====================================")
 	yp = node.node_tree.yp
 	inputs = node.inputs
@@ -396,12 +398,15 @@ def generate_ucupaint_data(node, file_path, pack_file):
 
 	# bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
 	# 						export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
-	obj = bpy.context.active_object
 	original_pos = obj.location.copy()
 	obj.location = (0, 0, 0)
 
+	obj.select_set(True)
+	bpy.context.view_layer.objects.active = obj	
+
 	bpy.ops.wm.obj_export(filepath=os.path.join(my_directory, name_asset + ".obj"), apply_modifiers=True, export_selected_objects=True, export_materials=False,export_animation=False,export_colors=True)
 	obj.location = original_pos
+	obj.select_set(False)
 
 	# copying all textures
 	for file in copying_files:
