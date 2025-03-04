@@ -417,13 +417,21 @@ def generate_ucupaint_data(obj, node, file_path, pack_file):
 	# bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
 	# 						export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
 	original_pos = obj.location.copy()
+	original_scale = obj.scale.copy()
+	org_rot = obj.rotation_euler.copy()
+
 	obj.location = (0, 0, 0)
+	obj.scale = (1, 1, 1)
+	obj.rotation_euler = (0, 0, 0)
 
 	obj.select_set(True)
 	bpy.context.view_layer.objects.active = obj	
 
 	bpy.ops.wm.obj_export(filepath=os.path.join(my_directory, name_asset + ".obj"), apply_modifiers=True, export_selected_objects=True, export_materials=False,export_animation=False,export_colors=True)
 	obj.location = original_pos
+	obj.scale = original_scale
+	obj.rotation_euler = org_rot
+
 	obj.select_set(False)
 
 	# copying all textures
