@@ -16,6 +16,7 @@ blender_to_godot = mathutils.Matrix((
 version = (0, 1, 0)
 
 filetype = ".ucon"
+filetype_scene = ".ucsc"
 filetype_packed = ".ucu"
 
 class YSceneExporter(Operator):
@@ -31,23 +32,41 @@ class YSceneExporter(Operator):
 	def execute(self, context):
 		bpy.ops.object.select_all(action='DESELECT')
 
-		print("file path ", self.filepath)
-		my_directory = os.path.dirname(self.filepath)
+		scene_path = fix_filename(self.filepath, filetype_scene)
+		print("file path ", scene_path)
+
+		my_directory = os.path.dirname(scene_path)
+
+		data = {
+			"version": version,
+			"objects": [],
+		}
 
 		# print all objects in the scene
 		for obj in bpy.context.scene.objects:
 			node = get_active_ypaint_node(obj)
 			if node != None:
 				file_path = os.path.join(my_directory, obj.name, obj.name + filetype)
-				# file_path = fix_filename(file_path)
-
 				print("node ", obj.name, "=", file_path)
+				print("localtion ", obj.location)
+				rotasi = obj.rotation_euler
+				# convert to angle 
+				rotasi = [math.degrees(rotasi.x), math.degrees(rotasi.y), math.degrees(rotasi.z)]
 				# export per object
 				generate_ucupaint_data(obj, node, file_path, False)
 
+				new_obj = {
+					"name": obj.name,
+					"location": obj.location[:],
+					"rotation": rotasi[:],
+					"scale": obj.scale[:],
+				}
+				data["objects"].append(new_obj)
+
+		with open(scene_path, 'w') as json_file:
+			json.dump(data, json_file, indent=4)
 
 		return {'FINISHED'}
-	
 
 class YExporter(Operator):
 
@@ -60,10 +79,9 @@ class YExporter(Operator):
 	
 	def execute(self, context):
 		node = get_active_ypaint_node()
-		file_path = fix_filename(self.filepath)
-		pack_file = self.pack_file
-
-		generate_ucupaint_data(node, file_path, pack_file)
+		file_path = fix_filename(self.filepath, filetype)
+		obj = bpy.context.active_object
+		generate_ucupaint_data(obj, node, file_path, self.pack_file)
 
 		return {'FINISHED'}
 
@@ -76,14 +94,14 @@ class YExporter(Operator):
 		col.prop(self, "pack_file")
 
 
-def fix_filename(filename:str):
+def fix_filename(filename:str, target_ext:str):
 	base, ext = os.path.splitext(filename)
 	retval = filename
 
-	if ext != filetype:
-		retval = base + filetype
+	if ext != target_ext:
+		retval = base + target_ext
 	else:
-		print(f"File extension is already {filetype}")
+		print(f"File extension is already {target_ext}")
 
 	print(f"File extension changed to: {retval}")
 
