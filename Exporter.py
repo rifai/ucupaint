@@ -94,6 +94,19 @@ class YExporter(Operator):
 		col.prop(self, "pack_file")
 
 
+class YPExportMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_ypaint_export_menu"
+    bl_label = get_addon_title() + " Export Menu"
+    bl_description = get_addon_title() + " export menu"
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def draw(self, context):
+        obj = context.object
+        op = self.layout.operator("node.y_scene_export", text="Export to Godot", icon='EXPORT')
+
 def fix_filename(filename:str, target_ext:str):
 	base, ext = os.path.splitext(filename)
 	retval = filename
@@ -585,15 +598,24 @@ def resize_decal_texture(directory_path, image, padding = 1) -> str:
 
 	return filepath_new
 
-classes = [YExporter, YSceneExporter]
+def draw_yp_export(self, context):
+	layout = self.layout
+	layout.separator()
+	self.layout.menu("NODE_MT_ypaint_export_menu", text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
+
+classes = [YExporter, YSceneExporter, YPExportMenu]
 
 def register():
 	for cl in classes:
 		bpy.utils.register_class(cl)
 
+	bpy.types.OUTLINER_MT_collection.append(draw_yp_export)
+
 def unregister():
 	for cl in classes:
 		bpy.utils.unregister_class(cl)
+
+	bpy.types.OUTLINER_MT_collection.remove(draw_yp_export)
 
 if __name__ == "__main__":
 	register()
