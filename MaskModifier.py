@@ -10,6 +10,12 @@ mask_modifier_type_items = (
     ('CURVE', 'Curve', '', 'MODIFIER', 2),
 )
 
+mask_modifier_type_labels = {
+    'INVERT' : 'Invert',
+    'RAMP' : 'Ramp',
+    'CURVE' : 'Curve',
+}
+
 can_be_expanded = {
     'RAMP',
     'CURVE',
@@ -120,7 +126,7 @@ def draw_modifier_properties(tree, m, layout):
         curve.draw_buttons_ext(bpy.context, layout)
 
 class YNewMaskModifier(bpy.types.Operator):
-    bl_idname = "node.y_new_mask_modifier"
+    bl_idname = "wm.y_new_mask_modifier"
     bl_label = "New Mask Modifier"
     bl_description = "New Mask Modifier"
     bl_options = {'REGISTER', 'UNDO'}
@@ -153,7 +159,7 @@ class YNewMaskModifier(bpy.types.Operator):
         return {'FINISHED'}
 
 class YMoveMaskModifier(bpy.types.Operator):
-    bl_idname = "node.y_move_mask_modifier"
+    bl_idname = "wm.y_move_mask_modifier"
     bl_label = "Move Mask Modifier"
     bl_description = "Move Mask Modifier"
     bl_options = {'REGISTER', 'UNDO'}
@@ -208,7 +214,7 @@ class YMoveMaskModifier(bpy.types.Operator):
         return {'FINISHED'}
 
 class YRemoveMaskModifier(bpy.types.Operator):
-    bl_idname = "node.y_remove_mask_modifier"
+    bl_idname = "wm.y_remove_mask_modifier"
     bl_label = "Remove Mask Modifier"
     bl_description = "Remove Mask Modifier"
     bl_options = {'REGISTER', 'UNDO'}

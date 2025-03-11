@@ -213,7 +213,7 @@ class YListItem(bpy.types.PropertyGroup):
     )
 
 class YRefreshListItems(bpy.types.Operator):
-    bl_idname = "node.y_refresh_list_items"
+    bl_idname = "wm.y_refresh_list_items"
     bl_label = "Refresh List Items"
     bl_description = "Refresh List Items"
     bl_options = {'REGISTER', 'UNDO'}
@@ -274,7 +274,7 @@ def update_list_item_index(self, context):
                     ch.active_edit = True
                 else: ch.active_edit_1 = True
 
-    if layer_index != -1 and layer_index < len(yp.layers) and yp.active_layer_index != layer_index:
+    if layer_index != -1 and layer_index < len(yp.layers): # and yp.active_layer_index != layer_index:
         yp.active_layer_index = layer_index
 
 def get_active_item_entity(yp):

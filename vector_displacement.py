@@ -41,6 +41,7 @@ def _remember_before_bake(obj):
     book['ori_use_bake_clear'] = scene.render.use_bake_clear
     book['ori_render_bake_type'] = scene.render.bake_type
     book['ori_bake_margin'] = scene.render.bake_margin
+    book['ori_view_transform'] = scene.view_settings.view_transform
 
     # Remember world settings
     book['ori_distance'] = scene.world.light_settings.distance
@@ -80,6 +81,7 @@ def _prepare_bake_settings(book, obj, uv_map='', samples=1, margin=15, bake_devi
     scene.cycles.use_denoising = False
     scene.cycles.bake_type = 'EMIT'
     scene.cycles.device = bake_device
+    scene.view_settings.view_transform = 'Standard' if is_bl_newer_than(2, 80) else 'Default'
     bpy.context.view_layer.material_override = None
 
     # Show viewport and render of object layer collection
@@ -129,6 +131,7 @@ def _recover_bake_settings(book, recover_active_uv=False):
     scene.render.bake.max_ray_distance = book['ori_max_ray_distance']
     scene.render.bake.cage_extrusion = book['ori_cage_extrusion']
     scene.render.bake.use_cage = book['ori_use_cage']
+    scene.view_settings.view_transform = book['ori_view_transform']
     bpy.context.view_layer.material_override = book['ori_material_override']
 
     # Multires related
@@ -491,11 +494,28 @@ def get_tangent_bitangent_images(obj, uv_name):
     bitimage = bpy.data.images.get(bitimage_name)
 
     # Check mesh hash
+    hash_invalid = False
     mh = get_mesh_hash(obj)
     if obj.yp.mesh_hash != mh:
         obj.yp.mesh_hash = mh
+        hash_invalid = True
+        #print('Hash invalid because of vertices')
 
-        # Remove current images if hash doesn't match
+    # Check uv hash
+    hash_str = get_uv_hash(obj, uv_name)
+    uvh = obj.yp.uv_hashes.get(uv_name)
+    if not uvh or uvh.uv_hash != hash_str:
+
+        if not uvh:
+            uvh = obj.yp.uv_hashes.add()
+            uvh.name = uv_name
+        uvh.uv_hash = hash_str
+
+        hash_invalid = True
+        #print('Hash invalid because of UV')
+
+    # Remove current images if hash doesn't match
+    if hash_invalid:
         if tanimage: bpy.data.images.remove(tanimage)
         if bitimage: bpy.data.images.remove(bitimage)
 

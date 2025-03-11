@@ -164,18 +164,29 @@ def draw_bake_info(bake_info, layout, entity):
     yp = entity.id_data.yp
     bi = bake_info
 
-    if len(bi.other_objects) > 0:
+    if bi.bake_type.startswith('OTHER_OBJECT_'):
+
+        if is_bl_newer_than(2, 79):
+            num_oos = len([oo for oo in bi.other_objects if oo.object])
+        else: num_oos = len(bi.other_objects)
+
         layout.label(text='List of Objects:')
         box = layout.box()
         bcol = box.column()
-        for oo in bi.other_objects:
+
+        if num_oos > 0:
+            for oo in bi.other_objects:
+                if is_bl_newer_than(2,79) and not oo.object: continue
+                brow = bcol.row()
+                brow.context_pointer_set('other_object', oo)
+                brow.context_pointer_set('bake_info', bi)
+                if is_bl_newer_than(2, 79):
+                    brow.label(text=oo.object.name, icon_value=lib.get_icon('object_index'))
+                else: brow.label(text=oo.object_name, icon_value=lib.get_icon('object_index'))
+                brow.operator('wm.y_remove_bake_info_other_object', text='', icon_value=lib.get_icon('close'))
+        else:
             brow = bcol.row()
-            brow.context_pointer_set('other_object', oo)
-            brow.context_pointer_set('bake_info', bi)
-            if is_bl_newer_than(2, 79):
-                brow.label(text=oo.object.name, icon_value=lib.get_icon('object_index'))
-            else: brow.label(text=oo.object_name, icon_value=lib.get_icon('object_index'))
-            brow.operator('node.y_remove_bake_info_other_object', text='', icon_value=lib.get_icon('close'))
+            brow.label(text='No source objects found!', icon='ERROR')
 
     m1 = re.match(r'^yp\.layers\[(\d+)\]$', entity.path_from_id())
     m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', entity.path_from_id())
@@ -188,8 +199,8 @@ def draw_bake_info(bake_info, layout, entity):
 
     layout.context_pointer_set('bake_info', bi)
     if bi.bake_type == 'SELECTED_VERTICES':
-        c = layout.operator("node.y_try_to_select_baked_vertex", text='Try to Reselect Vertices', icon='GROUP_VERTEX')
-    c = layout.operator("node.y_bake_to_layer", text='Rebake ' + bake_type_labels[bi.bake_type], icon_value=lib.get_icon('bake'))
+        c = layout.operator("wm.y_try_to_select_baked_vertex", text='Try to Reselect Vertices', icon='GROUP_VERTEX')
+    c = layout.operator("wm.y_bake_to_layer", text='Rebake ' + bake_type_labels[bi.bake_type], icon_value=lib.get_icon('bake'))
     c.type = bi.bake_type
     if m1 or m3: c.target_type = 'LAYER'
     else: c.target_type = 'MASK'
@@ -206,7 +217,7 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False, sh
         split.label(text='Input:')
         split.prop(entity, 'source_input', text='')
 
-    unlink_op = 'node.y_remove_layer'
+    unlink_op = 'wm.y_remove_layer'
     if entity:
         yp = entity.id_data.yp
         m1 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', entity.path_from_id())
@@ -215,14 +226,14 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False, sh
             layer = yp.layers[int(m1.group(1))]
             col.context_pointer_set('layer', layer)
             col.context_pointer_set('mask', entity)
-            unlink_op = 'node.y_remove_layer_mask'
+            unlink_op = 'wm.y_remove_layer_mask'
         elif m2: 
             layer = yp.layers[int(m2.group(1))]
             col.context_pointer_set('layer', layer)
             col.context_pointer_set('channel', entity)
             if show_flip_y:
-                unlink_op = 'node.y_remove_channel_override_1_source'
-            else: unlink_op = 'node.y_remove_channel_override_source'
+                unlink_op = 'wm.y_remove_channel_override_1_source'
+            else: unlink_op = 'wm.y_remove_channel_override_source'
 
     if image.y_bake_info.is_baked and not image.y_bake_info.is_baked_channel:
         bi = image.y_bake_info
@@ -344,7 +355,9 @@ def draw_image_props(context, source, layout, entity=None, show_flip_y=False, sh
 
 def draw_object_index_props(entity, layout):
     col = layout.column()
-    col.prop(entity, 'object_index')
+    row = split_layout(col, 0.6)
+    row.label(text='Object Index:')
+    row.prop(entity, 'object_index', text='')
 
 def draw_hemi_props(entity, source, layout):
     col = layout.column()
@@ -671,7 +684,7 @@ def draw_mask_modifier_stack(layer, mask, layout, ui):
             rrow.label(text='', icon_value=lib.get_icon('modifier'))
             rrow.label(text=m.name)
 
-        rrow = row.row(align=True) # To make sure the next row align right
+        if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
 
         row.context_pointer_set('layer', layer)
         row.context_pointer_set('mask', mask)
@@ -745,7 +758,7 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
             rrow.label(text='', icon_value=lib.get_icon('modifier'))
             rrow.label(text=label)
 
-        rrow = row.row(align=True) # To make sure the next row align right
+        if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
         
         if not modui.expand_content:
 
@@ -817,7 +830,6 @@ def draw_bake_target_channel(context, layout, bt, letter='r'):
         #    icon_name = 'uncollapsed_' + icon_name
         #else: icon_name = 'collapsed_' + icon_name
         icon_value = lib.get_icon(icon_name)
-        #icon = 'DOWNARROW_HLT' if getattr(btui, 'expand_' + letter) else 'RIGHTARROW'
         icon = get_collapse_arrow_icon(getattr(btui, 'expand_' + letter))
         row.prop(btui, 'expand_' + letter, text='', emboss=False, icon=icon)
         if is_bl_newer_than(2, 80):
@@ -878,11 +890,11 @@ def draw_bake_targets_ui(context, layout, node):
     #rcol.context_pointer_set('node', node)
 
     if is_bl_newer_than(2, 80):
-        rcol.operator("node.y_new_bake_target", icon='ADD', text='')
-        rcol.operator("node.y_remove_bake_target", icon='REMOVE', text='')
+        rcol.operator("wm.y_new_bake_target", icon='ADD', text='')
+        rcol.operator("wm.y_remove_bake_target", icon='REMOVE', text='')
     else: 
-        rcol.operator("node.y_new_bake_target", icon='ZOOMIN', text='')
-        rcol.operator("node.y_remove_bake_target", icon='ZOOMOUT', text='')
+        rcol.operator("wm.y_new_bake_target", icon='ZOOMIN', text='')
+        rcol.operator("wm.y_remove_bake_target", icon='ZOOMOUT', text='')
 
     if len(yp.bake_targets) > 0:
         bt = yp.bake_targets[yp.active_bake_target_index]
@@ -897,7 +909,6 @@ def draw_bake_targets_ui(context, layout, node):
 
         row = col.row(align=True)
 
-        #icon = 'DOWNARROW_HLT' if btui.expand_content else 'RIGHTARROW'
         icon = get_collapse_arrow_icon(btui.expand_content)
 
         if is_bl_newer_than(2, 80):
@@ -972,15 +983,15 @@ def draw_root_channels_ui(context, layout, node):
 
     if is_bl_newer_than(2, 80):
         rcol.menu("NODE_MT_y_new_channel_menu", text='', icon='ADD')
-        #rcol.operator_menu_enum("node.y_add_new_ypaint_channel", 'type', icon='ADD', text='')
-        rcol.operator("node.y_remove_ypaint_channel", icon='REMOVE', text='')
+        #rcol.operator_menu_enum("wm.y_add_new_ypaint_channel", 'type', icon='ADD', text='')
+        rcol.operator("wm.y_remove_ypaint_channel", icon='REMOVE', text='')
     else: 
         rcol.menu("NODE_MT_y_new_channel_menu", text='', icon='ZOOMIN')
-        #rcol.operator_menu_enum("node.y_add_new_ypaint_channel", 'type', icon='ZOOMIN', text='')
-        rcol.operator("node.y_remove_ypaint_channel", icon='ZOOMOUT', text='')
+        #rcol.operator_menu_enum("wm.y_add_new_ypaint_channel", 'type', icon='ZOOMIN', text='')
+        rcol.operator("wm.y_remove_ypaint_channel", icon='ZOOMOUT', text='')
 
-    rcol.operator("node.y_move_ypaint_channel", text='', icon='TRIA_UP').direction = 'UP'
-    rcol.operator("node.y_move_ypaint_channel", text='', icon='TRIA_DOWN').direction = 'DOWN'
+    rcol.operator("wm.y_move_ypaint_channel", text='', icon='TRIA_UP').direction = 'UP'
+    rcol.operator("wm.y_move_ypaint_channel", text='', icon='TRIA_DOWN').direction = 'DOWN'
 
     if len(yp.channels) > 0:
 
@@ -1004,22 +1015,22 @@ def draw_root_channels_ui(context, layout, node):
                 if is_height_input_unconnected_but_has_start_process(node, root_normal_ch):
                     row = mcol.row(align=True)
                     row.alert = True
-                    row.operator('node.y_optimize_normal_process', icon='ERROR', text='Fix Height Process')
+                    row.operator('wm.y_optimize_normal_process', icon='ERROR', text='Fix Height Process')
                 elif is_height_input_connected_but_has_no_start_process(node, root_normal_ch):
                     row = mcol.row(align=True)
                     row.alert = True
-                    row.operator('node.y_optimize_normal_process', icon='ERROR', text='Fix Height Input')
+                    row.operator('wm.y_optimize_normal_process', icon='ERROR', text='Fix Height Input')
 
             if is_output_unconnected(node, output_index, channel):
                 row = mcol.row(align=True)
                 row.alert = True
-                row.operator('node.y_connect_ypaint_channel', icon='ERROR', text='Fix Unconnected Channel Output')
+                row.operator('wm.y_connect_ypaint_channel', icon='ERROR', text='Fix Unconnected Channel Output')
 
             # Fix for alpha channel missing connection
             elif channel.type == 'RGB' and channel.enable_alpha and is_output_unconnected(node, output_index + 1, channel):
                 row = mcol.row(align=True)
                 row.alert = True
-                row.operator('node.y_connect_ypaint_channel_alpha', icon='ERROR', text='Fix Unconnected Alpha Output')
+                row.operator('wm.y_connect_ypaint_channel_alpha', icon='ERROR', text='Fix Unconnected Alpha Output')
 
         row = mcol.row(align=True)
 
@@ -1033,7 +1044,6 @@ def draw_root_channels_ui(context, layout, node):
         icon_value = lib.get_icon(icon_name)
         text=channel.name + ' ' + pgettext_iface('Channel')
 
-        #icon = 'DOWNARROW_HLT' if chui.expand_content else 'RIGHTARROW'
         icon = get_collapse_arrow_icon(chui.expand_content)
         rrow.prop(chui, 'expand_content', text='', emboss=False, icon=icon)
 
@@ -1099,16 +1109,20 @@ def draw_root_channels_ui(context, layout, node):
                     inp_alpha = node.inputs[channel.io_index+1]
                     inbox_dropdown_button(rrow, chui, 'expand_alpha_settings', 'Base Alpha:')
 
-                    rrow = brow.row(align=True)
+                    if is_bl_newer_than(2, 80):
+                        rrow = brow.row(align=True) # To make sure next row is aligned right
+                        rrow.alignment = 'RIGHT'
+
                     if len(node.inputs[channel.io_index+1].links)==0:
                         if not yp.use_baked:
-                            rrow.prop(inp_alpha, 'default_value', text='')
-                    else: rrow.label(text='', icon='LINKED')
+                            brow.prop(inp_alpha, 'default_value', text='')
+                    else: brow.label(text='', icon='LINKED')
                 else: 
                     inbox_dropdown_button(rrow, chui, 'expand_alpha_settings', 'Alpha:')
-                    rrow = brow.row(align=True)
 
-                rrow.alignment = 'RIGHT'
+                    if is_bl_newer_than(2, 80):
+                        rrow = brow.row(align=True) # To make sure next row is aligned right
+                        rrow.alignment = 'RIGHT'
 
                 if not yp.use_baked:
                     brow.prop(channel, 'enable_alpha', text='')
@@ -1175,7 +1189,7 @@ def draw_root_channels_ui(context, layout, node):
             #    brow.label(text='', icon='BLANK1')
 
             if channel.type == 'NORMAL':
-                if ypup.show_experimental or channel.enable_smooth_bump or not is_bl_newer_than(2, 80):
+                if ypup.show_experimental or channel.enable_smooth_bump: # or not is_bl_newer_than(2, 80):
                     brow = bcol.row(align=True)
 
                     if is_bl_newer_than(2, 80):
@@ -1185,8 +1199,10 @@ def draw_root_channels_ui(context, layout, node):
                     rrow = brow.row(align=True)
                     inbox_dropdown_button(rrow, chui, 'expand_smooth_bump_settings', label_text)
 
-                    rrow = brow.row(align=True)
-                    rrow.alignment = 'RIGHT'
+                    if is_bl_newer_than(2, 80):
+                        rrow = brow.row(align=True) # To make sure next row is aligned right
+                        rrow.alignment = 'RIGHT'
+
                     if not yp.use_baked:
                         brow.prop(channel, 'enable_smooth_bump', text='')
                     else: brow.label(text='', icon_value=lib.get_icon('texture'))
@@ -1250,8 +1266,10 @@ def draw_root_channels_ui(context, layout, node):
                     rrow = brow.row(align=True)
                     inbox_dropdown_button(rrow, chui, 'expand_parallax_settings', 'Parallax:')
 
-                    rrow = brow.row(align=True)
-                    rrow.alignment = 'RIGHT'
+                    if is_bl_newer_than(2, 80):
+                        rrow = brow.row(align=True) # To make sure next row is aligned right
+                        rrow.alignment = 'RIGHT'
+
                     if not chui.expand_parallax_settings and channel.enable_parallax:
                         rrow.prop(channel, 'baked_parallax_num_of_layers', text='')
                         brow.separator()
@@ -1287,10 +1305,12 @@ def draw_root_channels_ui(context, layout, node):
                 brow = bcol.row(align=True)
 
                 rrow = brow.row(align=True)
-                inbox_dropdown_button(rrow, chui, 'expand_subdiv_settings', 'Displacement Setup', scale_override=0.925)
+                inbox_dropdown_button(rrow, chui, 'expand_subdiv_settings', 'Displacement Setup:', scale_override=0.925)
 
-                rrow = brow.row(align=True)
-                rrow.alignment = 'RIGHT'
+                if is_bl_newer_than(2, 80):
+                    rrow = brow.row(align=True) # To make sure next row is aligned right
+                    rrow.alignment = 'RIGHT'
+
                 brow.prop(channel, 'enable_subdiv_setup', text='')
 
                 if chui.expand_subdiv_settings:
@@ -1353,8 +1373,8 @@ def draw_root_channels_ui(context, layout, node):
 
                     vcols = get_vertex_colors(context.object)
                     if yp.use_baked and channel.bake_to_vcol_name in vcols:
-                        label_text = 'Use Baked Vertex Color'
-                    else: label_text = 'Bake To Vertex Color'
+                        label_text = 'Use Baked Vertex Color:'
+                    else: label_text = 'Bake To Vertex Color:'
 
                     rrow = brow.row(align=True)
                     inbox_dropdown_button(rrow, chui, 'expand_bake_to_vcol_settings', label_text, scale_override=0.95)
@@ -1438,7 +1458,6 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
         icon_value = lib.get_icon('texture')
         label += layer.name
 
-    #icon = 'DOWNARROW_HLT' if lui.expand_content else 'RIGHTARROW'
     icon = get_collapse_arrow_icon(lui.expand_content)
     rrow.prop(lui, 'expand_content', text='', emboss=False, icon=icon)
     if is_bl_newer_than(2, 80):
@@ -1451,7 +1470,7 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
 
     if layer.use_temp_bake:
         row = row.row(align=True)
-        row.operator('node.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
+        row.operator('wm.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
 
     if layer.type not in {'GROUP', 'PREFERENCES'}:
         #icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
@@ -1533,26 +1552,39 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
         #bbox = row.box()
         rrcol = row.column()
 
+        ccol = rrcol.column()
+        ccol.active = not layer.use_baked
+
         if layer.use_temp_bake:
-            rrcol.context_pointer_set('parent', layer)
-            rrcol.operator('node.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
+            ccol.context_pointer_set('parent', layer)
+            ccol.operator('wm.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
         elif image:
-            draw_image_props(context, source, rrcol, layer, show_flip_y=True, show_datablock=False)
+            draw_image_props(context, source, ccol, layer, show_flip_y=True, show_datablock=False)
 
             # NOTE: Divide rgb by alpha is mostly useless for image layer, 
             # so it's hidden under experimental feature unless the user ever enabled it before
             if hasattr(layer, 'divide_rgb_by_alpha') and (layer.divide_rgb_by_alpha or ypup.show_experimental):
-                rrrow = rrcol.row(align=True)
+                rrrow = ccol.row(align=True)
                 rrrow.label(text='Divide RGB by Alpha:')
                 rrrow.prop(layer, 'divide_rgb_by_alpha', text='')
 
         elif layer.type == 'COLOR':
-            draw_solid_color_props(layer, source, rrcol)
+            draw_solid_color_props(layer, source, ccol)
         elif layer.type == 'VCOL':
-            draw_vcol_props(rrcol, vcol, layer)
+            draw_vcol_props(ccol, vcol, layer)
         elif layer.type == 'HEMI':
-            draw_hemi_props(layer, source, rrcol)
-        else: draw_tex_props(source, rrcol, entity=layer)
+            draw_hemi_props(layer, source, ccol)
+        else: draw_tex_props(source, ccol, entity=layer)
+
+        if layer.baked_source != '':
+            rrcol.context_pointer_set('entity', layer)
+            rrcol.context_pointer_set('layer', layer)
+            rrrow = rrcol.row(align=True)
+            rrrow.operator("wm.y_bake_entity_to_image", text='Rebake', icon_value=lib.get_icon('bake'))
+            rrrow.prop(layer, 'use_baked', text='Use Baked', toggle=True)
+
+            icon = 'TRASH' if is_bl_newer_than(2, 80) else 'X'
+            rrrow.operator("wm.y_remove_baked_entity", text='', icon=icon)
 
     layout.separator()
 
@@ -1565,8 +1597,12 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
     scene = context.scene
 
     # Vector
-    if is_layer_using_vector(layer):
-        row = layout.row(align=False)
+    if is_layer_using_vector(layer, exclude_baked=True):
+
+        col = layout.column()
+        col.active = not layer.use_baked
+
+        row = col.row(align=False)
 
         icon_value = lib.get_icon('uv')
         rrow = row.row(align=True)
@@ -1609,94 +1645,109 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
         #    rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
 
         if lui.expand_vector:
-            row = layout.row(align=True)
+            row = col.row(align=True)
             row.label(text='', icon='BLANK1')
             bbox = row.box()
             boxcol = bbox.column()
-            if image and (image.yia.is_image_atlas or image.yua.is_udim_atlas):
-                #boxcol.label(text="Transform vector with image atlas is not possible!")
-                pass
-            else:
-                rrow = boxcol.row()
-                rrow.label(text='Coordinate:')
-                rrow.prop(layer, 'texcoord_type', text='')
 
-                if layer.texcoord_type == 'UV':
+            rrow = boxcol.row(align=True)
+            rrow.label(text='', icon='BLANK1')
+            rrow.label(text='Coordinate:')
+            rrow.prop(layer, 'texcoord_type', text='')
+
+            is_using_image_atlas = image and (image.yia.is_image_atlas or image.yua.is_udim_atlas)
+
+            if layer.texcoord_type == 'UV':
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow.label(text='UV Map:')
+                rrrow = rrow.row(align=True)
+                rrrow.scale_x = 1.2
+                rrrow.prop_search(layer, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+
+                icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
+                rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
+
+            if layer.type == 'IMAGE' and layer.texcoord_type in {'Generated', 'Object'}:
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                splits = split_layout(rrow, 0.5, align=True)
+                splits.label(text='Projection Blend:')
+                splits.prop(layer, 'projection_blend', text='')
+
+            if layer.texcoord_type == 'Decal':
+
+                if texcoord:
                     rrow = boxcol.row(align=True)
-                    rrow.label(text='UV Map:')
-                    rrrow = rrow.row(align=True)
-                    rrrow.scale_x = 1.2
-                    rrrow.prop_search(layer, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                    rrow.label(text='', icon='BLANK1')
+                    splits = split_layout(rrow, 0.45, align=True)
+                    splits.label(text='Decal Object:')
+                    splits.prop(texcoord, 'object', text='')
 
-                    icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
-                    rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                splits = split_layout(rrow, 0.5, align=True)
+                splits.label(text='Decal Distance:')
+                draw_input_prop(splits, layer, 'decal_distance_value')
 
-                if layer.type == 'IMAGE' and layer.texcoord_type in {'Generated', 'Object'}:
-                    splits = split_layout(boxcol, 0.5, align=True)
-                    splits.label(text='Projection Blend:')
-                    splits.prop(layer, 'projection_blend', text='')
+                boxcol.context_pointer_set('entity', layer)
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                if is_bl_newer_than(2, 80):
+                    rrow.operator('wm.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
+                else: rrow.operator('wm.y_select_decal_object', icon='EMPTY_DATA')
 
-                if layer.texcoord_type == 'Decal':
-
-                    if texcoord:
-                        splits = split_layout(boxcol, 0.45, align=True)
-                        splits.label(text='Decal Object:')
-                        splits.prop(texcoord, 'object', text='')
-
-                    splits = split_layout(boxcol, 0.5, align=True)
-                    splits.label(text='Decal Distance:')
-                    draw_input_prop(splits, layer, 'decal_distance_value')
-
-                    boxcol.context_pointer_set('entity', layer)
-                    if is_bl_newer_than(2, 80):
-                        boxcol.operator('node.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
-                    else: boxcol.operator('node.y_select_decal_object', icon='EMPTY_DATA')
-                    boxcol.operator('node.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
-                    
-                if layer.texcoord_type != 'Decal':
-                    mapping = get_layer_mapping(layer)
-
-                    rrow = boxcol.row()
-                    rrow.label(text='Transform:')
-                    rrow.prop(mapping, 'vector_type', text='')
-
-                    rrow = boxcol.row()
-                    if is_bl_newer_than(2, 81):
-                        mcol = rrow.column()
-                        mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
-                        mcol = rrow.column()
-                        mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
-                        if layer.enable_uniform_scale:
-                            mcol = rrow.column(align=True)
-                            mcol.label(text='Scale:')
-                            draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'X')
-                            draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Y')
-                            draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Z')
-                        else:
-                            mcol = rrow.column()
-                            mcol.prop(mapping.inputs[3], 'default_value', text='Scale')
-                    else:
-                        mcol = rrow.column()
-                        mcol.prop(mapping, 'translation')
-                        mcol = rrow.column()
-                        mcol.prop(mapping, 'rotation')
-                        mcol = rrow.column()
-                        mcol.prop(mapping, 'scale')
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow.operator('wm.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
                 
-                    # Uniform scale
-                    if is_bl_newer_than(2, 81):
-                        rrow = boxcol.row(align=True)
-                        splits = split_layout(rrow, 0.5)
-                        splits.label(text='Uniform Scale:')
-                        rrow.prop(layer, 'enable_uniform_scale', text='')
+            if layer.texcoord_type != 'Decal' and not is_using_image_atlas:
+                mapping = get_layer_mapping(layer)
 
-                    if yp.need_temp_uv_refresh:
-                        rrow = boxcol.row(align=True)
-                        rrow.alert = True
-                        rrow.operator('node.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow.label(text='Transform:')
+                rrow.prop(mapping, 'vector_type', text='')
+
+                rrow = boxcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow = rrow.row()
+                if is_bl_newer_than(2, 81):
+                    mcol = rrow.column()
+                    mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
+                    mcol = rrow.column()
+                    mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
+                    if layer.enable_uniform_scale:
+                        mcol = rrow.column(align=True)
+                        mrow = mcol.row()
+                        mrow.label(text='Scale:')
+                        mrow.prop(layer, 'enable_uniform_scale', text='', icon='LOCKED')
+                        draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'X')
+                        draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Y')
+                        draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Z')
+                    else:
+                        mcol = rrow.column(align=True)
+                        mrow = mcol.row()
+                        mrow.label(text='Scale:')
+                        mrow.prop(layer, 'enable_uniform_scale', text='', icon='UNLOCKED')
+                        mcol.prop(mapping.inputs[3], 'default_value', text='')
+                else:
+                    mcol = rrow.column()
+                    mcol.prop(mapping, 'translation')
+                    mcol = rrow.column()
+                    mcol.prop(mapping, 'rotation')
+                    mcol = rrow.column()
+                    mcol.prop(mapping, 'scale')
+            
+                if yp.need_temp_uv_refresh:
+                    rrow = boxcol.row(align=True)
+                    rrow.label(text='', icon='BLANK1')
+                    rrow.alert = True
+                    rrow.operator('wm.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
 
             # Blur row
             rrow = boxcol.row(align=True)
+            rrow.label(text='', icon='BLANK1')
             splits = split_layout(rrow, 0.5)
             splits.label(text='Blur:')
             if layer.enable_blur_vector:
@@ -1765,18 +1816,21 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
                 #label = root_ch.name
                 if root_ch.type == 'NORMAL' and ch.normal_map_type != 'NORMAL_MAP':
                     if ch.normal_map_type == 'BUMP_MAP':
-                        label += ' (Bump)'
-                        #label = 'Bump'
+                        if is_bl_newer_than(2, 80):
+                            label += ' (Bump)'
+                        else: label = 'Bump'
                     elif ch.normal_map_type == 'BUMP_NORMAL_MAP':
-                        label += ' (Bump + Normal)'
-                        #label = 'Bump + Normal'
+                        if is_bl_newer_than(2, 80):
+                            label += ' (Bump + Normal)'
+                        else: label = 'Bump + Normal'
                     elif ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
-                        label += ' (VDM)'
-                        #label = 'VDM'
-                    #label += ' (' + root_ch.name + ')'
+                        if is_bl_newer_than(2, 80):
+                            label += ' (VDM)'
+                        else: label = 'VDM'
                 else:
-                    label += ' (' + root_ch.name + ')'
-                    #label = root_ch.name
+                    if is_bl_newer_than(2, 80):
+                        label += ' (' + root_ch.name + ')'
+                    else: label = root_ch.name + ' ' + pgettext_iface('Channel')   
 
         else:
             label = pgettext_iface('Channels') + ' (' + str(len(enabled_channels)) + ')'
@@ -1799,15 +1853,15 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
             rrow = row.row(align=True)
             rrow.alignment = 'RIGHT'
             if root_ch.type == 'NORMAL':
-                rrow.prop(ch, 'normal_blend_type', text='')
-                #rrow.prop(ch, 'normal_map_type', text='')
+                splits = split_layout(rrow, 0.5, align=True)
+                splits.prop(ch, 'normal_blend_type', text='')
                 if ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'}:
-                    draw_input_prop(rrow, ch, 'bump_distance')
+                    draw_input_prop(splits, ch, 'bump_distance')
                 elif ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
-                    draw_input_prop(rrow, ch, 'vdisp_strength')
-                else: draw_input_prop(rrow, ch, 'normal_strength')
+                    draw_input_prop(splits, ch, 'vdisp_strength')
+                else: draw_input_prop(splits, ch, 'normal_strength')
             else: 
-                #rrow.scale_x = 1.2
+                rrow.scale_x = 1.25
                 rrow.prop(ch, 'blend_type', text='')
 
         if not lui.expand_channels:
@@ -1883,7 +1937,6 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
         #else: icon_name = 'collapsed_' + icon_name
         channel_icon_value = lib.get_icon(icon_name)
 
-        #icon = 'DOWNARROW_HLT' if chui.expand_content else 'RIGHTARROW'
         icon = get_collapse_arrow_icon(chui.expand_content)
         #rrow.prop(chui, 'expand_content', text=label, emboss=False, icon_value=channel_icon_value, translate=False)
         rrow.prop(chui, 'expand_content', text='', emboss=False, icon=icon)
@@ -2062,6 +2115,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
                     # Midlevel
                     row = mcol.row(align=True)
                     row.label(text='', icon='BLANK1')
+                    row.active = layer.type != 'COLOR' or not ch.enable_transition_bump
                     row.label(text='Midlevel:') 
                     draw_input_prop(row, ch, 'bump_midlevel')
 
@@ -2122,7 +2176,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
                         brow.alert = True
                         brow.context_pointer_set('channel', ch)
                         brow.context_pointer_set('image', image)
-                        brow.operator('node.y_refresh_neighbor_uv', icon='ERROR')
+                        brow.operator('wm.y_refresh_neighbor_uv', icon='ERROR')
 
             if ch.show_transition_bump or ch.enable_transition_bump:
 
@@ -2131,7 +2185,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
                 rrow = brow.row(align=True)
                 inbox_dropdown_button(rrow, chui, 'expand_transition_bump_settings', 'Transition Bump:', scale_override=0.915)
 
-                rrow = brow.row(align=True) # To make sure the next row align right
+                if is_bl_newer_than(2, 80): rrow = brow.row(align=True) # To make sure the next row align right
                 brow.separator()
 
                 if ch.enable_transition_bump and not chui.expand_transition_bump_settings:
@@ -2257,8 +2311,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
                 else:
                     inbox_dropdown_button(rrow, chui, 'expand_transition_ramp_settings', label_text, scale_override=0.915)
 
-                rrow = row.row(align=True) # To make sure the next row align right
-                #rrow.alignment = 'RIGHT'
+                if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
                 row.separator()
 
                 if ch.enable_transition_ramp and not chui.expand_transition_ramp_settings:
@@ -2307,8 +2360,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
 
                 inbox_dropdown_button(rrow, chui, 'expand_transition_ao_settings', 'Transition AO:', scale_override=0.915)
 
-                rrow = row.row(align=True) # To make sure the next row align right
-                #rrow.alignment = 'RIGHT'
+                if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
                 row.separator()
 
                 if ch.enable_transition_ao and not chui.expand_transition_ao_settings:
@@ -2602,10 +2654,6 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
 
         icon_value = lib.get_icon('mask')
         if len(layer.masks) > 0:
-            #if lui.expand_masks:
-            #    icon_value = lib.get_icon('uncollapsed_mask')
-            #else: icon_value = lib.get_icon('collapsed_mask')
-            #icon = 'DOWNARROW_HLT' if lui.expand_masks else 'RIGHTARROW'
             icon = get_collapse_arrow_icon(lui.expand_masks)
             rrow.prop(lui, 'expand_masks', text='', emboss=False, icon=icon)
         else: 
@@ -2667,10 +2715,6 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
         if is_bl_newer_than(2, 80):
             rrow.alignment = 'LEFT'
             rrow.scale_x = 0.95
-        #if maskui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_mask')
-        #else: icon_value = lib.get_icon('collapsed_mask')
-        #icon = 'DOWNARROW_HLT' if maskui.expand_content else 'RIGHTARROW'
         icon = get_collapse_arrow_icon(maskui.expand_content)
         rrow.prop(maskui, 'expand_content', text='', emboss=False, icon=icon)
 
@@ -2678,6 +2722,9 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
         if is_bl_newer_than(2, 80):
             rrow.prop(maskui, 'expand_content', text=label_text, emboss=False, icon_value=icon_value)
         else: rrow.label(text=label_text, icon_value=icon_value)
+
+        if maskui.expand_content:
+            srow.separator()
 
         rrow = srow.row(align=True)
         if maskui.expand_content:
@@ -2831,7 +2878,7 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
             rbcol.active = not mask.use_baked
             if mask.use_temp_bake:
                 rbcol.context_pointer_set('parent', mask)
-                rbcol.operator('node.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
+                rbcol.operator('wm.y_disable_temp_image', icon='FILE_REFRESH', text='Disable Baked Temp')
             elif mask_image:
                 draw_image_props(context, mask_source, rbcol, mask, show_datablock=False, show_source_input=True)
             elif mask.type == 'HEMI':
@@ -2848,12 +2895,19 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
                 draw_vcol_props(rbcol, entity=mask, show_divide_rgb_alpha=False, show_source_input=True)
             else: draw_tex_props(mask_source, rbcol, entity=mask, show_source_input=True)
 
-            if mask.baked_source != '':
-                rrcol.context_pointer_set('entity', mask)
+            rrcol.context_pointer_set('entity', mask)
+            if mask.baked_source == '' and mask.type in {'EDGE_DETECT'}:
                 rrrow = rrcol.row(align=True)
                 rrrow.label(text='', icon='BLANK1')
-                rrrow.operator("node.y_bake_entity_to_image", text='Rebake', icon_value=lib.get_icon('bake'))
+                rrrow.operator("wm.y_bake_entity_to_image", text='Bake '+mask_type_labels[mask.type]+' as Image', icon_value=lib.get_icon('bake'))
+
+            elif mask.baked_source != '':
+                rrrow = rrcol.row(align=True)
+                rrrow.label(text='', icon='BLANK1')
+                rrrow.operator("wm.y_bake_entity_to_image", text='Rebake', icon_value=lib.get_icon('bake'))
                 rrrow.prop(mask, 'use_baked', text='Use Baked', toggle=True)
+                icon = 'TRASH' if is_bl_newer_than(2, 80) else 'X'
+                rrrow.operator("wm.y_remove_baked_entity", text='', icon=icon)
 
             if mask.type not in {'VCOL', 'HEMI', 'OBJECT_INDEX', 'COLOR_ID', 'BACKFACE', 'EDGE_DETECT', 'MODIFIER'}:
                 rrcol.separator()
@@ -2907,86 +2961,80 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
                 boxcol = rrow.column()
                 boxcol.active = not mask.use_baked
 
-                #if mask.texcoord_type == 'Layer':
-                #    boxcol.label(text="Mask is using layer vector", icon='INFO')
-                if mask_image and (mask_image.yia.is_image_atlas or mask_image.yua.is_udim_atlas):
-                    #boxcol.label(text="Transform vector with image atlas is not possible!")
-                    pass
-                else:
-                    if mask.type == 'IMAGE' and mask.texcoord_type in {'Generated', 'Object'}:
-                        splits = split_layout(boxcol, 0.5, align=True)
-                        splits.label(text='Projection Blend:')
-                        splits.prop(mask_src, 'projection_blend', text='')
+                is_using_image_atlas = mask_image and (mask_image.yia.is_image_atlas or mask_image.yua.is_udim_atlas)
 
-                    if mask.texcoord_type == 'UV':
-                        rrow = boxcol.row(align=True)
-                        rrow.label(text='UV Map:')
-                        rrrow = rrow.row(align=True)
-                        rrrow.scale_x = 1.2
-                        rrrow.prop_search(mask, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                if mask.type == 'IMAGE' and mask.texcoord_type in {'Generated', 'Object'}:
+                    splits = split_layout(boxcol, 0.5, align=True)
+                    splits.label(text='Projection Blend:')
+                    splits.prop(mask_src, 'projection_blend', text='')
 
-                        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
-                        rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
+                if mask.texcoord_type == 'UV':
+                    rrow = boxcol.row(align=True)
+                    rrow.label(text='UV Map:')
+                    rrrow = rrow.row(align=True)
+                    rrrow.scale_x = 1.2
+                    rrrow.prop_search(mask, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
 
-                    if mask.texcoord_type == 'Decal':
-                        if texcoord:
-                            splits = split_layout(boxcol, 0.45, align=True)
-                            splits.label(text='Decal Object:')
-                            splits.prop(texcoord, 'object', text='')
+                    icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
+                    rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
 
-                        splits = split_layout(boxcol, 0.5, align=True)
-                        splits.label(text='Decal Distance:')
-                        draw_input_prop(splits, mask, 'decal_distance_value')
+                if mask.texcoord_type == 'Decal':
+                    if texcoord:
+                        splits = split_layout(boxcol, 0.45, align=True)
+                        splits.label(text='Decal Object:')
+                        splits.prop(texcoord, 'object', text='')
 
-                        boxcol.context_pointer_set('entity', mask)
-                        if is_bl_newer_than(2, 80):
-                            boxcol.operator('node.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
-                        else: boxcol.operator('node.y_select_decal_object', icon='EMPTY_DATA')
-                        boxcol.operator('node.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
+                    splits = split_layout(boxcol, 0.5, align=True)
+                    splits.label(text='Decal Distance:')
+                    draw_input_prop(splits, mask, 'decal_distance_value')
 
-                    if mask.texcoord_type != 'Decal':
-                        mapping = get_mask_mapping(mask)
+                    boxcol.context_pointer_set('entity', mask)
+                    if is_bl_newer_than(2, 80):
+                        boxcol.operator('wm.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
+                    else: boxcol.operator('wm.y_select_decal_object', icon='EMPTY_DATA')
+                    boxcol.operator('wm.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
 
-                        rrow = boxcol.row()
-                        rrow.label(text='Transform:')
-                        rrow.prop(mapping, 'vector_type', text='')
+                if mask.texcoord_type != 'Decal' and not is_using_image_atlas:
+                    mapping = get_mask_mapping(mask)
 
-                        rrow = boxcol.row()
-                        if is_bl_newer_than(2, 81):
-                            mcol = rrow.column()
-                            mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
-                            mcol = rrow.column()
-                            mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
-                            if mask.enable_uniform_scale:
-                                mcol = rrow.column(align=True)
-                                mcol.label(text='Scale:')
-                                draw_input_prop(mcol, mask, 'uniform_scale_value', None, 'X')
-                                draw_input_prop(mcol, mask, 'uniform_scale_value', None, 'Y')
-                                draw_input_prop(mcol, mask, 'uniform_scale_value', None, 'Z')
-                            else:
-                                mcol = rrow.column()
-                                mcol.prop(mapping.inputs[3], 'default_value', text='Scale')
+                    rrow = boxcol.row()
+                    rrow.label(text='Transform:')
+                    rrow.prop(mapping, 'vector_type', text='')
+
+                    rrow = boxcol.row()
+                    if is_bl_newer_than(2, 81):
+                        mcol = rrow.column()
+                        mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
+                        mcol = rrow.column()
+                        mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
+                        if mask.enable_uniform_scale:
+                            mcol = rrow.column(align=True)
+                            mrow = mcol.row()
+                            mrow.label(text='Scale:')
+                            mrow.prop(mask, 'enable_uniform_scale', text='', icon='LOCKED')
+                            draw_input_prop(mcol, mask, 'uniform_scale_value', None, 'X')
+                            draw_input_prop(mcol, mask, 'uniform_scale_value', None, 'Y')
+                            draw_input_prop(mcol, mask, 'uniform_scale_value', None, 'Z')
                         else:
-                            mcol = rrow.column()
-                            mcol.prop(mapping, 'translation')
-                            mcol = rrow.column()
-                            mcol.prop(mapping, 'rotation')
-                            mcol = rrow.column()
-                            mcol.prop(mapping, 'scale')
-                    
-                        # Uniform scale
-                        if is_bl_newer_than(2, 81):
-                            rrow = boxcol.row(align=True)
-                            splits = split_layout(rrow, 0.5)
-                            splits.label(text='Uniform Scale:')
-                            rrow.prop(mask, 'enable_uniform_scale', text='')
-
-                        if mask.type == 'IMAGE' and mask.active_edit and (
-                                yp.need_temp_uv_refresh
-                                ):
-                            rrow = boxcol.row(align=True)
-                            rrow.alert = True
-                            rrow.operator('node.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
+                            mcol = rrow.column(align=True)
+                            mrow = mcol.row()
+                            mrow.label(text='Scale:')
+                            mrow.prop(mask, 'enable_uniform_scale', text='', icon='UNLOCKED')
+                            mcol.prop(mapping.inputs[3], 'default_value', text='')
+                    else:
+                        mcol = rrow.column()
+                        mcol.prop(mapping, 'translation')
+                        mcol = rrow.column()
+                        mcol.prop(mapping, 'rotation')
+                        mcol = rrow.column()
+                        mcol.prop(mapping, 'scale')
+                
+                    if mask.type == 'IMAGE' and mask.active_edit and (
+                            yp.need_temp_uv_refresh
+                            ):
+                        rrow = boxcol.row(align=True)
+                        rrow.alert = True
+                        rrow.operator('wm.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
             
                 # Blur row
                 if mask.texcoord_type != 'Layer':
@@ -3023,7 +3071,7 @@ def draw_layers_ui(context, layout, node):
     if group_tree.users > 1:
         row = box.row(align=True)
         row.alert = True
-        op = row.operator("node.y_duplicate_yp_nodes", text='Fix Multi-User ' + get_addon_title() + ' Node', icon='ERROR')
+        op = row.operator("wm.y_duplicate_yp_nodes", text='Fix Multi-User ' + get_addon_title() + ' Node', icon='ERROR')
         op.duplicate_node = True
         op.duplicate_material = False
         op.only_active = True
@@ -3047,7 +3095,7 @@ def draw_layers_ui(context, layout, node):
                 col.label(text=root_ch.name + " channel hasn't been baked yet!", icon_value=icon_value)
             else:
                 row = col.row(align=True)
-                title = 'Baked ' + root_ch.name + ':'
+                title = 'Baked ' + root_ch.name
                 row.label(text=title, icon_value=icon_value)
 
                 row.context_pointer_set('root_ch', root_ch)
@@ -3153,7 +3201,7 @@ def draw_layers_ui(context, layout, node):
     if is_a_mesh and not uv_found:
         row = box.row(align=True)
         row.alert = True
-        row.operator("node.y_add_simple_uvs", icon='ERROR')
+        row.operator("wm.y_add_simple_uvs", icon='ERROR')
         row.alert = False
         return
 
@@ -3176,7 +3224,7 @@ def draw_layers_ui(context, layout, node):
     if channel_mismatch:
         row = box.row(align=True)
         row.alert = True
-        row.operator("node.y_fix_channel_missmatch", text='Fix Missmatched Channels!', icon='ERROR')
+        row.operator("wm.y_fix_channel_missmatch", text='Fix Missmatched Channels!', icon='ERROR')
         row.alert = False
         return
 
@@ -3206,7 +3254,7 @@ def draw_layers_ui(context, layout, node):
     #        ):
     #        row = box.row(align=True)
     #        row.alert = True
-    #        row.operator("node.y_fix_duplicated_yp_nodes", text='Fix Duplicated Layers', icon='ERROR')
+    #        row.operator("wm.y_fix_duplicated_yp_nodes", text='Fix Duplicated Layers', icon='ERROR')
     #        row.alert = False
     #        #box.prop(ypui, 'make_image_single_user')
     #        return
@@ -3267,7 +3315,7 @@ def draw_layers_ui(context, layout, node):
     if missing_data:
         row = box.row(align=True)
         row.alert = True
-        row.operator("node.y_fix_missing_data", icon='ERROR')
+        row.operator("wm.y_fix_missing_data", icon='ERROR')
         row.alert = False
         return
 
@@ -3309,7 +3357,7 @@ def draw_layers_ui(context, layout, node):
             row = box.row(align=True)
             row.alert = True
             title = 'UV ' + uv_name + ' is missing or renamed!'
-            row.operator("node.y_fix_missing_uv", text=title, icon='ERROR').source_uv_name = uv_name
+            row.operator("wm.y_fix_missing_uv", text=title, icon='ERROR').source_uv_name = uv_name
             #print(entities)
             row.alert = False
 
@@ -3325,7 +3373,7 @@ def draw_layers_ui(context, layout, node):
     if need_tangent_refresh:
         row = box.row(align=True)
         row.alert = True
-        row.operator('node.y_refresh_tangent_sign_vcol', icon='FILE_REFRESH', text='Tangent Sign Hacks is missing!')
+        row.operator('wm.y_refresh_tangent_sign_vcol', icon='FILE_REFRESH', text='Tangent Sign Hacks is missing!')
         row.alert = False
 
     # Get active item entity
@@ -3426,7 +3474,7 @@ def draw_layers_ui(context, layout, node):
 
     if ypup.layer_list_mode in {'DYNAMIC', 'BOTH'}:
         if ypup.layer_list_mode == 'BOTH':
-            rcol.operator('node.y_refresh_list_items', icon='FILE_REFRESH', text='Refresh Items')
+            rcol.operator('wm.y_refresh_list_items', icon='FILE_REFRESH', text='Refresh Items')
         rcol.template_list("NODE_UL_YPaint_list_items", "", yp,
                 "list_items", yp, "active_item_index", rows=5, maxrows=5)  
 
@@ -3440,60 +3488,62 @@ def draw_layers_ui(context, layout, node):
         if has_children(layer): # or (image and not image.packed_file):
 
             if is_bl_newer_than(2, 80):
-                rcol.operator("node.y_remove_layer_menu", icon='REMOVE', text='')
-            else: rcol.operator("node.y_remove_layer_menu", icon='ZOOMOUT', text='')
+                rcol.operator("wm.y_remove_layer_menu", icon='REMOVE', text='')
+            else: rcol.operator("wm.y_remove_layer_menu", icon='ZOOMOUT', text='')
 
         else: 
             if is_bl_newer_than(2, 80):
-                c = rcol.operator("node.y_remove_layer", icon='REMOVE', text='')
-            else: c = rcol.operator("node.y_remove_layer", icon='ZOOMOUT', text='')
+                c = rcol.operator("wm.y_remove_layer", icon='REMOVE', text='')
+            else: c = rcol.operator("wm.y_remove_layer", icon='ZOOMOUT', text='')
 
             c.remove_children = False
 
         if is_top_member(layer):
-            c = rcol.operator("node.y_move_in_out_layer_group_menu", text='', icon='TRIA_UP')
+            c = rcol.operator("wm.y_move_in_out_layer_group_menu", text='', icon='TRIA_UP')
             c.direction = 'UP'
             c.move_out = True
         else:
             upper_idx, upper_layer = get_upper_neighbor(layer)
 
             if upper_layer and (upper_layer.type == 'GROUP' or upper_layer.parent_idx != layer.parent_idx):
-                c = rcol.operator("node.y_move_in_out_layer_group_menu", text='', icon='TRIA_UP')
+                c = rcol.operator("wm.y_move_in_out_layer_group_menu", text='', icon='TRIA_UP')
                 c.direction = 'UP'
                 c.move_out = False
             else: 
-                c = rcol.operator("node.y_move_layer", text='', icon='TRIA_UP')
+                c = rcol.operator("wm.y_move_layer", text='', icon='TRIA_UP')
                 c.direction = 'UP'
 
         if is_bottom_member(layer):
-            c = rcol.operator("node.y_move_in_out_layer_group_menu", text='', icon='TRIA_DOWN')
+            c = rcol.operator("wm.y_move_in_out_layer_group_menu", text='', icon='TRIA_DOWN')
             c.direction = 'DOWN'
             c.move_out = True
         else:
             lower_idx, lower_layer = get_lower_neighbor(layer)
 
             if lower_layer and (lower_layer.type == 'GROUP' and lower_layer.parent_idx == layer.parent_idx):
-                c = rcol.operator("node.y_move_in_out_layer_group_menu", text='', icon='TRIA_DOWN')
+                c = rcol.operator("wm.y_move_in_out_layer_group_menu", text='', icon='TRIA_DOWN')
                 c.direction = 'DOWN'
                 c.move_out = False
             else: 
-                c = rcol.operator("node.y_move_layer", text='', icon='TRIA_DOWN')
+                c = rcol.operator("wm.y_move_layer", text='', icon='TRIA_DOWN')
                 c.direction = 'DOWN'
 
     else:
 
         if is_bl_newer_than(2, 80):
-            rcol.operator("node.y_remove_layer", icon='REMOVE', text='')
-        else: rcol.operator("node.y_remove_layer", icon='ZOOMOUT', text='')
+            rcol.operator("wm.y_remove_layer", icon='REMOVE', text='')
+        else: rcol.operator("wm.y_remove_layer", icon='ZOOMOUT', text='')
 
-        rcol.operator("node.y_move_layer", text='', icon='TRIA_UP').direction = 'UP'
-        rcol.operator("node.y_move_layer", text='', icon='TRIA_DOWN').direction = 'DOWN'
+        rcol.operator("wm.y_move_layer", text='', icon='TRIA_UP').direction = 'UP'
+        rcol.operator("wm.y_move_layer", text='', icon='TRIA_DOWN').direction = 'DOWN'
 
     rcol.menu("NODE_MT_y_layer_list_special_menu", text='', icon='DOWNARROW_HLT')
 
-    if is_bl_newer_than(2, 80) and any_subitem_exists(yp) and ypup.layer_list_mode != 'CLASSIC' :
+    if any_subitem_exists(yp) and ypup.layer_list_mode != 'CLASSIC' :
         rcol.separator()
-        rcol.popover("NODE_PT_y_list_item_option_popover", text='', icon='OUTLINER')
+        if is_bl_newer_than(2, 80):
+            rcol.popover("NODE_PT_y_list_item_option_popover", text='', icon='OUTLINER')
+        else: rcol.menu("NODE_PT_y_list_item_option_menu", text='', icon='OOPS')
 
     if layer:
         layer_tree = get_tree(layer)
@@ -3513,7 +3563,7 @@ def draw_layers_ui(context, layout, node):
         # Check if any images aren't using proper linear pipelines
         if any_linear_images_problem(yp):
             col.alert = True
-            col.operator('node.y_use_linear_color_space', text='Refresh Linear Color Space', icon='ERROR')
+            col.operator('wm.y_use_linear_color_space', text='Refresh Linear Color Space', icon='ERROR')
             col.alert = False
 
         # Check if AO is enabled or not
@@ -3527,7 +3577,7 @@ def draw_layers_ui(context, layout, node):
                         break
             if edge_detect_found:
                 col.alert = True
-                col.operator('node.y_fix_edge_detect_ao', text='Fix EEVEE Edge Detect AO', icon='ERROR')
+                col.operator('wm.y_fix_edge_detect_ao', text='Fix EEVEE Edge Detect AO', icon='ERROR')
                 col.alert = False
 
         if obj.type == 'MESH' and colorid_vcol:
@@ -3596,20 +3646,40 @@ def draw_layers_ui(context, layout, node):
                 row = bbox.row(align=True)
                 row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
 
-        in_texture_paint_mode = obj.mode == 'TEXTURE_PAINT' or (
-                is_bl_newer_than(4, 4) and obj.mode == 'SCULPT' and 
-                # Assuming sculpt texture paint is already stable or enabled in experimental feature
-                (not hasattr(context.preferences.experimental, 'use_sculpt_texture_paint') or context.preferences.experimental.use_sculpt_texture_paint)
-                )
+        # Only works with experimental sculpt texture paint is turned on
+        in_sculpt_texture_paint_mode = obj.mode == 'SCULPT' and (
+            hasattr(context.preferences.experimental, 'use_sculpt_texture_paint') and 
+            context.preferences.experimental.use_sculpt_texture_paint
+            )
 
-        if obj.type == 'MESH' and in_texture_paint_mode and ((layer.type == 'IMAGE' and not mask_image) or (mask_image and mask.source_input == 'ALPHA')) and not override_image:
-            bbox = col.box()
-            row = bbox.row(align=True)
-            row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
+        in_texture_paint_mode = obj.mode == 'TEXTURE_PAINT'
+
+        if obj.type == 'MESH' and ((layer.type == 'IMAGE' and not mask_image) or (mask_image and mask.source_input == 'ALPHA')) and not override_image:
+
+            if is_bl_newer_than(4, 3) and in_texture_paint_mode:
+                brush = context.tool_settings.image_paint.brush
+                if brush.image_tool != 'MASK':
+                    bbox = col.box()
+                    row = bbox.row(align=True)
+                    row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
+
+            elif in_texture_paint_mode or in_sculpt_texture_paint_mode:
+                bbox = col.box()
+                row = bbox.row(align=True)
+                row.operator('paint.y_toggle_eraser', text='Toggle Eraser')
 
         ve = context.scene.ve_edit
-        if in_texture_paint_mode:
-            brush = context.tool_settings.image_paint.brush if obj.mode == 'TEXTURE_PAINT' else context.tool_settings.sculpt.brush
+        if is_bl_newer_than(4, 3) and in_texture_paint_mode:
+            brush = context.tool_settings.image_paint.brush
+            if ((mask_image and mask.source_input == 'RGB') or override_image) and (brush.name in tex_eraser_asset_names or brush.blend == 'ERASE_ALPHA'):
+                bbox = col.box()
+                row = bbox.row(align=True)
+                row.alert = True
+                row.operator('paint.y_toggle_eraser', text='Disable Eraser')
+                row.alert = False
+
+        elif in_texture_paint_mode or in_sculpt_texture_paint_mode:
+            brush = context.tool_settings.image_paint.brush if in_texture_paint_mode else context.tool_settings.sculpt.brush
             if ((mask_image and mask.source_input == 'RGB') or override_image) and brush.name == eraser_names[obj.mode]:
                 bbox = col.box()
                 row = bbox.row(align=True)
@@ -3641,18 +3711,18 @@ def draw_layers_ui(context, layout, node):
                     bbox = col.box()
                     row = bbox.row(align=True)
                     row.alert = True
-                    row.operator('node.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
+                    row.operator('wm.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
                 elif obj.data.uv_layers.active.name == TEMP_UV:
                     bbox = col.box()
                     row = bbox.row(align=True)
                     row.alert = True
-                    row.operator('node.y_back_to_original_uv', icon='EDITMODE_HLT', text='Edit Original UV')
+                    row.operator('wm.y_back_to_original_uv', icon='EDITMODE_HLT', text='Edit Original UV')
         else:
             if yp.need_temp_uv_refresh or is_active_uv_map_missmatch_active_entity(obj, layer):
                 bbox = col.box()
                 row = bbox.row(align=True)
                 row.alert = True
-                row.operator('node.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
+                row.operator('wm.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
 
         if is_a_mesh and is_bl_newer_than(3, 2):
             height_layer_ch = get_height_channel(layer)
@@ -3678,7 +3748,7 @@ def draw_layers_ui(context, layout, node):
             cbox = bbox.column()
             row = cbox.row(align=True)
             row.alert = True
-            row.operator('node.y_refresh_list_items', icon='FILE_REFRESH', text='Refresh Layer List')
+            row.operator('wm.y_refresh_list_items', icon='FILE_REFRESH', text='Refresh Layer List')
             row.alert = False
 
         specific_ch = None
@@ -3743,7 +3813,7 @@ def draw_test_ui(context, layout):
 
             col.label(text='Run test with default cube scene!')
             if obj and obj.name == 'Cube' and mat and mat.name == 'Material' and not node:
-                col.operator('node.y_run_automated_test')
+                col.operator('wm.y_run_automated_test')
 
             if (wmyp.test_result_run != 0):
                 col.label(text=pgettext_iface('Test Run Count: ') + str(wmyp.test_result_run))
@@ -3757,6 +3827,7 @@ def main_draw(self, context):
     scene = context.scene
     obj = context.object
     mat = obj.active_material
+    ypup = get_user_preferences()
     #slot = context.material_slot
     #space = context.space_data
 
@@ -3773,8 +3844,8 @@ def main_draw(self, context):
 
     layout = self.layout
 
-    #layout.operator("node.y_debug_mesh", icon='MESH_DATA')
-    #layout.operator("node.y_test_ray", icon='MESH_DATA')
+    #layout.operator("wm.y_debug_mesh", icon='MESH_DATA')
+    #layout.operator("wm.y_test_ray", icon='MESH_DATA')
 
     from . import addon_updater_ops
 
@@ -3831,8 +3902,9 @@ def main_draw(self, context):
     if ypui.show_object:
         box = layout.box()
         col = box.column()
-        col.prop(obj, 'pass_index')
-        #row = box.row()
+        row = split_layout(col, 0.6)
+        row.label(text='Object Index:')
+        row.prop(obj, 'pass_index', text='')
 
     # HACK: Create split layout to load all icons (Only for Blender 3.2+)
     if is_bl_newer_than(3, 2) and not wm.ypprops.all_icons_loaded:
@@ -3906,7 +3978,7 @@ def main_draw(self, context):
 
     if not node:
         layout.label(text="No active " + get_addon_title() + " node!", icon='ERROR')
-        layout.operator("node.y_quick_ypaint_node_setup", icon_value=lib.get_icon('nodetree'))
+        layout.operator("wm.y_quick_ypaint_node_setup", icon_value=lib.get_icon('nodetree'))
 
         # Test
         draw_test_ui(context=context, layout=layout)
@@ -3921,8 +3993,17 @@ def main_draw(self, context):
         col = layout.column()
         col.alert = True
         col.label(text=group_tree.name + ' (' + yp.version + ')', icon_value=lib.get_icon('nodetree'))
-        col.operator("node.y_update_yp_trees", text='Update node to version ' + get_current_version_str(), icon='ERROR')
+        col.operator("wm.y_update_yp_trees", text='Update node to version ' + get_current_version_str(), icon='ERROR')
         return
+
+    if ypup.developer_mode:
+        height_root_ch = get_root_height_channel(yp)
+        if height_root_ch and height_root_ch.enable_smooth_bump:
+            col = layout.column()
+            col.alert = True
+            col.label(text='Smooth(er) bump is no longer supported!', icon='ERROR')
+            col.operator("wm.y_update_remove_smooth_bump", text='Remove Smooth Bump')
+            #return
 
     #layout.label(text='Active: ' + node.node_tree.name, icon_value=lib.get_icon('nodetree'))
     row = layout.row(align=True)
@@ -3957,7 +4038,7 @@ def main_draw(self, context):
     #if (baked_found or yp.use_baked) and not group_tree.users > 1:
     #    rrow = row.row(align=True)
     #    rrow.alignment = 'RIGHT'
-    #    rrow.operator('node.y_bake_channels', text='Rebake', icon_value=lib.get_icon('bake')).only_active_channel = False
+    #    rrow.operator('wm.y_bake_channels', text='Rebake', icon_value=lib.get_icon('bake')).only_active_channel = False
     #    rrow.separator()
     #    rrow.prop(yp, 'use_baked', toggle=True, text='Use Baked')
     #    rrow.prop(yp, 'enable_baked_outside', toggle=True, text='', icon='NODETREE')
@@ -3986,12 +4067,12 @@ def main_draw(self, context):
     if scenario_1:
         rrow = row.row(align=True)
         rrow.alignment = 'RIGHT'
-        rrow.operator('node.y_refresh_tangent_sign_vcol', icon='FILE_REFRESH', text='Tangent')
+        rrow.operator('wm.y_refresh_tangent_sign_vcol', icon='FILE_REFRESH', text='Tangent')
 
     if (baked_found or yp.use_baked) and not group_tree.users > 1:
         rrow = row.row(align=True)
         rrow.alignment = 'RIGHT'
-        rrow.operator('node.y_bake_channels', text='Rebake', icon_value=lib.get_icon('bake')).only_active_channel = False
+        rrow.operator('wm.y_bake_channels', text='Rebake', icon_value=lib.get_icon('bake')).only_active_channel = False
         rrow.separator()
         rrow.prop(yp, 'use_baked', toggle=True, text='Use Baked')
         rrow.prop(yp, 'enable_baked_outside', toggle=True, text='', icon='NODETREE')
@@ -4160,9 +4241,9 @@ def main_draw(self, context):
         col.label(text=pgettext_iface('Number of Color Ramps: ') + str(num_ramps), icon_value=lib.get_icon('modifier'))
         col.label(text=pgettext_iface('Number of RGB Curves: ') + str(num_curves), icon_value=lib.get_icon('modifier'))
 
-        #col.operator('node.y_new_image_atlas_segment_test', icon_value=lib.get_icon('image'))
-        #col.operator('node.y_new_udim_atlas_segment_test', icon_value=lib.get_icon('image'))
-        #col.operator('node.y_uv_transform_test', icon_value=lib.get_icon('uv'))
+        #col.operator('wm.y_new_image_atlas_segment_test', icon_value=lib.get_icon('image'))
+        #col.operator('wm.y_new_udim_atlas_segment_test', icon_value=lib.get_icon('image'))
+        #col.operator('wm.y_uv_transform_test', icon_value=lib.get_icon('uv'))
 
     # Test
     draw_test_ui(context=context, layout=layout)
@@ -4900,10 +4981,17 @@ class NODE_UL_YPaint_list_items(bpy.types.UIList):
                     source = mask_tree.nodes.get(mask.source)
                     if source and source.image:
                         mask_image = source.image
-                        if ypup.use_image_preview and mask_image.preview: 
-                            #if not mask_image.preview: mask_image.preview_ensure()
-                            row.prop(mask_image, 'name', text='', emboss=False, icon_value=mask_image.preview.icon_id)
-                        else: row.prop(mask_image, 'name', text='', emboss=False, icon_value=lib.get_icon('image'))
+                        if mask_image:
+                            if (mask_image.yia.is_image_atlas or mask_image.yua.is_udim_atlas): 
+                                if ypup.use_image_preview and mask_image.preview: 
+                                    #if not mask_image.preview: mask_image.preview_ensure()
+                                    row.prop(mask, 'name', text='', emboss=False, icon_value=mask_image.preview.icon_id)
+                                else: row.prop(mask, 'name', text='', emboss=False, icon_value=lib.get_icon('image'))
+                            else:
+                                if ypup.use_image_preview and mask_image.preview: 
+                                    #if not mask_image.preview: mask_image.preview_ensure()
+                                    row.prop(mask_image, 'name', text='', emboss=False, icon_value=mask_image.preview.icon_id)
+                                else: row.prop(mask_image, 'name', text='', emboss=False, icon_value=lib.get_icon('image'))
                     else: row.prop(mask, 'name', text='', emboss=False, icon_value=lib.get_icon('mask'))
                 elif mask.type == 'VCOL':
                     if mask.source_input in {'ALPHA', 'R', 'G', 'B'}:
@@ -4979,7 +5067,7 @@ class YPAssetBrowserMenu(bpy.types.Menu):
 
     def draw(self, context):
         obj = context.object
-        op = self.layout.operator("node.y_open_images_from_material_to_single_layer", icon_value=lib.get_icon('image'), text='Open Material Images to Layer')
+        op = self.layout.operator("wm.y_open_images_from_material_to_single_layer", icon_value=lib.get_icon('image'), text='Open Material Images to Layer')
         op.mat_name = context.mat_asset.name if hasattr(context, 'mat_asset') else ''
         op.asset_library_path = context.mat_asset.full_library_path if hasattr(context, 'mat_asset') else ''
 
@@ -5029,15 +5117,15 @@ class YPFileBrowserMenu(bpy.types.Menu):
 
             self.layout.label(text='Image: ' + filename)
 
-            op = self.layout.operator("node.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Layer")
+            op = self.layout.operator("wm.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Layer")
             op.file_browser_filepath = filepath
             op.texcoord_type = 'UV'
 
-            op = self.layout.operator("node.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Mask")
+            op = self.layout.operator("wm.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Mask")
             op.file_browser_filepath = filepath
             op.texcoord_type = 'UV'
 
-            op = self.layout.operator("node.y_new_layer", icon_value=lib.get_icon('image'), text="Open Image as Mask for New Layer")
+            op = self.layout.operator("wm.y_new_layer", icon_value=lib.get_icon('image'), text="Open Image as Mask for New Layer")
             op.type = 'COLOR'
             op.add_mask = True
             op.mask_type = 'IMAGE'
@@ -5046,15 +5134,15 @@ class YPFileBrowserMenu(bpy.types.Menu):
 
             self.layout.separator()
 
-            op = self.layout.operator("node.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Decal Layer")
+            op = self.layout.operator("wm.y_open_image_to_layer", icon_value=lib.get_icon('image'), text="Open Image as Decal Layer")
             op.file_browser_filepath = filepath
             op.texcoord_type = 'Decal'
 
-            op = self.layout.operator("node.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Decal Mask")
+            op = self.layout.operator("wm.y_open_image_as_mask", icon_value=lib.get_icon('image'), text="Open Image as Decal Mask")
             op.file_browser_filepath = filepath
             op.texcoord_type = 'Decal'
 
-            op = self.layout.operator("node.y_new_layer", icon_value=lib.get_icon('image'), text="Open Image as Decal Mask for New Layer")
+            op = self.layout.operator("wm.y_new_layer", icon_value=lib.get_icon('image'), text="Open Image as Decal Mask for New Layer")
             op.type = 'COLOR'
             op.add_mask = True
             op.mask_type = 'IMAGE'
@@ -5172,23 +5260,22 @@ class YPaintSpecialMenu(bpy.types.Menu):
 
         col = row.column()
 
-        col.operator('node.y_bake_channels', text='Bake All Channels', icon_value=lib.get_icon('bake')).only_active_channel = False
+        col.operator('wm.y_bake_channels', text='Bake All Channels', icon_value=lib.get_icon('bake')).only_active_channel = False
+        col.operator('wm.y_rename_ypaint_tree', text='Rename Tree', icon_value=lib.get_icon('rename'))
         col.operator('node.y_export', text='Export Ucupaint', icon_value=lib.get_icon('color'))
         col.operator("node.y_scene_export", text="Export Ucupaint Scene", icon='OUTLINER')
 
-        col.operator('node.y_rename_ypaint_tree', text='Rename Tree', icon_value=lib.get_icon('rename'))
+        col.separator()
+
+        col.operator('wm.y_remove_yp_node', icon_value=lib.get_icon('close'))
 
         col.separator()
 
-        col.operator('node.y_remove_yp_node', icon_value=lib.get_icon('close'))
+        col.operator('wm.y_clean_yp_caches', icon_value=lib.get_icon('clean'))
 
         col.separator()
 
-        col.operator('node.y_clean_yp_caches', icon_value=lib.get_icon('clean'))
-
-        col.separator()
-
-        op = col.operator('node.y_duplicate_yp_nodes', text='Duplicate Material and ' + get_addon_title() + ' nodes', icon='COPY_ID')
+        op = col.operator('wm.y_duplicate_yp_nodes', text='Duplicate Material and ' + get_addon_title() + ' nodes', icon='COPY_ID')
         op.duplicate_material = True
 
         col.separator()
@@ -5200,7 +5287,7 @@ class YPaintSpecialMenu(bpy.types.Menu):
             else: icon = 'RADIOBUT_OFF'
 
             #row = col.row()
-            col.operator('node.y_change_active_ypaint_node', text=n.node_tree.name, icon=icon).name = n.name
+            col.operator('wm.y_change_active_ypaint_node', text=n.node_tree.name, icon=icon).name = n.name
 
         col.separator()
         col.label(text='Option:')
@@ -5228,14 +5315,14 @@ class YBakeTargetMenu(bpy.types.Menu):
     def draw(self, context):
 
         col = self.layout.column()
-        col.operator('node.y_pack_image', icon='PACKAGE')
-        col.operator('node.y_save_image', icon='FILE_TICK')
+        col.operator('wm.y_pack_image', icon='PACKAGE')
+        col.operator('wm.y_save_image', icon='FILE_TICK')
 
         if context.image:
             if context.image.packed_file:
-                col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
-            else: col.operator('node.y_save_as_image', text='Save As Image').copy = False
-            col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
+                col.operator('wm.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
+            else: col.operator('wm.y_save_as_image', text='Save As Image').copy = False
+            col.operator('wm.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
 class YNewChannelMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_new_channel_menu"
@@ -5251,13 +5338,13 @@ class YNewChannelMenu(bpy.types.Menu):
         col.label(text='Add New Channel')
 
         icon_value = lib.get_icon(lib.channel_custom_icon_dict['VALUE'])
-        col.operator("node.y_add_new_ypaint_channel", icon_value=icon_value, text='Value').type = 'VALUE'
+        col.operator("wm.y_add_new_ypaint_channel", icon_value=icon_value, text='Value').type = 'VALUE'
 
         icon_value = lib.get_icon(lib.channel_custom_icon_dict['RGB'])
-        col.operator("node.y_add_new_ypaint_channel", icon_value=icon_value, text='RGB').type = 'RGB'
+        col.operator("wm.y_add_new_ypaint_channel", icon_value=icon_value, text='RGB').type = 'RGB'
 
         icon_value = lib.get_icon(lib.channel_custom_icon_dict['NORMAL'])
-        col.operator("node.y_add_new_ypaint_channel", icon_value=icon_value, text='Normal').type = 'NORMAL'
+        col.operator("wm.y_add_new_ypaint_channel", icon_value=icon_value, text='Normal').type = 'NORMAL'
 
 class YNewLayerMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_new_layer_menu"
@@ -5279,56 +5366,56 @@ class YNewLayerMenu(bpy.types.Menu):
         #col = self.layout.column(align=True)
         #col.context_pointer_set('group_node', context.group_node)
         #col.label(text='Image:')
-        col.operator("node.y_new_layer", text='New Image', icon_value=lib.get_icon('image')).type = 'IMAGE'
+        col.operator("wm.y_new_layer", text='New Image', icon_value=lib.get_icon('image')).type = 'IMAGE'
 
         #col.separator()
 
-        op = col.operator("node.y_open_image_to_layer", text='Open Image...')
+        op = col.operator("wm.y_open_image_to_layer", text='Open Image...')
         op.texcoord_type = 'UV'
         op.file_browser_filepath = ''
-        col.operator("node.y_open_available_data_to_layer", text='Open Available Image').type = 'IMAGE'
+        col.operator("wm.y_open_available_data_to_layer", text='Open Available Image').type = 'IMAGE'
 
-        col.operator("node.y_open_images_to_single_layer", text='Open Images to Single Layer...')
-        col.operator("node.y_open_images_from_material_to_single_layer", text='Open Images from Material').asset_library_path = ''
+        col.operator("wm.y_open_images_to_single_layer", text='Open Images to Single Layer...')
+        col.operator("wm.y_open_images_from_material_to_single_layer", text='Open Images from Material').asset_library_path = ''
 
         # NOTE: Dedicated menu for opening images to single layer is kinda hard to see, so it's probably better be hidden for now
         #col.menu("NODE_MT_y_open_images_to_single_layer_menu", text='Open Images to Single Layer')
 
         col.separator()
 
-        col.operator("node.y_new_layer", icon_value=lib.get_icon('group'), text='Layer Group').type = 'GROUP'
+        col.operator("wm.y_new_layer", icon_value=lib.get_icon('group'), text='Layer Group').type = 'GROUP'
         col.separator()
 
         #col.label(text='Vertex Color:')
-        #col.operator("node.y_new_layer", icon='GROUP_VCOL', text='New Vertex Color').type = 'VCOL'
-        col.operator("node.y_new_layer", icon_value=lib.get_icon('vertex_color'), text='New Vertex Color').type = 'VCOL'
-        col.operator("node.y_open_available_data_to_layer", text='Open Available Vertex Color').type = 'VCOL'
+        #col.operator("wm.y_new_layer", icon='GROUP_VCOL', text='New Vertex Color').type = 'VCOL'
+        col.operator("wm.y_new_layer", icon_value=lib.get_icon('vertex_color'), text='New Vertex Color').type = 'VCOL'
+        col.operator("wm.y_open_available_data_to_layer", text='Open Available Vertex Color').type = 'VCOL'
         col.separator()
 
         #col.menu("NODE_MT_y_new_solid_color_layer_menu", text='Solid Color', icon_value=lib.get_icon('color'))
 
         icon_value = lib.get_icon("color")
-        c = col.operator("node.y_new_layer", icon_value=icon_value, text='Solid Color')
+        c = col.operator("wm.y_new_layer", icon_value=icon_value, text='Solid Color')
         c.type = 'COLOR'
         c.add_mask = False
 
-        c = col.operator("node.y_new_layer", text='Solid Color w/ Image Mask')
+        c = col.operator("wm.y_new_layer", text='Solid Color w/ Image Mask')
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'IMAGE'
 
-        c = col.operator("node.y_new_layer", text='Solid Color w/ Vertex Color Mask')
+        c = col.operator("wm.y_new_layer", text='Solid Color w/ Vertex Color Mask')
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'VCOL'
 
-        c = col.operator("node.y_new_layer", text='Solid Color w/ Color ID Mask')
+        c = col.operator("wm.y_new_layer", text='Solid Color w/ Color ID Mask')
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'COLOR_ID'
 
         if is_bl_newer_than(2, 93):
-            c = col.operator("node.y_new_layer", text='Solid Color w/ Edge Detect Mask')
+            c = col.operator("wm.y_new_layer", text='Solid Color w/ Edge Detect Mask')
             c.type = 'COLOR'
             c.add_mask = True
             c.mask_type = 'EDGE_DETECT'
@@ -5336,15 +5423,15 @@ class YNewLayerMenu(bpy.types.Menu):
         col.separator()
 
         #col.label(text='Background:')
-        c = col.operator("node.y_new_layer", icon_value=lib.get_icon('background'), text='Background w/ Image Mask')
+        c = col.operator("wm.y_new_layer", icon_value=lib.get_icon('background'), text='Background w/ Image Mask')
         c.type = 'BACKGROUND'
         c.add_mask = True
         c.mask_type = 'IMAGE'
 
         #if is_bl_newer_than(2, 80):
-        #    c = col.operator("node.y_new_layer", text='Background w/ Vertex Color Mask')
-        #else: c = col.operator("node.y_new_layer", text='Background w/ Vertex Color Mask')
-        c = col.operator("node.y_new_layer", text='Background w/ Vertex Color Mask')
+        #    c = col.operator("wm.y_new_layer", text='Background w/ Vertex Color Mask')
+        #else: c = col.operator("wm.y_new_layer", text='Background w/ Vertex Color Mask')
+        c = col.operator("wm.y_new_layer", text='Background w/ Vertex Color Mask')
 
         c.type = 'BACKGROUND'
         c.add_mask = True
@@ -5352,64 +5439,65 @@ class YNewLayerMenu(bpy.types.Menu):
 
         if is_bl_newer_than(3, 2):
             col.separator()
-            col.operator("node.y_new_vdm_layer", text='Vector Displacement Image', icon='SCULPTMODE_HLT')
+            col.operator("wm.y_new_vdm_layer", text='Vector Displacement Image', icon='SCULPTMODE_HLT')
 
         col = row.column()
         col.label(text='Generated Layer:')
-        #col.operator("node.y_new_layer", icon='TEXTURE', text='Brick').type = 'BRICK'
-        col.operator("node.y_new_layer", icon_value=lib.get_icon('texture'), text='Brick').type = 'BRICK'
-        col.operator("node.y_new_layer", text='Checker').type = 'CHECKER'
-        col.operator("node.y_new_layer", text='Gradient').type = 'GRADIENT'
-        col.operator("node.y_new_layer", text='Magic').type = 'MAGIC'
-        if not is_bl_newer_than(4, 1): col.operator("node.y_new_layer", text='Musgrave').type = 'MUSGRAVE'
-        col.operator("node.y_new_layer", text='Noise').type = 'NOISE'
-        if is_bl_newer_than(4, 3): col.operator("node.y_new_layer", text='Gabor').type = 'GABOR'
-        col.operator("node.y_new_layer", text='Voronoi').type = 'VORONOI'
-        col.operator("node.y_new_layer", text='Wave').type = 'WAVE'
+        #col.operator("wm.y_new_layer", icon='TEXTURE', text='Brick').type = 'BRICK'
+        col.operator("wm.y_new_layer", icon_value=lib.get_icon('texture'), text='Brick').type = 'BRICK'
+        col.operator("wm.y_new_layer", text='Checker').type = 'CHECKER'
+        col.operator("wm.y_new_layer", text='Gradient').type = 'GRADIENT'
+        col.operator("wm.y_new_layer", text='Magic').type = 'MAGIC'
+        if not is_bl_newer_than(4, 1): col.operator("wm.y_new_layer", text='Musgrave').type = 'MUSGRAVE'
+        col.operator("wm.y_new_layer", text='Noise').type = 'NOISE'
+        if is_bl_newer_than(4, 3): col.operator("wm.y_new_layer", text='Gabor').type = 'GABOR'
+        col.operator("wm.y_new_layer", text='Voronoi').type = 'VORONOI'
+        col.operator("wm.y_new_layer", text='Wave').type = 'WAVE'
 
         col.separator()
-        col.operator("node.y_new_layer", icon_value=lib.get_icon('hemi'), text='Fake Lighting').type = 'HEMI'
+        col.operator("wm.y_new_layer", icon_value=lib.get_icon('hemi'), text='Fake Lighting').type = 'HEMI'
 
         col = row.column()
         col.label(text='Bake as Layer:')
-        c = col.operator("node.y_bake_to_layer", icon_value=lib.get_icon('bake'), text='Ambient Occlusion')
+        c = col.operator("wm.y_bake_to_layer", icon_value=lib.get_icon('bake'), text='Ambient Occlusion')
         c.type = 'AO'
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
-        c = col.operator("node.y_bake_to_layer", text='Pointiness')
+        c = col.operator("wm.y_bake_to_layer", text='Pointiness')
         c.type = 'POINTINESS'
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
-        c = col.operator("node.y_bake_to_layer", text='Cavity')
+        c = col.operator("wm.y_bake_to_layer", text='Cavity')
         c.type = 'CAVITY'
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
-        c = col.operator("node.y_bake_to_layer", text='Dust')
+        c = col.operator("wm.y_bake_to_layer", text='Dust')
         c.type = 'DUST'
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
-        c = col.operator("node.y_bake_to_layer", text='Paint Base')
+        c = col.operator("wm.y_bake_to_layer", text='Paint Base')
         c.type = 'PAINT_BASE'
         c.target_type = 'LAYER'
         c.overwrite_current = False
 
-        c = col.operator("node.y_bake_to_layer", text='Bevel Normal')
-        c.type = 'BEVEL_NORMAL'
-        c.target_type = 'LAYER'
-        c.overwrite_current = False
+        if is_bl_newer_than(2, 80):
+            c = col.operator("wm.y_bake_to_layer", text='Bevel Normal')
+            c.type = 'BEVEL_NORMAL'
+            c.target_type = 'LAYER'
+            c.overwrite_current = False
 
-        c = col.operator("node.y_bake_to_layer", text='Bevel Grayscale')
-        c.type = 'BEVEL_MASK'
-        c.target_type = 'LAYER'
-        c.overwrite_current = False
+            c = col.operator("wm.y_bake_to_layer", text='Bevel Grayscale')
+            c.type = 'BEVEL_MASK'
+            c.target_type = 'LAYER'
+            c.overwrite_current = False
 
         # NOTE: Blender 2.76 does not bake to object space normal correctly
         if is_bl_newer_than(2, 77):
-            c = col.operator("node.y_bake_to_layer", text='Object Space Normal')
+            c = col.operator("wm.y_bake_to_layer", text='Object Space Normal')
             c.type = 'OBJECT_SPACE_NORMAL'
             c.target_type = 'LAYER'
             c.overwrite_current = False
@@ -5417,12 +5505,12 @@ class YNewLayerMenu(bpy.types.Menu):
         if is_bl_newer_than(2, 80):
             col.separator()
 
-            c = col.operator("node.y_bake_to_layer", text='Multires Normal')
+            c = col.operator("wm.y_bake_to_layer", text='Multires Normal')
             c.type = 'MULTIRES_NORMAL'
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
-            c = col.operator("node.y_bake_to_layer", text='Multires Displacement')
+            c = col.operator("wm.y_bake_to_layer", text='Multires Displacement')
             c.type = 'MULTIRES_DISPLACEMENT'
             c.target_type = 'LAYER'
             c.overwrite_current = False
@@ -5431,24 +5519,24 @@ class YNewLayerMenu(bpy.types.Menu):
         if is_bl_newer_than(2, 77):
             col.separator()
 
-            c = col.operator("node.y_bake_to_layer", text='Other Objects Emission')
+            c = col.operator("wm.y_bake_to_layer", text='Other Objects Emission')
             c.type = 'OTHER_OBJECT_EMISSION'
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
-            c = col.operator("node.y_bake_to_layer", text='Other Objects Normal')
+            c = col.operator("wm.y_bake_to_layer", text='Other Objects Normal')
             c.type = 'OTHER_OBJECT_NORMAL'
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
-            c = col.operator("node.y_bake_to_layer", text='Other Objects Channels')
+            c = col.operator("wm.y_bake_to_layer", text='Other Objects Channels')
             c.type = 'OTHER_OBJECT_CHANNELS'
             c.target_type = 'LAYER'
             c.overwrite_current = False
 
         col.separator()
 
-        c = col.operator("node.y_bake_to_layer", text='Selected Vertices')
+        c = col.operator("wm.y_bake_to_layer", text='Selected Vertices')
         c.type = 'SELECTED_VERTICES'
         c.target_type = 'LAYER'
         c.overwrite_current = False
@@ -5456,7 +5544,7 @@ class YNewLayerMenu(bpy.types.Menu):
         if ypup.show_experimental:
             col.separator()
 
-            c = col.operator("node.y_bake_to_layer", text='Flow')
+            c = col.operator("wm.y_bake_to_layer", text='Flow')
             c.type = 'FLOW'
             c.target_type = 'LAYER'
             c.overwrite_current = False
@@ -5484,22 +5572,22 @@ class YBakedImageMenu(bpy.types.Menu):
         #except Exception as e: 
         #    print(e)
 
-        col.operator('node.y_pack_image', icon='PACKAGE')
-        col.operator('node.y_save_image', icon='FILE_TICK')
+        col.operator('wm.y_pack_image', icon='PACKAGE')
+        col.operator('wm.y_save_image', icon='FILE_TICK')
 
         if context.image.packed_file:
-            col.operator('node.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
-        else: col.operator('node.y_save_as_image', text='Save As Image').copy = False
-        col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
+            col.operator('wm.y_save_as_image', text='Unpack As Image', icon='UGLYPACKAGE').copy = False
+        else: col.operator('wm.y_save_as_image', text='Save As Image').copy = False
+        col.operator('wm.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
 
         icon = 'FILEBROWSER' if is_bl_newer_than(2, 80) else 'FILE_FOLDER'
-        col.operator('node.y_save_all_baked_images', text='Save All Baked Images to...', icon=icon).copy = False
-        col.operator('node.y_save_all_baked_images', text='Save All Baked Image Copies to...').copy = True
+        col.operator('wm.y_save_all_baked_images', text='Save All Baked Images to...', icon=icon).copy = False
+        col.operator('wm.y_save_all_baked_images', text='Save All Baked Image Copies to...').copy = True
 
         col.separator()
-        col.operator('node.y_delete_baked_channel_images', text='Delete All Baked Images', icon='ERROR')
+        col.operator('wm.y_delete_baked_channel_images', text='Delete All Baked Images', icon='ERROR')
 
 class YLayerChannelNormalBlendMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_layer_channel_normal_blend_menu"
@@ -5513,7 +5601,7 @@ class YLayerChannelNormalBlendMenu(bpy.types.Menu):
     def draw(self, context):
         col = self.layout.column() #align=True)
         for key, val in normal_blend_labels.items():
-            col.operator('node.y_set_layer_channel_normal_blend_type', text=val).normal_blend_type = key
+            col.operator('wm.y_set_layer_channel_normal_blend_type', text=val).normal_blend_type = key
 
 class YLayerChannelBlendMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_layer_channel_blend_menu"
@@ -5527,7 +5615,7 @@ class YLayerChannelBlendMenu(bpy.types.Menu):
     def draw(self, context):
         col = self.layout.column() #align=True)
         for key, val in blend_type_labels.items():
-            col.operator('node.y_set_layer_channel_blend_type', text=val).blend_type = key
+            col.operator('wm.y_set_layer_channel_blend_type', text=val).blend_type = key
 
 class YLayerChannelBlendPopover(bpy.types.Panel):
     bl_idname = "NODE_PT_y_layer_channel_blend_popover"
@@ -5562,6 +5650,19 @@ class YLayerChannelBlendPopover(bpy.types.Panel):
         col.prop(ch, 'blend_type', text='')
         draw_input_prop(col, ch, 'intensity_value', text='')
 
+
+def draw_expandable_list_options(layout):
+    col = layout.column()
+    yp = get_active_ypaint_node().node_tree.yp
+
+    col.label(text='Layer List Options (Experimental)')
+    col.separator()
+    
+    col.prop(yp, 'enable_expandable_subitems')
+    row = col.row()
+    row.active =  yp.enable_expandable_subitems
+    row.prop(yp, 'enable_inline_subitems')
+
 class YListItemOptionPopover(bpy.types.Panel):
     bl_idname = "NODE_PT_y_list_item_option_popover"
     bl_label = "List Item Popover"
@@ -5575,16 +5676,19 @@ class YListItemOptionPopover(bpy.types.Panel):
         return get_active_ypaint_node()
 
     def draw(self, context):
-        col = self.layout.column()
-        yp = get_active_ypaint_node().node_tree.yp
+        draw_expandable_list_options(self.layout)
 
-        col.label(text='Layer List Options (Experimental)')
-        col.separator()
-        
-        col.prop(yp, 'enable_expandable_subitems')
-        row = col.row()
-        row.active =  yp.enable_expandable_subitems
-        row.prop(yp, 'enable_inline_subitems')
+class YListItemOptionMenu(bpy.types.Menu):
+    bl_idname = "NODE_PT_y_list_item_option_menu"
+    bl_label = "List Item Menu"
+    bl_description = "List item menu"
+    
+    @classmethod
+    def poll(cls, context):
+        return get_active_ypaint_node()
+
+    def draw(self, context):
+        draw_expandable_list_options(self.layout)
 
 class YLayerChannelNormalBlendPopover(bpy.types.Panel):
     bl_idname = "NODE_PT_y_layer_channel_normal_blend_popover"
@@ -5670,7 +5774,7 @@ class YLayerChannelInputMenu(bpy.types.Menu):
             label += ' ('+layer_type_labels[layer.type]+')'
 
         icon = 'RADIOBUT_ON' if not ch.override and (ch.layer_input == 'RGB' or not has_layer_input_options(layer)) else 'RADIOBUT_OFF'
-        op = col.operator('node.y_set_layer_channel_input', text=label, icon=icon)
+        op = col.operator('wm.y_set_layer_channel_input', text=label, icon=icon)
         op.type = 'RGB'
         op.set_normal_input = False
 
@@ -5688,7 +5792,7 @@ class YLayerChannelInputMenu(bpy.types.Menu):
                 label += ' ('+layer_type_labels[layer.type]+')'
 
             icon = 'RADIOBUT_ON' if ch.layer_input == 'ALPHA' and not ch.override else 'RADIOBUT_OFF'
-            op = col.operator('node.y_set_layer_channel_input', text=label, icon=icon)
+            op = col.operator('wm.y_set_layer_channel_input', text=label, icon=icon)
             op.type = 'ALPHA'
             op.set_normal_input = False
 
@@ -5701,7 +5805,7 @@ class YLayerChannelInputMenu(bpy.types.Menu):
         else: label += ' Color'
 
         icon = 'RADIOBUT_ON' if ch.override and ch.override_type == 'DEFAULT' else 'RADIOBUT_OFF'
-        op = col.operator('node.y_set_layer_channel_input', text=label, icon=icon)
+        op = col.operator('wm.y_set_layer_channel_input', text=label, icon=icon)
         op.type = 'CUSTOM'
         op.set_normal_input = False
 
@@ -5760,7 +5864,7 @@ class YLayerChannelInput1Menu(bpy.types.Menu):
             label += ' ('+layer_type_labels[layer.type]+')'
 
         icon = 'RADIOBUT_ON' if not ch.override_1 else 'RADIOBUT_OFF'
-        op = col.operator('node.y_set_layer_channel_input', text=label, icon=icon)
+        op = col.operator('wm.y_set_layer_channel_input', text=label, icon=icon)
         op.type = 'RGB'
         op.set_normal_input = True
 
@@ -5768,7 +5872,7 @@ class YLayerChannelInput1Menu(bpy.types.Menu):
 
         # Custom/Override Default
         icon = 'RADIOBUT_ON' if ch.override_1 and ch.override_1_type == 'DEFAULT' else 'RADIOBUT_OFF'
-        op = col.operator('node.y_set_layer_channel_input', text='Custom Color', icon=icon)
+        op = col.operator('wm.y_set_layer_channel_input', text='Custom Color', icon=icon)
         op.type = 'CUSTOM'
         op.set_normal_input = True
 
@@ -5802,23 +5906,25 @@ class YLayerListSpecialMenu(bpy.types.Menu):
         row = self.layout.row()
         col = row.column()
         
-        col.operator('node.y_merge_layer', text='Merge Layer Up', icon='TRIA_UP').direction = 'UP'
-        col.operator('node.y_merge_layer', text='Merge Layer Down', icon='TRIA_DOWN').direction = 'DOWN'
+        col.operator('wm.y_merge_layer', text='Merge Layer Up', icon='TRIA_UP').direction = 'UP'
+        col.operator('wm.y_merge_layer', text='Merge Layer Down', icon='TRIA_DOWN').direction = 'DOWN'
 
         col.separator()
 
-        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Layer').duplicate_blank = False
-        c = col.operator("node.y_duplicate_layer", icon='COPY_ID', text='Duplicate Blank Layer').duplicate_blank = True
+        c = col.operator("wm.y_duplicate_layer", icon='COPY_ID', text='Duplicate Layer').duplicate_blank = False
+        c = col.operator("wm.y_duplicate_layer", icon='COPY_ID', text='Duplicate Blank Layer').duplicate_blank = True
 
         col.separator()
 
-        col.operator('node.y_copy_layer', text='Copy Layer', icon='COPYDOWN').all_layers = False
-        col.operator('node.y_copy_layer', text='Copy All Layers', icon='COPYDOWN').all_layers = True
-        col.operator('node.y_paste_layer', text='Paste Layer(s)', icon='PASTEDOWN')
+        col.operator('wm.y_copy_layer', text='Copy Layer', icon='COPYDOWN').all_layers = False
+        col.operator('wm.y_copy_layer', text='Copy All Layers', icon='COPYDOWN').all_layers = True
+        col.operator('wm.y_paste_layer', text='Paste Layer(s)', icon='PASTEDOWN')
+
+        col.separator()
+        col.operator('wm.y_rebake_baked_images', text='Rebake All Baked Images', icon_value=lib.get_icon('bake'))
 
         if UDIM.is_udim_supported():
-            col.separator()
-            col.operator('node.y_refill_udim_tiles', text='Refill UDIM Tiles', icon_value=lib.get_icon('uv'))
+            col.operator('wm.y_refill_udim_tiles', text='Refill UDIM Tiles', icon_value=lib.get_icon('uv'))
 
         #col.prop(yp, 'layer_preview_mode', text='Layer Only Viewer')
 
@@ -5832,39 +5938,39 @@ class YLayerListSpecialMenu(bpy.types.Menu):
             col.label(text='No active image')
 
         #col.separator()
-        #col.operator('node.y_transfer_layer_uv', text='Transfer Active Layer UV', icon_value=lib.get_icon('uv'))
-        #col.operator('node.y_transfer_some_layer_uv', text='Transfer All Layers & Masks UV', icon_value=lib.get_icon('uv'))
+        #col.operator('wm.y_transfer_layer_uv', text='Transfer Active Layer UV', icon_value=lib.get_icon('uv'))
+        #col.operator('wm.y_transfer_some_layer_uv', text='Transfer All Layers & Masks UV', icon_value=lib.get_icon('uv'))
         
         #if hasattr(context, 'image') and context.image:
         col.separator()
-        op = col.operator('node.y_resize_image', text='Resize Image', icon='FULLSCREEN_ENTER')
+        op = col.operator('wm.y_resize_image', text='Resize Image', icon='FULLSCREEN_ENTER')
         if hasattr(context, 'layer'):
             op.layer_name = context.layer.name
         if hasattr(context, 'image'):
             op.image_name = context.image.name
-        col.operator("node.y_invert_image", icon='IMAGE_ALPHA')
+        col.operator("wm.y_invert_image", icon='IMAGE_ALPHA')
 
         col.separator()
-        col.operator('node.y_pack_image', icon='PACKAGE')
-        col.operator('node.y_save_image', icon='FILE_TICK')
+        col.operator('wm.y_pack_image', icon='PACKAGE')
+        col.operator('wm.y_save_image', icon='FILE_TICK')
         if hasattr(context, 'image') and context.image.packed_file:
-            col.operator('node.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE').copy = False
+            col.operator('wm.y_save_as_image', text='Unpack As Image...', icon='UGLYPACKAGE').copy = False
         else:
             if is_bl_newer_than(2, 80):
-                col.operator('node.y_save_as_image', text='Save As Image...').copy = False
-            else: col.operator('node.y_save_as_image', text='Save As Image...', icon='SAVE_AS').copy = False
-        col.operator('node.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
+                col.operator('wm.y_save_as_image', text='Save As Image...').copy = False
+            else: col.operator('wm.y_save_as_image', text='Save As Image...', icon='SAVE_AS').copy = False
+        col.operator('wm.y_save_as_image', text='Save an Image Copy...', icon='FILE_TICK').copy = True
 
         col.separator()
-        col.operator("node.y_reload_image", icon='FILE_REFRESH')
+        col.operator("wm.y_reload_image", icon='FILE_REFRESH')
 
         col.separator()
 
         if hasattr(context, 'image'):
             col.menu("NODE_MT_y_image_convert_menu", text='Convert Image')
 
-        if is_bl_newer_than(2, 80): col.operator('node.y_save_pack_all', text='Save/Pack All Images')
-        else: col.operator('node.y_save_pack_all', text='Save/Pack All Images', icon='FILE_TICK')
+        if is_bl_newer_than(2, 80): col.operator('wm.y_save_pack_all', text='Save/Pack All Images')
+        else: col.operator('wm.y_save_pack_all', text='Save/Pack All Images', icon='FILE_TICK')
 
 class YOpenImagesToSingleLayerMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_open_images_to_single_layer_menu"
@@ -5878,8 +5984,8 @@ class YOpenImagesToSingleLayerMenu(bpy.types.Menu):
     def draw(self, context):
         col = self.layout.column()
 
-        col.operator("node.y_open_images_to_single_layer", icon='FILE_FOLDER', text='From Directory')
-        col.operator("node.y_open_images_from_material_to_single_layer", icon='MATERIAL_DATA', text='From Material').asset_library_path = ''
+        col.operator("wm.y_open_images_to_single_layer", icon='FILE_FOLDER', text='From Directory')
+        col.operator("wm.y_open_images_from_material_to_single_layer", icon='MATERIAL_DATA', text='From Material').asset_library_path = ''
 
 class YNewSolidColorLayerMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_new_solid_color_layer_menu"
@@ -5894,27 +6000,27 @@ class YNewSolidColorLayerMenu(bpy.types.Menu):
         col = self.layout.column()
 
         icon_value = lib.get_icon("color")
-        c = col.operator("node.y_new_layer", icon_value=icon_value, text='Solid Color')
+        c = col.operator("wm.y_new_layer", icon_value=icon_value, text='Solid Color')
         c.type = 'COLOR'
         c.add_mask = False
 
-        c = col.operator("node.y_new_layer", text='Solid Color w/ Image Mask')
+        c = col.operator("wm.y_new_layer", text='Solid Color w/ Image Mask')
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'IMAGE'
 
-        c = col.operator("node.y_new_layer", text='Solid Color w/ Vertex Color Mask')
+        c = col.operator("wm.y_new_layer", text='Solid Color w/ Vertex Color Mask')
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'VCOL'
 
-        c = col.operator("node.y_new_layer", text='Solid Color w/ Color ID Mask')
+        c = col.operator("wm.y_new_layer", text='Solid Color w/ Color ID Mask')
         c.type = 'COLOR'
         c.add_mask = True
         c.mask_type = 'COLOR_ID'
 
         if is_bl_newer_than(2, 93):
-            c = col.operator("node.y_new_layer", text='Solid Color w/ Edge Detect Mask')
+            c = col.operator("wm.y_new_layer", text='Solid Color w/ Edge Detect Mask')
             c.type = 'COLOR'
             c.add_mask = True
             c.mask_type = 'EDGE_DETECT'
@@ -5941,11 +6047,11 @@ class YImageConvertToMenu(bpy.types.Menu):
 
         col.separator()
         if context.image.yia.is_image_atlas or context.image.yua.is_udim_atlas:
-            col.operator("node.y_convert_to_standard_image", icon='IMAGE_DATA', text='Convert to standard Image').all_images = False
-            col.operator("node.y_convert_to_standard_image", icon='IMAGE_DATA', text='Convert All Image Atlas to standard Images').all_images = True
+            col.operator("wm.y_convert_to_standard_image", icon='IMAGE_DATA', text='Convert to standard Image').all_images = False
+            col.operator("wm.y_convert_to_standard_image", icon='IMAGE_DATA', text='Convert All Image Atlas to standard Images').all_images = True
         else:
-            col.operator("node.y_convert_to_image_atlas", icon='IMAGE_DATA', text='Convert to Image Atlas').all_images = False
-            col.operator("node.y_convert_to_image_atlas", icon='IMAGE_DATA', text='Convert All Images to Image Atlas').all_images = True
+            col.operator("wm.y_convert_to_image_atlas", icon='IMAGE_DATA', text='Convert to Image Atlas').all_images = False
+            col.operator("wm.y_convert_to_image_atlas", icon='IMAGE_DATA', text='Convert All Images to Image Atlas').all_images = True
 
 class YUVSpecialMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_uv_special_menu"
@@ -5959,8 +6065,8 @@ class YUVSpecialMenu(bpy.types.Menu):
     def draw(self, context):
         col = self.layout.column()
 
-        col.operator('node.y_transfer_layer_uv', text='Transfer UV', icon_value=lib.get_icon('uv'))
-        col.operator('node.y_transfer_some_layer_uv', text='Transfer All Layers & Masks UV', icon_value=lib.get_icon('uv'))
+        col.operator('wm.y_transfer_layer_uv', text='Transfer UV', icon_value=lib.get_icon('uv'))
+        col.operator('wm.y_transfer_some_layer_uv', text='Transfer All Layers & Masks UV', icon_value=lib.get_icon('uv'))
 
 class YModifierMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_modifier_menu"
@@ -5980,16 +6086,16 @@ class YModifierMenu(bpy.types.Menu):
             col.label(text='ERROR: Context has no parent or modifier!', icon='ERROR')
             return
 
-        op = col.operator('node.y_move_ypaint_modifier', icon='TRIA_UP', text='Move Modifier Up')
+        op = col.operator('wm.y_move_ypaint_modifier', icon='TRIA_UP', text='Move Modifier Up')
         op.direction = 'UP'
 
-        op = col.operator('node.y_move_ypaint_modifier', icon='TRIA_DOWN', text='Move Modifier Down')
+        op = col.operator('wm.y_move_ypaint_modifier', icon='TRIA_DOWN', text='Move Modifier Down')
         op.direction = 'DOWN'
 
         col.separator()
         if is_bl_newer_than(2, 80):
-            op = col.operator('node.y_remove_ypaint_modifier', icon='REMOVE', text='Remove Modifier')
-        else: op = col.operator('node.y_remove_ypaint_modifier', icon='ZOOMOUT', text='Remove Modifier')
+            op = col.operator('wm.y_remove_ypaint_modifier', icon='REMOVE', text='Remove Modifier')
+        else: op = col.operator('wm.y_remove_ypaint_modifier', icon='ZOOMOUT', text='Remove Modifier')
 
         #if hasattr(context, 'layer') and context.modifier.type in {'RGB_TO_INTENSITY', 'OVERRIDE_COLOR'}:
         #    col.separator()
@@ -6013,16 +6119,16 @@ class YModifier1Menu(bpy.types.Menu):
             col.label(text='ERROR: Context has no parent or modifier!', icon='ERROR')
             return
 
-        op = col.operator('node.y_move_normalmap_modifier', icon='TRIA_UP', text='Move Modifier Up')
+        op = col.operator('wm.y_move_normalmap_modifier', icon='TRIA_UP', text='Move Modifier Up')
         op.direction = 'UP'
 
-        op = col.operator('node.y_move_normalmap_modifier', icon='TRIA_DOWN', text='Move Modifier Down')
+        op = col.operator('wm.y_move_normalmap_modifier', icon='TRIA_DOWN', text='Move Modifier Down')
         op.direction = 'DOWN'
 
         col.separator()
         if is_bl_newer_than(2, 80):
-            op = col.operator('node.y_remove_normalmap_modifier', icon='REMOVE', text='Remove Modifier')
-        else: op = col.operator('node.y_remove_normalmap_modifier', icon='ZOOMOUT', text='Remove Modifier')
+            op = col.operator('wm.y_remove_normalmap_modifier', icon='REMOVE', text='Remove Modifier')
+        else: op = col.operator('wm.y_remove_normalmap_modifier', icon='ZOOMOUT', text='Remove Modifier')
 
 class YMaskModifierMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_mask_modifier_menu"
@@ -6042,17 +6148,17 @@ class YMaskModifierMenu(bpy.types.Menu):
             col.label(text='ERROR: Context has no mask, modifier, or layer!', icon='ERROR')
             return
 
-        op = col.operator('node.y_move_mask_modifier', icon='TRIA_UP', text='Move Modifier Up')
+        op = col.operator('wm.y_move_mask_modifier', icon='TRIA_UP', text='Move Modifier Up')
         op.direction = 'UP'
 
-        op = col.operator('node.y_move_mask_modifier', icon='TRIA_DOWN', text='Move Modifier Down')
+        op = col.operator('wm.y_move_mask_modifier', icon='TRIA_DOWN', text='Move Modifier Down')
         op.direction = 'DOWN'
 
         col.separator()
 
         if is_bl_newer_than(2, 80):
-            op = col.operator('node.y_remove_mask_modifier', icon='REMOVE', text='Remove Modifier')
-        else: op = col.operator('node.y_remove_mask_modifier', icon='ZOOMOUT', text='Remove Modifier')
+            op = col.operator('wm.y_remove_mask_modifier', icon='REMOVE', text='Remove Modifier')
+        else: op = col.operator('wm.y_remove_mask_modifier', icon='ZOOMOUT', text='Remove Modifier')
 
 class YTransitionBumpMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_transition_bump_menu"
@@ -6074,8 +6180,8 @@ class YTransitionBumpMenu(bpy.types.Menu):
             return
 
         if is_bl_newer_than(2, 80):
-            col.operator('node.y_hide_transition_effect', text='Remove Transition Bump', icon='REMOVE').type = 'BUMP'
-        else: col.operator('node.y_hide_transition_effect', text='Remove Transition Bump', icon='ZOOMOUT').type = 'BUMP'
+            col.operator('wm.y_hide_transition_effect', text='Remove Transition Bump', icon='REMOVE').type = 'BUMP'
+        else: col.operator('wm.y_hide_transition_effect', text='Remove Transition Bump', icon='ZOOMOUT').type = 'BUMP'
 
 class YTransitionRampMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_transition_ramp_menu"
@@ -6100,8 +6206,8 @@ class YTransitionRampMenu(bpy.types.Menu):
         col.separator()
 
         if is_bl_newer_than(2, 80):
-            col.operator('node.y_hide_transition_effect', text='Remove Transition Ramp', icon='REMOVE').type = 'RAMP'
-        else: col.operator('node.y_hide_transition_effect', text='Remove Transition Ramp', icon='ZOOMOUT').type = 'RAMP'
+            col.operator('wm.y_hide_transition_effect', text='Remove Transition Ramp', icon='REMOVE').type = 'RAMP'
+        else: col.operator('wm.y_hide_transition_effect', text='Remove Transition Ramp', icon='ZOOMOUT').type = 'RAMP'
 
 class YTransitionAOMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_transition_ao_menu"
@@ -6133,8 +6239,8 @@ class YTransitionAOMenu(bpy.types.Menu):
 
         col = layout.column()
         if is_bl_newer_than(2, 80):
-            col.operator('node.y_hide_transition_effect', text='Remove Transition AO', icon='REMOVE').type = 'AO'
-        else: col.operator('node.y_hide_transition_effect', text='Remove Transition AO', icon='ZOOMOUT').type = 'AO'
+            col.operator('wm.y_hide_transition_effect', text='Remove Transition AO', icon='REMOVE').type = 'AO'
+        else: col.operator('wm.y_hide_transition_effect', text='Remove Transition AO', icon='ZOOMOUT').type = 'AO'
 
 def new_mask_button(layout, operator, text, lib_icon='', otype='', target_type='', modifier_type='', overwrite_current=None):
     if lib_icon:
@@ -6171,56 +6277,56 @@ class YAddLayerMaskMenu(bpy.types.Menu):
         col.context_pointer_set('layer', context.layer)
 
         col.label(text='Image Mask:')
-        new_mask_button(col, 'node.y_new_layer_mask', 'New Image Mask', lib_icon='image', otype='IMAGE')
-        op = new_mask_button(col, 'node.y_open_image_as_mask', 'Open Image as Mask...', lib_icon='open_image')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'New Image Mask', lib_icon='image', otype='IMAGE')
+        op = new_mask_button(col, 'wm.y_open_image_as_mask', 'Open Image as Mask...', lib_icon='open_image')
         op.texcoord_type = 'UV'
         op.file_browser_filepath = ''
-        new_mask_button(col, 'node.y_open_available_data_as_mask', 'Open Available Image as Mask', lib_icon='open_image', otype='IMAGE')
+        new_mask_button(col, 'wm.y_open_available_data_as_mask', 'Open Available Image as Mask', lib_icon='open_image', otype='IMAGE')
         col.separator()
 
         col.label(text='Vertex Color Mask:')
-        new_mask_button(col, 'node.y_new_layer_mask', 'New Vertex Color Mask', lib_icon='vertex_color', otype='VCOL')
-        new_mask_button(col, 'node.y_open_available_data_as_mask', 'Open Available Vertex Color as Mask', lib_icon='vertex_color', otype='VCOL')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'New Vertex Color Mask', lib_icon='vertex_color', otype='VCOL')
+        new_mask_button(col, 'wm.y_open_available_data_as_mask', 'Open Available Vertex Color as Mask', lib_icon='vertex_color', otype='VCOL')
 
-        new_mask_button(col, 'node.y_new_layer_mask', 'Color ID', lib_icon='color', otype='COLOR_ID')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Color ID', lib_icon='color', otype='COLOR_ID')
 
         col = row.column(align=True)
         col.label(text='Generated Mask:')
 
-        new_mask_button(col, 'node.y_new_layer_mask', 'Brick', otype='BRICK', lib_icon='texture')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Checker', otype='CHECKER')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Gradient', otype='GRADIENT')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Magic', otype='MAGIC')
-        if not is_bl_newer_than(4, 1): new_mask_button(col, 'node.y_new_layer_mask', 'Musgrave', otype='MUSGRAVE')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Noise', otype='NOISE')
-        if is_bl_newer_than(4, 3): new_mask_button(col, 'node.y_new_layer_mask', 'Gabor', otype='GABOR')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Voronoi', otype='VORONOI')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Wave', otype='WAVE')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Brick', otype='BRICK', lib_icon='texture')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Checker', otype='CHECKER')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Gradient', otype='GRADIENT')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Magic', otype='MAGIC')
+        if not is_bl_newer_than(4, 1): new_mask_button(col, 'wm.y_new_layer_mask', 'Musgrave', otype='MUSGRAVE')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Noise', otype='NOISE')
+        if is_bl_newer_than(4, 3): new_mask_button(col, 'wm.y_new_layer_mask', 'Gabor', otype='GABOR')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Voronoi', otype='VORONOI')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Wave', otype='WAVE')
 
         col.separator()
-        new_mask_button(col, 'node.y_new_layer_mask', 'Fake Lighting', lib_icon='hemi', otype='HEMI')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Fake Lighting', lib_icon='hemi', otype='HEMI')
 
         col.separator()
-        new_mask_button(col, 'node.y_new_layer_mask', 'Object Index', otype='OBJECT_INDEX', lib_icon='object_index')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Backface', otype='BACKFACE', lib_icon='backface')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Object Index', otype='OBJECT_INDEX', lib_icon='object_index')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Backface', otype='BACKFACE', lib_icon='backface')
         if is_bl_newer_than(2, 93):
-            new_mask_button(col, 'node.y_new_layer_mask', 'Edge Detect', otype='EDGE_DETECT', lib_icon='edge_detect')
+            new_mask_button(col, 'wm.y_new_layer_mask', 'Edge Detect', otype='EDGE_DETECT', lib_icon='edge_detect')
 
         col = row.column(align=True)
         col.label(text='Bake as Mask:')
-        new_mask_button(col, 'node.y_bake_to_layer', 'Ambient Occlusion', lib_icon='bake', otype='AO', target_type='MASK', overwrite_current=False)
-        new_mask_button(col, 'node.y_bake_to_layer', 'Pointiness', otype='POINTINESS', target_type='MASK', overwrite_current=False)
-        new_mask_button(col, 'node.y_bake_to_layer', 'Cavity', otype='CAVITY', target_type='MASK', overwrite_current=False)
-        new_mask_button(col, 'node.y_bake_to_layer', 'Dust', otype='DUST', target_type='MASK', overwrite_current=False)
-        new_mask_button(col, 'node.y_bake_to_layer', 'Paint Base', otype='PAINT_BASE', target_type='MASK', overwrite_current=False)
-        new_mask_button(col, 'node.y_bake_to_layer', 'Bevel Grayscale', otype='BEVEL_MASK', target_type='MASK', overwrite_current=False)
-        new_mask_button(col, 'node.y_bake_to_layer', 'Selected Vertices', otype='SELECTED_VERTICES', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Ambient Occlusion', lib_icon='bake', otype='AO', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Pointiness', otype='POINTINESS', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Cavity', otype='CAVITY', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Dust', otype='DUST', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Paint Base', otype='PAINT_BASE', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Bevel Grayscale', otype='BEVEL_MASK', target_type='MASK', overwrite_current=False)
+        new_mask_button(col, 'wm.y_bake_to_layer', 'Selected Vertices', otype='SELECTED_VERTICES', target_type='MASK', overwrite_current=False)
 
         col.separator()
         col.label(text='Inbetween Modifier Mask:')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Invert', otype='MODIFIER', modifier_type='INVERT', lib_icon='modifier')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Ramp', otype='MODIFIER', modifier_type='RAMP', lib_icon='modifier')
-        new_mask_button(col, 'node.y_new_layer_mask', 'Curve', otype='MODIFIER', modifier_type='CURVE', lib_icon='modifier')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Invert', otype='MODIFIER', modifier_type='INVERT', lib_icon='modifier')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Ramp', otype='MODIFIER', modifier_type='RAMP', lib_icon='modifier')
+        new_mask_button(col, 'wm.y_new_layer_mask', 'Curve', otype='MODIFIER', modifier_type='CURVE', lib_icon='modifier')
 
 class YLayerMaskMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_layer_mask_menu"
@@ -6250,47 +6356,43 @@ class YLayerMaskMenu(bpy.types.Menu):
             mask_tree = get_mask_tree(mask)
             source = mask_tree.nodes.get(mask.source)
             col.context_pointer_set('image', source.image)
-            col.operator('node.y_invert_image', text='Invert Image', icon='IMAGE_ALPHA')
+            col.operator('wm.y_invert_image', text='Invert Image', icon='IMAGE_ALPHA')
 
         col.separator()
 
-        op = col.operator('node.y_move_layer_mask', icon='TRIA_UP', text='Move Mask Up')
+        op = col.operator('wm.y_move_layer_mask', icon='TRIA_UP', text='Move Mask Up')
         op.direction = 'UP'
-        op = col.operator('node.y_move_layer_mask', icon='TRIA_DOWN', text='Move Mask Down')
+        op = col.operator('wm.y_move_layer_mask', icon='TRIA_DOWN', text='Move Mask Down')
         op.direction = 'DOWN'
 
         col.separator()
 
-        op = col.operator('node.y_merge_mask', icon='TRIA_UP', text='Merge Mask Up')
+        op = col.operator('wm.y_merge_mask', icon='TRIA_UP', text='Merge Mask Up')
         op.direction = 'UP'
-        op = col.operator('node.y_merge_mask', icon='TRIA_DOWN', text='Merge Mask Down')
+        op = col.operator('wm.y_merge_mask', icon='TRIA_DOWN', text='Merge Mask Down')
         op.direction = 'DOWN'
 
         col.separator()
 
         col.context_pointer_set('entity', mask)
-        col.operator('node.y_bake_entity_to_image', icon_value=lib.get_icon('bake'), text='Bake as Image')
-        if mask.baked_source != '':
-            if is_bl_newer_than(2, 80):
-                col.operator('node.y_remove_baked_entity', text='Remove Baked Image', icon='REMOVE')
-            else: col.operator('node.y_remove_baked_entity', text='Remove Baked Image', icon='ZOOMOUT')
+        col.operator('wm.y_bake_entity_to_image', icon_value=lib.get_icon('bake'), text='Bake as Image')
 
         col.separator()
 
-        #op = col.operator('node.y_transfer_layer_uv', icon_value=lib.get_icon('uv'), text='Transfer UV')
+        #op = col.operator('wm.y_transfer_layer_uv', icon_value=lib.get_icon('uv'), text='Transfer UV')
 
         #col.separator()
 
         if is_bl_newer_than(2, 80):
-            col.operator('node.y_remove_layer_mask', text='Remove Mask', icon='REMOVE')
-        else: col.operator('node.y_remove_layer_mask', text='Remove Mask', icon='ZOOMOUT')
+            col.operator('wm.y_remove_layer_mask', text='Remove Mask', icon='REMOVE')
+        else: col.operator('wm.y_remove_layer_mask', text='Remove Mask', icon='ZOOMOUT')
 
         col = row.column(align=True)
         col.label(text='Add Modifier')
 
-        col.operator('node.y_new_mask_modifier', text='Invert', icon_value=lib.get_icon('modifier')).type = 'INVERT'
-        col.operator('node.y_new_mask_modifier', text='Ramp', icon_value=lib.get_icon('modifier')).type = 'RAMP'
-        col.operator('node.y_new_mask_modifier', text='Curve', icon_value=lib.get_icon('modifier')).type = 'CURVE'
+        col.operator('wm.y_new_mask_modifier', text='Invert', icon_value=lib.get_icon('modifier')).type = 'INVERT'
+        col.operator('wm.y_new_mask_modifier', text='Ramp', icon_value=lib.get_icon('modifier')).type = 'RAMP'
+        col.operator('wm.y_new_mask_modifier', text='Curve', icon_value=lib.get_icon('modifier')).type = 'CURVE'
 
         #if mask.type not in {'VCOL', 'HEMI', 'OBJECT_INDEX', 'COLOR_ID'}:
         #    col.separator()
@@ -6303,9 +6405,9 @@ class YLayerMaskMenu(bpy.types.Menu):
             col.context_pointer_set('parent', mask)
             col.label(text='Advanced')
             if not mask.use_temp_bake:
-                col.operator('node.y_bake_temp_image', text='Bake Temp Image', icon_value=lib.get_icon('bake'))
+                col.operator('wm.y_bake_temp_image', text='Bake Temp Image', icon_value=lib.get_icon('bake'))
             else:
-                col.operator('node.y_disable_temp_image', text='Disable Baked Temp Image', icon='FILE_REFRESH')
+                col.operator('wm.y_disable_temp_image', text='Disable Baked Temp Image', icon='FILE_REFRESH')
 
 class YMaterialSpecialMenu(bpy.types.Menu):
     bl_idname = "MATERIAL_MT_y_special_menu"
@@ -6318,8 +6420,8 @@ class YMaterialSpecialMenu(bpy.types.Menu):
 
     def draw(self, context):
         col = self.layout.column()
-        col.operator('material.y_select_all_material_polygons', icon='FACESEL')
-        col.operator('material.y_rename_uv_using_the_same_material', icon='GROUP_UVS')
+        col.operator('wm.y_select_all_material_polygons', icon='FACESEL')
+        col.operator('wm.y_rename_uv_using_the_same_material', icon='GROUP_UVS')
 
 class YReplaceChannelOverrideMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_replace_channel_override_menu"
@@ -6355,8 +6457,8 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
 
         #icon = 'RADIOBUT_ON' if ch.override_type == 'DEFAULT' else 'RADIOBUT_OFF'
         #if root_ch.type == 'VALUE':
-        #    col.operator('node.y_replace_layer_channel_override', text='Value', icon=icon).type = 'DEFAULT'
-        #else: col.operator('node.y_replace_layer_channel_override', text='Color', icon=icon).type = 'DEFAULT'
+        #    col.operator('wm.y_replace_layer_channel_override', text='Value', icon=icon).type = 'DEFAULT'
+        #else: col.operator('wm.y_replace_layer_channel_override', text='Color', icon=icon).type = 'DEFAULT'
 
         col.separator()
 
@@ -6371,15 +6473,15 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
 
         icon = 'RADIOBUT_ON' if ch.override and ch.override_type == 'IMAGE' else 'RADIOBUT_OFF'
         if cache_image and (ch.override_type != 'IMAGE' or not ch.override):
-            col.operator('node.y_replace_layer_channel_override', text=label, icon=icon).type = 'IMAGE'
+            col.operator('wm.y_replace_layer_channel_override', text=label, icon=icon).type = 'IMAGE'
         else:
             col.label(text=label, icon=icon)
 
         row = col.row(align=True)
 
         ccol = row.column(align=True)
-        ccol.operator('node.y_open_image_to_override_layer_channel', text='Open Image...', icon_value=lib.get_icon('open_image'))
-        ccol.operator('node.y_open_available_data_to_override_channel', text='Open Available Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
+        ccol.operator('wm.y_open_image_to_override_layer_channel', text='Open Image...', icon_value=lib.get_icon('open_image'))
+        ccol.operator('wm.y_open_available_data_to_override_channel', text='Open Available Image', icon_value=lib.get_icon('open_image')).type = 'IMAGE'
         
         col.separator()
 
@@ -6393,16 +6495,16 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
 
         icon = 'RADIOBUT_ON' if ch.override and ch.override_type == 'VCOL' else 'RADIOBUT_OFF'
         if cache_vcol and (ch.override_type != 'VCOL' or not ch.override):
-            col.operator('node.y_replace_layer_channel_override', text=label, icon=icon).type = 'VCOL'
+            col.operator('wm.y_replace_layer_channel_override', text=label, icon=icon).type = 'VCOL'
         else:
             col.label(text=label, icon=icon)
 
         row = col.row(align=True)
 
         ccol = row.column(align=True)
-        #ccol.operator('node.y_replace_layer_channel_override', text='New Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
-        ccol.operator('node.y_new_vcol_to_override_channel', text='New Vertex Color', icon_value=lib.get_icon('vertex_color'))
-        ccol.operator('node.y_open_available_data_to_override_channel', text='Use Available Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
+        #ccol.operator('wm.y_replace_layer_channel_override', text='New Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
+        ccol.operator('wm.y_new_vcol_to_override_channel', text='New Vertex Color', icon_value=lib.get_icon('vertex_color'))
+        ccol.operator('wm.y_open_available_data_to_override_channel', text='Use Available Vertex Color', icon_value=lib.get_icon('vertex_color')).type = 'VCOL'
 
         col.separator()
 
@@ -6416,7 +6518,7 @@ class YReplaceChannelOverrideMenu(bpy.types.Menu):
 
             if item[0] in {'DEFAULT', 'IMAGE', 'VCOL'}: continue
 
-            col.operator('node.y_replace_layer_channel_override', text=item[1], icon=icon).type = item[0]
+            col.operator('wm.y_replace_layer_channel_override', text=item[1], icon=icon).type = item[0]
 
 class YReplaceChannelOverride1Menu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_replace_channel_override_1_menu"
@@ -6451,9 +6553,9 @@ class YReplaceChannelOverride1Menu(bpy.types.Menu):
 
         #icon = 'RADIOBUT_ON' if ch.override_1_type == 'DEFAULT' else 'RADIOBUT_OFF'
         ##if root_ch.type == 'VALUE':
-        ##    col.operator('node.y_replace_layer_channel_override_1', text='Value', icon=icon).type = 'DEFAULT'
+        ##    col.operator('wm.y_replace_layer_channel_override_1', text='Value', icon=icon).type = 'DEFAULT'
         ##else: 
-        #col.operator('node.y_replace_layer_channel_override_1', text='Color', icon=icon).type = 'DEFAULT'
+        #col.operator('wm.y_replace_layer_channel_override_1', text='Color', icon=icon).type = 'DEFAULT'
 
         #col.separator()
 
@@ -6468,7 +6570,7 @@ class YReplaceChannelOverride1Menu(bpy.types.Menu):
 
         icon = 'RADIOBUT_ON' if ch.override_1 and ch.override_1_type == 'IMAGE' else 'RADIOBUT_OFF'
         if cache_1_image and (ch.override_1_type != 'IMAGE' or not ch.override_1):
-            col.operator('node.y_replace_layer_channel_override_1', text=label, icon=icon).type = 'IMAGE'
+            col.operator('wm.y_replace_layer_channel_override_1', text=label, icon=icon).type = 'IMAGE'
         else:
             col.label(text=label, icon=icon)
 
@@ -6477,8 +6579,8 @@ class YReplaceChannelOverride1Menu(bpy.types.Menu):
         #ccol.label(text='', icon='BLANK1')
 
         ccol = row.column(align=True)
-        ccol.operator('node.y_open_image_to_override_1_layer_channel', text='Open Image...', icon_value=lib.get_icon('open_image'))
-        ccol.operator('node.y_open_available_data_to_override_1_channel', text='Open Available Image', icon_value=lib.get_icon('open_image'))
+        ccol.operator('wm.y_open_image_to_override_1_layer_channel', text='Open Image...', icon_value=lib.get_icon('open_image'))
+        ccol.operator('wm.y_open_available_data_to_override_1_channel', text='Open Available Image', icon_value=lib.get_icon('open_image'))
 
 class YChannelSpecialMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_channel_special_menu"
@@ -6499,7 +6601,7 @@ class YChannelSpecialMenu(bpy.types.Menu):
             col.label(text='ERROR: Context has no parent!', icon='ERROR')
             return
 
-        col.operator('node.y_bake_channels', text="Bake " + context.parent.name + " Channel", icon_value=lib.get_icon('bake')).only_active_channel = True
+        col.operator('wm.y_bake_channels', text="Bake " + context.parent.name + " Channel", icon_value=lib.get_icon('bake')).only_active_channel = True
 
         if context.parent.type != 'NORMAL':
             col.separator()
@@ -6510,15 +6612,15 @@ class YChannelSpecialMenu(bpy.types.Menu):
                 # Override color and multiplier modifier are deprecated
                 if mt[0] == 'OVERRIDE_COLOR': continue
                 if mt[0] == 'MULTIPLIER': continue
-                col.operator('node.y_new_ypaint_modifier', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
+                col.operator('wm.y_new_ypaint_modifier', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
 
         ypup = get_user_preferences()
         if ypup.show_experimental:
 
             col = row.column()
             col.label(text='Experimental')
-            col.operator('node.y_bake_channel_to_vcol', text='Bake Channel to Vertex Color', icon_value=lib.get_icon('vertex_color')).all_materials = False
-            col.operator('node.y_bake_channel_to_vcol', text='Bake Channel to Vertex Color (Batch All Materials)', icon_value=lib.get_icon('vertex_color')).all_materials = True
+            col.operator('wm.y_bake_channel_to_vcol', text='Bake Channel to Vertex Color', icon_value=lib.get_icon('vertex_color')).all_materials = False
+            col.operator('wm.y_bake_channel_to_vcol', text='Bake Channel to Vertex Color (Batch All Materials)', icon_value=lib.get_icon('vertex_color')).all_materials = True
         
 class YLayerChannelSpecialMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_layer_channel_special_menu"
@@ -6570,23 +6672,23 @@ class YLayerChannelSpecialMenu(bpy.types.Menu):
                 # Override color and multiplier modifier are deprecated
                 if mt[0] == 'OVERRIDE_COLOR': continue
                 if mt[0] == 'MULTIPLIER': continue
-                col.operator('node.y_new_ypaint_modifier', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
+                col.operator('wm.y_new_ypaint_modifier', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
 
         if is_bump_normal_layer_channel:
             col.separator()
             col.label(text='Add Modifier (Normal)')
 
         if is_normal_layer_channel or is_bump_normal_layer_channel:
-            col.operator('node.y_new_normalmap_modifier', text='Invert', icon_value=lib.get_icon('modifier')).type = 'INVERT'
-            col.operator('node.y_new_normalmap_modifier', text='Math', icon_value=lib.get_icon('modifier')).type = 'MATH'
+            col.operator('wm.y_new_normalmap_modifier', text='Invert', icon_value=lib.get_icon('modifier')).type = 'INVERT'
+            col.operator('wm.y_new_normalmap_modifier', text='Math', icon_value=lib.get_icon('modifier')).type = 'MATH'
 
         col = row.column()
         col.label(text='Transition Effects')
         if root_ch.type == 'NORMAL':
-            col.operator('node.y_show_transition_bump', text='Transition Bump', icon_value=lib.get_icon('background'))
+            col.operator('wm.y_show_transition_bump', text='Transition Bump', icon_value=lib.get_icon('background'))
         else:
-            col.operator('node.y_show_transition_ramp', text='Transition Ramp', icon_value=lib.get_icon('background'))
-            col.operator('node.y_show_transition_ao', text='Transition AO', icon_value=lib.get_icon('background'))
+            col.operator('wm.y_show_transition_ramp', text='Transition Ramp', icon_value=lib.get_icon('background'))
+            col.operator('wm.y_show_transition_ao', text='Transition AO', icon_value=lib.get_icon('background'))
 
 class YLayerTypeMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_layer_type_menu"
@@ -6610,7 +6712,7 @@ class YLayerTypeMenu(bpy.types.Menu):
 
         cache_image = tree.nodes.get(layer.cache_image)
         if layer.type != 'IMAGE' and cache_image and cache_image.image:
-            op = col.operator('node.y_replace_layer_type', text='Image: ' + cache_image.image.name, icon='RADIOBUT_OFF')
+            op = col.operator('wm.y_replace_layer_type', text='Image: ' + cache_image.image.name, icon='RADIOBUT_OFF')
             op.type = 'IMAGE'
             op.load_item = False
             op.item_name = ''
@@ -6623,7 +6725,7 @@ class YLayerTypeMenu(bpy.types.Menu):
             col.label(text='Image' + suffix, icon=icon)
 
         label = 'Open Available Image' if layer.type != 'IMAGE' else 'Replace Image'
-        op = col.operator('node.y_replace_layer_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
+        op = col.operator('wm.y_replace_layer_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
         op.type = 'IMAGE'
         op.load_item = True
 
@@ -6631,7 +6733,7 @@ class YLayerTypeMenu(bpy.types.Menu):
 
         cache_vcol = tree.nodes.get(layer.cache_vcol)
         if layer.type != 'VCOL' and cache_vcol and cache_vcol.attribute_name != '':
-            op = col.operator('node.y_replace_layer_type', text='Vertex Color: ' + cache_vcol.attribute_name, icon='RADIOBUT_OFF')
+            op = col.operator('wm.y_replace_layer_type', text='Vertex Color: ' + cache_vcol.attribute_name, icon='RADIOBUT_OFF')
             op.type = 'VCOL'
             op.load_item = False
             op.item_name = ''
@@ -6644,55 +6746,55 @@ class YLayerTypeMenu(bpy.types.Menu):
             col.label(text='Vertex Color' + suffix, icon=icon)
 
         label = 'Open Available Vertex Color' if layer.type != 'VCOL' else 'Replace Vertex Color'
-        op = col.operator('node.y_replace_layer_type', text=folder_emoji+label) #, icon_value=lib.get_icon('vertex_color'))
+        op = col.operator('wm.y_replace_layer_type', text=folder_emoji+label) #, icon_value=lib.get_icon('vertex_color'))
         op.type = 'VCOL'
         op.load_item = True
 
         col.separator()
 
         icon = 'RADIOBUT_ON' if layer.type == 'COLOR' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Solid Color', icon=icon).type = 'COLOR'
+        col.operator('wm.y_replace_layer_type', text='Solid Color', icon=icon).type = 'COLOR'
 
         icon = 'RADIOBUT_ON' if layer.type == 'BACKGROUND' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Background', icon=icon).type = 'BACKGROUND'
+        col.operator('wm.y_replace_layer_type', text='Background', icon=icon).type = 'BACKGROUND'
 
         icon = 'RADIOBUT_ON' if layer.type == 'GROUP' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Group', icon=icon).type = 'GROUP'
+        col.operator('wm.y_replace_layer_type', text='Group', icon=icon).type = 'GROUP'
 
         col.separator()
 
         icon = 'RADIOBUT_ON' if layer.type == 'BRICK' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Brick', icon=icon).type = 'BRICK'
+        col.operator('wm.y_replace_layer_type', text='Brick', icon=icon).type = 'BRICK'
 
         icon = 'RADIOBUT_ON' if layer.type == 'CHECKER' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Checker', icon=icon).type = 'CHECKER'
+        col.operator('wm.y_replace_layer_type', text='Checker', icon=icon).type = 'CHECKER'
 
         icon = 'RADIOBUT_ON' if layer.type == 'GRADIENT' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Gradient', icon=icon).type = 'GRADIENT'
+        col.operator('wm.y_replace_layer_type', text='Gradient', icon=icon).type = 'GRADIENT'
 
         icon = 'RADIOBUT_ON' if layer.type == 'MAGIC' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Magic', icon=icon).type = 'MAGIC'
+        col.operator('wm.y_replace_layer_type', text='Magic', icon=icon).type = 'MAGIC'
 
         if not is_bl_newer_than(4, 1): 
             icon = 'RADIOBUT_ON' if layer.type == 'MUSGRAVE' else 'RADIOBUT_OFF'
-            col.operator('node.y_replace_layer_type', text='Musgrave', icon=icon).type = 'MUSGRAVE'
+            col.operator('wm.y_replace_layer_type', text='Musgrave', icon=icon).type = 'MUSGRAVE'
 
         icon = 'RADIOBUT_ON' if layer.type == 'NOISE' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Noise', icon=icon).type = 'NOISE'
+        col.operator('wm.y_replace_layer_type', text='Noise', icon=icon).type = 'NOISE'
 
         if is_bl_newer_than(4, 3): 
             icon = 'RADIOBUT_ON' if layer.type == 'GABOR' else 'RADIOBUT_OFF'
-            col.operator('node.y_replace_layer_type', text='Gabor', icon=icon).type = 'GABOR'
+            col.operator('wm.y_replace_layer_type', text='Gabor', icon=icon).type = 'GABOR'
 
         icon = 'RADIOBUT_ON' if layer.type == 'VORONOI' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Voronoi', icon=icon).type = 'VORONOI'
+        col.operator('wm.y_replace_layer_type', text='Voronoi', icon=icon).type = 'VORONOI'
 
         icon = 'RADIOBUT_ON' if layer.type == 'WAVE' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_layer_type', text='Wave', icon=icon).type = 'WAVE'
+        col.operator('wm.y_replace_layer_type', text='Wave', icon=icon).type = 'WAVE'
 
         col.separator()
         icon = 'RADIOBUT_ON' if layer.type == 'HEMI' else 'RADIOBUT_OFF'
-        col.operator("node.y_replace_layer_type", icon=icon, text='Fake Lighting').type = 'HEMI'
+        col.operator("wm.y_replace_layer_type", icon=icon, text='Fake Lighting').type = 'HEMI'
 
 class YMaskTypeMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_mask_type_menu"
@@ -6717,7 +6819,7 @@ class YMaskTypeMenu(bpy.types.Menu):
 
         cache_image = tree.nodes.get(mask.cache_image)
         if mask.type != 'IMAGE' and cache_image and cache_image.image:
-            op = col.operator('node.y_replace_mask_type', text='Image: ' + cache_image.image.name, icon='RADIOBUT_OFF')
+            op = col.operator('wm.y_replace_mask_type', text='Image: ' + cache_image.image.name, icon='RADIOBUT_OFF')
             op.type = 'IMAGE'
             op.load_item = False
             op.item_name = ''
@@ -6730,7 +6832,7 @@ class YMaskTypeMenu(bpy.types.Menu):
             col.label(text='Image' + suffix, icon=icon)
 
         label = 'Open Available Image' if mask.type != 'IMAGE' else 'Replace Image'
-        op = col.operator('node.y_replace_mask_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
+        op = col.operator('wm.y_replace_mask_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
         op.type = 'IMAGE'
         op.load_item = True
 
@@ -6738,7 +6840,7 @@ class YMaskTypeMenu(bpy.types.Menu):
 
         cache_vcol = tree.nodes.get(mask.cache_vcol)
         if mask.type != 'VCOL' and cache_vcol and cache_vcol.attribute_name != '':
-            op = col.operator('node.y_replace_mask_type', text='Vertex Color: ' + cache_vcol.attribute_name, icon='RADIOBUT_OFF')
+            op = col.operator('wm.y_replace_mask_type', text='Vertex Color: ' + cache_vcol.attribute_name, icon='RADIOBUT_OFF')
             op.type = 'VCOL'
             op.load_item = False
             op.item_name = ''
@@ -6751,84 +6853,84 @@ class YMaskTypeMenu(bpy.types.Menu):
             col.label(text='Vertex Color' + suffix, icon=icon)
 
         label = 'Open Available Vertex Color' if mask.type != 'VCOL' else 'Replace Vertex Color'
-        op = col.operator('node.y_replace_mask_type', text=folder_emoji+label) #, icon_value=lib.get_icon('vertex_color'))
+        op = col.operator('wm.y_replace_mask_type', text=folder_emoji+label) #, icon_value=lib.get_icon('vertex_color'))
         op.type = 'VCOL'
         op.load_item = True
 
         col.separator()
 
         #icon = 'RADIOBUT_ON' if mask.type == 'COLOR' else 'RADIOBUT_OFF'
-        #col.operator('node.y_replace_mask_type', text='Solid Color', icon=icon).type = 'COLOR'
+        #col.operator('wm.y_replace_mask_type', text='Solid Color', icon=icon).type = 'COLOR'
 
         #icon = 'RADIOBUT_ON' if mask.type == 'BACKGROUND' else 'RADIOBUT_OFF'
-        #col.operator('node.y_replace_mask_type', text='Background', icon=icon).type = 'BACKGROUND'
+        #col.operator('wm.y_replace_mask_type', text='Background', icon=icon).type = 'BACKGROUND'
 
         #icon = 'RADIOBUT_ON' if mask.type == 'GROUP' else 'RADIOBUT_OFF'
-        #col.operator('node.y_replace_mask_type', text='Group', icon=icon).type = 'GROUP'
+        #col.operator('wm.y_replace_mask_type', text='Group', icon=icon).type = 'GROUP'
 
         #col.separator()
 
         icon = 'RADIOBUT_ON' if mask.type == 'BRICK' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Brick', icon=icon).type = 'BRICK'
+        col.operator('wm.y_replace_mask_type', text='Brick', icon=icon).type = 'BRICK'
 
         icon = 'RADIOBUT_ON' if mask.type == 'CHECKER' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Checker', icon=icon).type = 'CHECKER'
+        col.operator('wm.y_replace_mask_type', text='Checker', icon=icon).type = 'CHECKER'
 
         icon = 'RADIOBUT_ON' if mask.type == 'GRADIENT' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Gradient', icon=icon).type = 'GRADIENT'
+        col.operator('wm.y_replace_mask_type', text='Gradient', icon=icon).type = 'GRADIENT'
 
         icon = 'RADIOBUT_ON' if mask.type == 'MAGIC' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Magic', icon=icon).type = 'MAGIC'
+        col.operator('wm.y_replace_mask_type', text='Magic', icon=icon).type = 'MAGIC'
 
         if not is_bl_newer_than(4, 1): 
             icon = 'RADIOBUT_ON' if mask.type == 'MUSGRAVE' else 'RADIOBUT_OFF'
-            col.operator('node.y_replace_mask_type', text='Musgrave', icon=icon).type = 'MUSGRAVE'
+            col.operator('wm.y_replace_mask_type', text='Musgrave', icon=icon).type = 'MUSGRAVE'
 
         icon = 'RADIOBUT_ON' if mask.type == 'NOISE' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Noise', icon=icon).type = 'NOISE'
+        col.operator('wm.y_replace_mask_type', text='Noise', icon=icon).type = 'NOISE'
 
         if is_bl_newer_than(4, 3): 
             icon = 'RADIOBUT_ON' if mask.type == 'GABOR' else 'RADIOBUT_OFF'
-            col.operator('node.y_replace_mask_type', text='Gabor', icon=icon).type = 'GABOR'
+            col.operator('wm.y_replace_mask_type', text='Gabor', icon=icon).type = 'GABOR'
 
         icon = 'RADIOBUT_ON' if mask.type == 'VORONOI' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Voronoi', icon=icon).type = 'VORONOI'
+        col.operator('wm.y_replace_mask_type', text='Voronoi', icon=icon).type = 'VORONOI'
 
         icon = 'RADIOBUT_ON' if mask.type == 'WAVE' else 'RADIOBUT_OFF'
-        col.operator('node.y_replace_mask_type', text='Wave', icon=icon).type = 'WAVE'
+        col.operator('wm.y_replace_mask_type', text='Wave', icon=icon).type = 'WAVE'
 
         col.separator()
         icon = 'RADIOBUT_ON' if mask.type == 'HEMI' else 'RADIOBUT_OFF'
-        col.operator("node.y_replace_mask_type", icon=icon, text='Fake Lighting').type = 'HEMI'
+        col.operator("wm.y_replace_mask_type", icon=icon, text='Fake Lighting').type = 'HEMI'
 
         col.separator()
 
         icon = 'RADIOBUT_ON' if mask.type == 'COLOR_ID' else 'RADIOBUT_OFF'
-        col.operator("node.y_replace_mask_type", icon=icon, text='Color ID').type = 'COLOR_ID'
+        col.operator("wm.y_replace_mask_type", icon=icon, text='Color ID').type = 'COLOR_ID'
 
         icon = 'RADIOBUT_ON' if mask.type == 'OBJECT_INDEX' else 'RADIOBUT_OFF'
-        col.operator("node.y_replace_mask_type", icon=icon, text='Object Index').type = 'OBJECT_INDEX'
+        col.operator("wm.y_replace_mask_type", icon=icon, text='Object Index').type = 'OBJECT_INDEX'
 
         icon = 'RADIOBUT_ON' if mask.type == 'BACKFACE' else 'RADIOBUT_OFF'
-        col.operator("node.y_replace_mask_type", icon=icon, text='Backface').type = 'BACKFACE'
+        col.operator("wm.y_replace_mask_type", icon=icon, text='Backface').type = 'BACKFACE'
 
         icon = 'RADIOBUT_ON' if mask.type == 'EDGE_DETECT' else 'RADIOBUT_OFF'
-        col.operator("node.y_replace_mask_type", icon=icon, text='Edge Detect').type = 'EDGE_DETECT'
+        col.operator("wm.y_replace_mask_type", icon=icon, text='Edge Detect').type = 'EDGE_DETECT'
 
         col.separator()
 
         icon = 'RADIOBUT_ON' if mask.type == 'MODIFIER' and mask.modifier_type == 'INVERT' else 'RADIOBUT_OFF'
-        op = col.operator("node.y_replace_mask_type", icon=icon, text='Invert Modifier')
+        op = col.operator("wm.y_replace_mask_type", icon=icon, text='Invert Modifier')
         op.type = 'MODIFIER'
         op.modifier_type = 'INVERT'
 
         icon = 'RADIOBUT_ON' if mask.type == 'MODIFIER' and mask.modifier_type == 'RAMP' else 'RADIOBUT_OFF'
-        op = col.operator("node.y_replace_mask_type", icon=icon, text='Ramp Modifier')
+        op = col.operator("wm.y_replace_mask_type", icon=icon, text='Ramp Modifier')
         op.type = 'MODIFIER'
         op.modifier_type = 'RAMP'
 
         icon = 'RADIOBUT_ON' if mask.type == 'MODIFIER' and mask.modifier_type == 'CURVE' else 'RADIOBUT_OFF'
-        op = col.operator("node.y_replace_mask_type", icon=icon, text='Curve Modifier')
+        op = col.operator("wm.y_replace_mask_type", icon=icon, text='Curve Modifier')
         op.type = 'MODIFIER'
         op.modifier_type = 'CURVE'
 
@@ -6862,16 +6964,21 @@ class YLayerSpecialMenu(bpy.types.Menu):
                 # Override color modifier is deprecated
                 if mt[0] == 'OVERRIDE_COLOR': continue
                 if mt[0] == 'MULTIPLIER': continue
-                col.operator('node.y_new_ypaint_modifier', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
+                col.operator('wm.y_new_ypaint_modifier', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
 
         if ypup.developer_mode:
             #if context.parent.type == 'HEMI':
             col = row.column()
             col.label(text='Advanced')
             if context.parent.use_temp_bake:
-                col.operator('node.y_disable_temp_image', text='Disable Baked Temp Image', icon='FILE_REFRESH')
+                col.operator('wm.y_disable_temp_image', text='Disable Baked Temp Image', icon='FILE_REFRESH')
             else:
-                col.operator('node.y_bake_temp_image', text='Bake Temp Image', icon_value=lib.get_icon('bake'))
+                col.operator('wm.y_bake_temp_image', text='Bake Temp Image', icon_value=lib.get_icon('bake'))
+
+            #col.separator()
+            col.context_pointer_set('entity', context.parent)
+            col.context_pointer_set('layer', context.parent)
+            col.operator('wm.y_bake_entity_to_image', icon_value=lib.get_icon('bake'), text='Bake Layer as Image')
 
         #col = row.column()
         #col.label(text='Options:')
@@ -7408,7 +7515,7 @@ def add_new_ypaint_node_menu(self, context):
     l = self.layout
     l.operator_context = 'INVOKE_REGION_WIN'
     l.separator()
-    l.operator('node.y_add_new_ypaint_node', text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
+    l.operator('wm.y_add_new_ypaint_node', text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
 
 def copy_ui_settings(source, dest):
     for attr in dir(source):
@@ -7455,7 +7562,11 @@ def register():
 
     if not is_bl_newer_than(2, 80):
         bpy.utils.register_class(YPaintAboutMenu)
-    else: bpy.utils.register_class(YPaintAboutPopover)
+        bpy.utils.register_class(YListItemOptionMenu)
+    else: 
+        bpy.utils.register_class(YPaintAboutPopover)
+        bpy.utils.register_class(YListItemOptionPopover)
+
 
     bpy.utils.register_class(YPaintSpecialMenu)
     bpy.utils.register_class(YNewChannelMenu)
@@ -7465,7 +7576,6 @@ def register():
     bpy.utils.register_class(YLayerListSpecialMenu)
     bpy.utils.register_class(YLayerChannelBlendMenu)
     bpy.utils.register_class(YLayerChannelNormalBlendMenu)
-    bpy.utils.register_class(YListItemOptionPopover)
     bpy.utils.register_class(YLayerChannelBlendPopover)
     bpy.utils.register_class(YLayerChannelNormalBlendPopover)
     bpy.utils.register_class(YLayerChannelInputMenu)
@@ -7534,7 +7644,10 @@ def unregister():
 
     if not is_bl_newer_than(2, 80):
         bpy.utils.unregister_class(YPaintAboutMenu)
-    else: bpy.utils.unregister_class(YPaintAboutPopover)
+        bpy.utils.unregister_class(YListItemOptionMenu)
+    else: 
+        bpy.utils.unregister_class(YPaintAboutPopover)
+        bpy.utils.unregister_class(YListItemOptionPopover)
 
     bpy.utils.unregister_class(YPaintSpecialMenu)
     bpy.utils.unregister_class(YNewChannelMenu)
@@ -7544,7 +7657,6 @@ def unregister():
     bpy.utils.unregister_class(YLayerListSpecialMenu)
     bpy.utils.unregister_class(YLayerChannelBlendMenu)
     bpy.utils.unregister_class(YLayerChannelNormalBlendMenu)
-    bpy.utils.unregister_class(YListItemOptionPopover)
     bpy.utils.unregister_class(YLayerChannelBlendPopover)
     bpy.utils.unregister_class(YLayerChannelNormalBlendPopover)
     bpy.utils.unregister_class(YLayerChannelInputMenu)

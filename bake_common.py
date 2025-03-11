@@ -339,7 +339,7 @@ def prepare_other_objs_channels(yp, other_objs):
 
             for mat in o.data.materials:
                 if mat == None: continue
-                if mat in mats: continue
+                #if mat in mats: continue
                 if not mat.use_nodes: continue
 
                 # Get material output
@@ -585,7 +585,7 @@ def prepare_bake_settings(
                 uv_layers = get_uv_layers(obj)
                 if len(uv_layers) == 0:
                     scene.objects.active = obj
-                    bpy.ops.node.y_add_simple_uvs()
+                    bpy.ops.wm.y_add_simple_uvs()
                 if scene.objects.active != ori_active_object:
                     scene.objects.active = ori_active_object
 
@@ -2585,3 +2585,9 @@ class BaseBakeOperator():
     def check_operator(self, context):
         if not self.use_custom_resolution:
             self.height = self.width = int(self.image_resolution)
+
+    def is_cycles_exist(self, context):
+        if not hasattr(context.scene, 'cycles'):
+            self.report({'ERROR'}, "Cycles Render Engine need to be enabled in user preferences!")
+            return False
+        return True
