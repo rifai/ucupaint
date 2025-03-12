@@ -67,6 +67,94 @@ class YSceneExporter(Operator):
 			json.dump(data, json_file, indent=4)
 
 		return {'FINISHED'}
+	
+def get_objects_from_collection(collection):
+	objects = []
+	for obj in collection.objects:
+		objects.append(obj)
+		print("Object in Collection:", obj.name)
+
+	# show all children type = collection
+	for child in collection.children:
+		objects += get_objects_from_collection(child)
+	
+	return objects
+
+def export_object(obj, my_directory):
+
+	# bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
+	# 						export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
+	original_pos = obj.location.copy()
+	original_scale = obj.scale.copy()
+	org_rot = obj.rotation_euler.copy()
+
+	obj.location = (0, 0, 0)
+	obj.scale = (1, 1, 1)
+	obj.rotation_euler = (0, 0, 0)
+
+	obj.select_set(True)
+	bpy.context.view_layer.objects.active = obj	
+
+	path_target = os.path.join(my_directory, obj.name + ".obj")
+	print("export obj ", path_target)
+
+	bpy.ops.wm.obj_export(filepath=path_target, apply_modifiers=True, export_selected_objects=True, export_materials=False,export_animation=False,export_colors=True)
+	obj.location = original_pos
+	obj.scale = original_scale
+	obj.rotation_euler = org_rot
+
+	obj.select_set(False)
+
+class YGodotSceneExporter(Operator):
+	bl_idname = "node.y_godot_scene_export"
+	bl_label = "Export Ucupaint"
+
+	filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
+
+	def invoke(self, context, event):
+		context.window_manager.fileselect_add(self)
+		return {'RUNNING_MODAL'}
+		
+	def execute(self, context):
+
+		scene_path = fix_filename(self.filepath, filetype_scene)
+		print("file path ", scene_path)
+
+		my_directory = os.path.dirname(scene_path)
+
+		data = {
+			"version": version,
+			"objects": [],
+		}
+
+		active_collection = context.view_layer.active_layer_collection.collection
+		objects = get_objects_from_collection(active_collection)
+
+		# Print the name of the active collection
+		print("Active Collection:", active_collection.name)
+
+		# Retrieve all objects in the active collection
+		for obj in objects:
+			rotasi = obj.rotation_euler
+			# convert to angle 
+			rotasi = [math.degrees(rotasi.x), math.degrees(rotasi.y), math.degrees(rotasi.z)]
+			# export per object
+			new_obj = {
+				"name": obj.name,
+				"location": obj.location[:],
+				"rotation": rotasi[:],
+				"scale": obj.scale[:],
+				"ucupaint_object": False
+			}
+			data["objects"].append(new_obj)
+
+			export_object(obj, my_directory)
+
+
+		with open(scene_path, 'w') as json_file:
+			json.dump(data, json_file, indent=4)
+
+		return {'FINISHED'}
 
 class YExporter(Operator):
 
@@ -105,7 +193,7 @@ class YPExportMenu(bpy.types.Menu):
 
     def draw(self, context):
         obj = context.object
-        op = self.layout.operator("node.y_scene_export", text="Export to Godot", icon='EXPORT')
+        op = self.layout.operator("node.y_godot_scene_export", text="Export to Godot", icon='EXPORT')
 
 def fix_filename(filename:str, target_ext:str):
 	base, ext = os.path.splitext(filename)
@@ -603,7 +691,7 @@ def draw_yp_export(self, context):
 	layout.separator()
 	self.layout.menu("NODE_MT_ypaint_export_menu", text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
 
-classes = [YExporter, YSceneExporter, YPExportMenu]
+classes = [YExporter, YSceneExporter, YPExportMenu, YGodotSceneExporter]
 
 def register():
 	for cl in classes:
