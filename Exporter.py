@@ -80,10 +80,12 @@ def get_objects_from_collection(collection):
 	
 	return objects
 
-def export_object(obj, my_directory):
+def export_object(obj, my_directory, serializing_obj) -> bool:
 
-	# bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
-	# 						export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
+	if obj.type != 'MESH':
+		print("object is not mesh ", obj.name)
+		return False
+
 	original_pos = obj.location.copy()
 	original_scale = obj.scale.copy()
 	org_rot = obj.rotation_euler.copy()
@@ -92,10 +94,14 @@ def export_object(obj, my_directory):
 	obj.scale = (1, 1, 1)
 	obj.rotation_euler = (0, 0, 0)
 
+	mesh_name = obj.data.name
+
+	serializing_obj["mesh"] = mesh_name
+
 	obj.select_set(True)
 	bpy.context.view_layer.objects.active = obj	
 
-	path_target = os.path.join(my_directory, obj.name + ".obj")
+	path_target = os.path.join(my_directory, mesh_name + ".obj")
 	print("export obj ", path_target)
 
 	bpy.ops.wm.obj_export(filepath=path_target, apply_modifiers=True, export_selected_objects=True, export_materials=False,export_animation=False,export_colors=True)
@@ -104,6 +110,8 @@ def export_object(obj, my_directory):
 	obj.rotation_euler = org_rot
 
 	obj.select_set(False)
+
+	return True
 
 class YGodotSceneExporter(Operator):
 	bl_idname = "node.y_godot_scene_export"
@@ -146,10 +154,9 @@ class YGodotSceneExporter(Operator):
 				"scale": obj.scale[:],
 				"ucupaint_object": False
 			}
+
+			export_object(obj, my_directory, new_obj)
 			data["objects"].append(new_obj)
-
-			export_object(obj, my_directory)
-
 
 		with open(scene_path, 'w') as json_file:
 			json.dump(data, json_file, indent=4)
@@ -507,33 +514,13 @@ def generate_ucupaint_data(obj, node, file_path, pack_file):
 				data["layers"].append(layer_data)
 
 			flat_layers.append(layer_data)
+
+	export_object(obj, my_directory, data)
+
 	# data["copying_files"] = copying_files
 	# Save data to JSON file
 	with open(file_path, 'w') as json_file:
 		json.dump(data, json_file, indent=4)
-
-	# export mesh as OBJ mesh
-	name_asset = bpy.path.display_name_from_filepath(file_path)
-
-	# bpy.ops.export_scene.gltf(export_format='GLTF_SEPARATE', export_apply=True, filepath=os.path.join(my_directory, name_asset + ".glb"), 
-	# 						export_vertex_color="ACTIVE", export_tangents=True, use_selection=True, export_texture_dir="gltf_textures")
-	original_pos = obj.location.copy()
-	original_scale = obj.scale.copy()
-	org_rot = obj.rotation_euler.copy()
-
-	obj.location = (0, 0, 0)
-	obj.scale = (1, 1, 1)
-	obj.rotation_euler = (0, 0, 0)
-
-	obj.select_set(True)
-	bpy.context.view_layer.objects.active = obj	
-
-	bpy.ops.wm.obj_export(filepath=os.path.join(my_directory, name_asset + ".obj"), apply_modifiers=True, export_selected_objects=True, export_materials=False,export_animation=False,export_colors=True)
-	obj.location = original_pos
-	obj.scale = original_scale
-	obj.rotation_euler = org_rot
-
-	obj.select_set(False)
 
 	# copying all textures
 	for file in copying_files:
