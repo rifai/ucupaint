@@ -86,6 +86,10 @@ def export_object(obj, my_directory, serializing_obj) -> bool:
 		print("object is not mesh ", obj.name)
 		return False
 
+	object_hide = obj.hide_get()
+
+	obj.hide_set(False)
+
 	original_pos = obj.location.copy()
 	original_scale = obj.scale.copy()
 	org_rot = obj.rotation_euler.copy()
@@ -96,7 +100,9 @@ def export_object(obj, my_directory, serializing_obj) -> bool:
 
 	mesh_name = obj.data.name
 
-	serializing_obj["mesh"] = mesh_name
+	serializing_obj["data"] = { 
+		"mesh" : mesh_name
+	}
 
 	obj.select_set(True)
 	bpy.context.view_layer.objects.active = obj	
@@ -108,7 +114,8 @@ def export_object(obj, my_directory, serializing_obj) -> bool:
 	obj.location = original_pos
 	obj.scale = original_scale
 	obj.rotation_euler = org_rot
-
+	obj.hide_set(object_hide)
+	
 	obj.select_set(False)
 
 	return True
@@ -152,10 +159,28 @@ class YGodotSceneExporter(Operator):
 				"location": obj.location[:],
 				"rotation": rotasi[:],
 				"scale": obj.scale[:],
+				"type" : obj.type,
+				"visible" : not obj.hide_get(),
 				"ucupaint_object": False
 			}
 
-			export_object(obj, my_directory, new_obj)
+			if obj.type == 'MESH':
+				export_object(obj, my_directory, new_obj)
+			elif obj.type == 'LIGHT':
+				light_data = obj.data
+				light_type = light_data.type
+				new_obj["data"] = {
+					"color": light_data.color[:],
+					"light_type": light_type,
+					"shadow" : light_data.use_shadow,
+				}
+				
+				if light_type == 'SPOT':
+					new_obj["data"]["spot_angle"] = light_data.spot_size
+					new_obj["data"]["distance"] = light_data.cutoff_distance
+				elif light_type == 'SUN':
+					new_obj["data"]["energy"] = light_data.energy
+
 			data["objects"].append(new_obj)
 
 		with open(scene_path, 'w') as json_file:
