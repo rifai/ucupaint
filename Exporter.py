@@ -1,4 +1,4 @@
-from bpy.types import Operator
+from bpy.types import Operator, PropertyGroup
 import shutil
 
 import bpy, json
@@ -18,6 +18,21 @@ version = (0, 1, 0)
 filetype = ".ucon"
 filetype_scene = ".ucsc"
 filetype_packed = ".ucu"
+
+
+class YGameObject(PropertyGroup):
+	physics_type:EnumProperty(
+		items =  (('NONE', 'None', ''), ('STATIC', 'Static', ''), ('RIGIDBODY', 'Rigidbody', '')),
+		name = 'Physics Type',
+		default = 'NONE',
+		# update=change_mode_asset
+	)
+	collider_type:EnumProperty(
+		items =  (('CONVEX', 'Convex', ''), ('CONCAVE', 'Concave', '')),
+		name = 'Collider Type',
+		default = 'CONVEX',
+		# update=change_mode_asset
+	)
 
 class YSceneExporter(Operator):
 	bl_idname = "node.y_scene_export"
@@ -101,8 +116,12 @@ def export_object(obj, my_directory, serializing_obj) -> bool:
 	mesh_name = obj.data.name
 
 	serializing_obj["data"] = { 
-		"mesh" : mesh_name
+		"mesh" : mesh_name,
+		"physics_type" : obj.y_gameobject.physics_type,
 	}
+
+	if obj.y_gameobject.physics_type != 'NONE':
+		serializing_obj["data"]["collider_type"] = obj.y_gameobject.collider_type
 
 	obj.select_set(True)
 	bpy.context.view_layer.objects.active = obj	
@@ -215,17 +234,17 @@ class YExporter(Operator):
 
 
 class YPExportMenu(bpy.types.Menu):
-    bl_idname = "NODE_MT_ypaint_export_menu"
-    bl_label = get_addon_title() + " Export Menu"
-    bl_description = get_addon_title() + " export menu"
+	bl_idname = "NODE_MT_ypaint_export_menu"
+	bl_label = get_addon_title() + " Export Menu"
+	bl_description = get_addon_title() + " export menu"
 
-    @classmethod
-    def poll(cls, context):
-        return True
+	@classmethod
+	def poll(cls, context):
+		return True
 
-    def draw(self, context):
-        obj = context.object
-        op = self.layout.operator("node.y_godot_scene_export", text="Export to Godot", icon='EXPORT')
+	def draw(self, context):
+		obj = context.object
+		op = self.layout.operator("node.y_godot_scene_export", text="Export to Godot", icon='EXPORT')
 
 def fix_filename(filename:str, target_ext:str):
 	base, ext = os.path.splitext(filename)
@@ -703,11 +722,13 @@ def draw_yp_export(self, context):
 	layout.separator()
 	self.layout.menu("NODE_MT_ypaint_export_menu", text=get_addon_title(), icon_value=lib.get_icon('nodetree'))
 
-classes = [YExporter, YSceneExporter, YPExportMenu, YGodotSceneExporter]
+classes = [YExporter, YSceneExporter, YPExportMenu, YGodotSceneExporter, YGameObject]
 
 def register():
 	for cl in classes:
 		bpy.utils.register_class(cl)
+
+	bpy.types.Object.y_gameobject = PointerProperty(type=YGameObject)
 
 	bpy.types.OUTLINER_MT_collection.append(draw_yp_export)
 

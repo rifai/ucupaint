@@ -3901,10 +3901,30 @@ def main_draw(self, context):
 
     if ypui.show_object:
         box = layout.box()
-        col = box.column()
+        rowr = box.row()
+        col = rowr.column()
         row = split_layout(col, 0.6)
         row.label(text='Object Index:')
         row.prop(obj, 'pass_index', text='')
+
+        # gameobject
+        rowr = box.row()
+
+        go = obj.y_gameobject
+
+        col = rowr.column()
+        row = split_layout(col, 0.6)
+
+        row.label(text='Physics Type:')
+        row.prop(go, 'physics_type', text='')
+
+        if go.physics_type != "NONE":
+            rowr = box.row()
+            col = rowr.column()
+            row = split_layout(col, 0.6)
+
+            row.label(text='Collider Type:')
+            row.prop(go, 'collider_type', text='')
 
     # HACK: Create split layout to load all icons (Only for Blender 3.2+)
     if is_bl_newer_than(3, 2) and not wm.ypprops.all_icons_loaded:
