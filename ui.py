@@ -3926,6 +3926,15 @@ def main_draw(self, context):
             row.label(text='Collider Type:')
             row.prop(go, 'collider_type', text='')
 
+            rowr = box.row()
+            col = rowr.column()
+            row = split_layout(col, 0.6)
+
+        if go.physics_type == "STATIC":
+            row.label(text='Collider Only :')
+            row.prop(go, 'collider_only', text='')
+
+
     # HACK: Create split layout to load all icons (Only for Blender 3.2+)
     if is_bl_newer_than(3, 2) and not wm.ypprops.all_icons_loaded:
         split = split_layout(layout, 1.0)

@@ -21,6 +21,10 @@ filetype_packed = ".ucu"
 
 
 class YGameObject(PropertyGroup):
+	collider_only: BoolProperty(
+		name = "Collider Only",
+		default = False,
+	)
 	physics_type:EnumProperty(
 		items =  (('NONE', 'None', ''), ('STATIC', 'Static', ''), ('RIGIDBODY', 'Rigidbody', '')),
 		name = 'Physics Type',
@@ -122,6 +126,7 @@ def export_object(obj, my_directory, serializing_obj) -> bool:
 
 	if obj.y_gameobject.physics_type != 'NONE':
 		serializing_obj["data"]["collider_type"] = obj.y_gameobject.collider_type
+		serializing_obj["data"]["collider_only"] = obj.y_gameobject.collider_only
 
 	obj.select_set(True)
 	bpy.context.view_layer.objects.active = obj	
