@@ -1,7 +1,7 @@
 import bpy, time, re, os, random, numpy
 from bpy.props import *
 from bpy_extras.io_utils import ImportHelper
-from . import Modifier, lib, Mask, transition, ImageAtlas, UDIM, NormalMapModifier, ListItem, bake_common
+from . import Modifier, lib, Mask, transition, ImageAtlas, UDIM, NormalMapModifier, ListItem, bake_common, VectorWarp
 from .common import *
 #from .bake_common import *
 from .node_arrangements import *
@@ -7155,6 +7155,9 @@ class YLayer(bpy.types.PropertyGroup):
         default = False,
         update = ListItem.update_expand_subitems
     )
+
+    # Warps
+    warps: CollectionProperty(type=VectorWarp.YVectorWarp)
 
 def register():
     bpy.utils.register_class(YRefreshNeighborUV)

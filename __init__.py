@@ -37,6 +37,7 @@ if "bpy" in locals():
     imp.reload(MaskModifier)
     imp.reload(Mask)
     imp.reload(Modifier)
+    imp.reload(VectorWarp)
     imp.reload(NormalMapModifier)
     imp.reload(Layer)
     imp.reload(ListItem)
@@ -50,7 +51,7 @@ else:
     from . import Localization
     from . import image_ops, common, bake_common, modifier_common, lib, ui, subtree, transition_common, input_outputs, node_arrangements, node_connections, preferences
     from . import vector_displacement_lib, vector_displacement
-    from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, NormalMapModifier, Layer, ListItem, Bake, BakeToLayer, Root, versioning
+    from . import vcol_editor, transition, BakeTarget, BakeInfo, UDIM, ImageAtlas, MaskModifier, Mask, Modifier, VectorWarp, NormalMapModifier, Layer, ListItem, Bake, BakeToLayer, Root, versioning
     from . import addon_updater_ops
     from . import Test
 
@@ -73,6 +74,7 @@ def register():
     MaskModifier.register()
     Mask.register()
     Modifier.register()
+    VectorWarp.register()
     NormalMapModifier.register()
     Layer.register()
     ListItem.register()
@@ -102,6 +104,7 @@ def unregister():
     MaskModifier.unregister()
     Mask.unregister()
     Modifier.unregister()
+    VectorWarp.unregister()
     NormalMapModifier.unregister()
     Layer.unregister()
     ListItem.unregister()

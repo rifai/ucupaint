@@ -250,6 +250,25 @@ mask_type_items = (
     ('AO', 'Ambient Occlusion', ''),
 )
 
+warp_type_items = (
+    ('MAPPING', 'Mapping', ''),
+    ('IMAGE', 'Image', ''),
+    ('BRICK', 'Brick', ''),
+    ('CHECKER', 'Checker', ''),
+    ('GRADIENT', 'Gradient', ''),
+    ('MAGIC', 'Magic', ''),
+    ('MUSGRAVE', 'Musgrave', ''),
+    ('NOISE', 'Noise', ''),
+    ('VORONOI', 'Voronoi', ''),
+    ('WAVE', 'Wave', ''),
+    ('VCOL', 'Vertex Color', ''),
+    ('BACKGROUND', 'Background', ''),
+    ('HEMI', 'Fake Lighting', ''),
+    ('GABOR', 'Gabor', ''),
+    ('EDGE_DETECT', 'Edge Detect', ''),
+    ('AO', 'Ambient Occlusion', ''),
+)
+
 channel_override_type_items = (
     ('DEFAULT', 'Default', ''),
     ('IMAGE', 'Image', ''),
