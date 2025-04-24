@@ -125,7 +125,7 @@ class YMoveYPaintVectorWarp(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return (get_active_ypaint_node() and 
-                hasattr(context, 'parent') and hasattr(context, 'modifier'))
+                hasattr(context, 'parent') and hasattr(context, 'vector_warp'))
 
     def execute(self, context):
         node = get_active_ypaint_node()
@@ -134,29 +134,29 @@ class YMoveYPaintVectorWarp(bpy.types.Operator):
 
         parent = context.parent
 
-        num_mods = len(parent.modifiers)
-        # if num_mods < 2: return {'CANCELLED'}
+        num_mods = len(parent.warps)
+        if num_mods < 2: return {'CANCELLED'}
 
-        # mod = context.modifier
-        # index = -1
-        # for i, m in enumerate(parent.modifiers):
-        #     if m == mod:
-        #         index = i
-        #         break
-        # if index == -1: return {'CANCELLED'}
+        mod = context.vector_warp
+        index = -1
+        for i, m in enumerate(parent.warps):
+            if m == mod:
+                index = i
+                break
+        if index == -1: return {'CANCELLED'}
 
-        # # Get new index
-        # if self.direction == 'UP' and index > 0:
-        #     new_index = index-1
-        # elif self.direction == 'DOWN' and index < num_mods-1:
-        #     new_index = index+1
-        # else:
-        #     return {'CANCELLED'}
+        # Get new index
+        if self.direction == 'UP' and index > 0:
+            new_index = index-1
+        elif self.direction == 'DOWN' and index < num_mods-1:
+            new_index = index+1
+        else:
+            return {'CANCELLED'}
 
         # layer = context.layer if hasattr(context, 'layer') else None
 
-        # # Swap modifier
-        # parent.modifiers.move(index, new_index)
+        # Swap modifier
+        parent.warps.move(index, new_index)
         # swap_modifier_fcurves(parent, index, new_index)
 
         # # Reconnect and rearrange nodes
