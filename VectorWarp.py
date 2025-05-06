@@ -30,8 +30,12 @@ class YVectorWarp(bpy.types.PropertyGroup):
         items = blend_type_items,
     )
 
+    mix: StringProperty(default='')
+
     mapping : StringProperty(default='')
     image : StringProperty(default='')
+    brick : StringProperty(default='')
+    checker : StringProperty(default='')
 
 def check_vectorwarp_trees(parent, rearrange=False):
     group_tree = parent.id_data
@@ -82,15 +86,15 @@ def check_vectorwarp_trees(parent, rearrange=False):
     
     if enable_tree:
         if mod_group:
-            for mod in parent.warps:
-                check_vectorwarp_nodes(mod, mod_group.node_tree)
+            for index, mod in enumerate(parent.warps):
+                check_vectorwarp_nodes(mod, index, mod_group.node_tree)
         else:
             # enable_modifiers_tree(parent, parent_tree, name, is_layer)
             pass
     else:
         if not mod_group:
-            for mod in parent.warps:
-                check_vectorwarp_nodes(mod, parent_tree)
+            for index, mod in enumerate(parent.warps):
+                check_vectorwarp_nodes(mod, index, parent_tree)
         else:
             # disable_modifiers_tree(parent, parent_tree)
             pass
@@ -109,14 +113,18 @@ def delete_vectorwarp_nodes(tree, vw):
             remove_node(tree, vw, 'mapping')
         case 'IMAGE':
             remove_node(tree, vw, 'image')
+        case 'BRICK':
+            remove_node(tree, vw, 'brick')
+        case 'CHECKER':
+            remove_node(tree, vw, 'checker')
 
 
-def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
+def check_vectorwarp_nodes(vw:YVectorWarp, index:int, tree, ref_tree=None):
 
-    yp = vw.id_data.yp
-    nodes = tree.nodes
+    # yp = vw.id_data.yp
+    # nodes = tree.nodes
 
-    print("type=", vw.type)
+    print("type=", vw.type, "index=", index)
     # Check the nodes
     match vw.type:
         case 'MAPPING':
@@ -136,16 +144,51 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
                 remove_node(tree, vw, 'image')
             else:
                 if ref_tree:
-                    node_ref = ref_tree.nodes.get(vw.source)
+                    node_ref = ref_tree.nodes.get(vw.image)
                     if node_ref: ref_tree.nodes.remove(node_ref)
 
-                    img = new_node(tree, vw, 'image', 'ShaderNodeTexImage', 'Image Texture')
+                    img = new_node(tree, vw, 'image', layer_node_bl_idnames[vw.type], 'Image Texture')
                     dirty = True
                 else:
-                    img, dirty = check_new_node(tree, vw, 'image', 'ShaderNodeTexImage', 'Image Texture', True)
-        case _:
-            pass
+                    img, dirty = check_new_node(tree, vw, 'image', layer_node_bl_idnames[vw.type], 'Image Texture', True)
+        case 'BRICK':
+            if not vw.enable:
+                remove_node(tree, vw, 'brick')
+            else:
+                if ref_tree:
+                    node_ref = ref_tree.nodes.get(vw.brick)
+                    if node_ref: ref_tree.nodes.remove(node_ref)
 
+                    img = new_node(tree, vw, 'brick', layer_node_bl_idnames[vw.type], 'Brick Texture')
+                    dirty = True
+                else:
+                    img, dirty = check_new_node(tree, vw, 'brick', layer_node_bl_idnames[vw.type], 'Brick Texture', True)
+        case 'CHECKER':
+            if not vw.enable:
+                remove_node(tree, vw, 'checker')
+            else:
+                if ref_tree:
+                    node_ref = ref_tree.nodes.get(vw.checker)
+                    if node_ref: ref_tree.nodes.remove(node_ref)
+
+                    img = new_node(tree, vw, 'checker', layer_node_bl_idnames[vw.type], 'Checker Texture')
+                    dirty = True
+                else:
+                    img, dirty = check_new_node(tree, vw, 'checker', layer_node_bl_idnames[vw.type], 'Checker Texture', True)
+
+    if index > 0:
+        if not vw.enable:
+                remove_node(tree, vw, 'mix')
+        else:
+            if ref_tree:
+                node_ref = ref_tree.nodes.get(vw.mix)
+                if node_ref: ref_tree.nodes.remove(node_ref)
+
+                mp = new_node(tree, vw, 'mix', 'ShaderNodeMapping', 'Mapping')
+                dirty = True
+            else:
+                mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
+                
 class YNewVectorWarp(bpy.types.Operator):
     bl_idname = "wm.y_new_vector_warp"
     bl_label = "New " + get_addon_title() + " Vector Warp"
@@ -185,7 +228,7 @@ class YNewVectorWarp(bpy.types.Operator):
 
         name = [mt[1] for mt in warp_type_items if mt[0] == self.type][0]
 
-        new_warp.name = name
+        new_warp.name = get_unique_name(name, layer.warps)
         new_warp.type = self.type
 
         check_vectorwarp_trees(parent)
@@ -306,7 +349,7 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         return hasattr(context, 'parent') and hasattr(context, 'vector_warp')
 
     def execute(self, context):
-        # group_tree = context.parent.id_data
+        group_tree = context.parent.id_data
         # yp = group_tree.yp
 
         parent = context.parent
@@ -321,7 +364,7 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
 
         if len(parent.warps) < 1: return {'CANCELLED'}
 
-        # layer = context.layer if hasattr(context, 'layer') else None
+        layer = context.layer if hasattr(context, 'layer') else None
 
         tree = get_mod_tree(parent)
 
@@ -347,9 +390,10 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         #     reconnect_yp_nodes(group_tree)
 
         # # Rearrange nodes
-        # if layer:
-        #     rearrange_layer_nodes(layer)
-        # else: rearrange_yp_nodes(group_tree)
+        if layer:
+            rearrange_layer_nodes(layer)
+        else: 
+            rearrange_yp_nodes(group_tree)
 
         # Update UI
         context.window_manager.ypui.need_update = True
