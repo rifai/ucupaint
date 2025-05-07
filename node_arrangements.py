@@ -317,7 +317,7 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
     items = parent.warps
 
     # Modifier loops
-    for index, wp in enumerate(items):
+    for wp in reversed(items):
 
         loc.x = ori_x
         loc.y -= 30
@@ -325,8 +325,7 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
         # mod_y_offset = get_mod_y_offsets(m, is_value)
         # if offset_y < mod_y_offset:
         #     offset_y = mod_y_offset
-        if index > 0:
-            check_set_node_loc(tree, wp.mix, loc + Vector((250, 0)))
+        check_set_node_loc(tree, wp.mix, loc + Vector((300, 0)))
 
         match wp.type:
             case 'MAPPING':
@@ -334,7 +333,7 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
                     loc.y -= 400.0
             case 'IMAGE':
                 if check_set_node_loc(tree, wp.image, loc):
-                    loc.y -= 200.0
+                    loc.y -= 210.0
             case 'BRICK':
                 if check_set_node_loc(tree, wp.brick, loc):
                     loc.y -= 400.0
@@ -982,11 +981,11 @@ def rearrange_layer_nodes(layer, tree=None):
         if check_set_node_loc(tree, ch.uv_neighbor, loc):
             loc.y -= 260
 
+    loc = arrange_vectorwarp_nodes(tree, layer, loc)
     #if layer.source_group == '' and check_set_node_loc(tree, layer.mapping, loc):
     if check_set_node_loc(tree, layer.mapping, loc):
         loc.y -= 430
 
-    loc = arrange_vectorwarp_nodes(tree, layer, loc)
 
     if check_set_node_loc(tree, layer.baked_mapping, loc):
         loc.y -= 360
