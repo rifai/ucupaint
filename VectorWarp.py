@@ -62,6 +62,13 @@ class YVectorWarp(bpy.types.PropertyGroup):
     image : StringProperty(default='')
     brick : StringProperty(default='')
     checker : StringProperty(default='')
+    gradient : StringProperty(default='')
+    magic : StringProperty(default='')
+    musgrave : StringProperty(default='')
+    noise : StringProperty(default='')
+    voronoi : StringProperty(default='')
+    wave : StringProperty(default='')
+    gabor : StringProperty(default='')
 
 def check_vectorwarp_trees(parent, rearrange=False):
     group_tree = parent.id_data
@@ -144,6 +151,20 @@ def delete_vectorwarp_nodes(tree, vw):
             remove_node(tree, vw, 'brick')
         case 'CHECKER':
             remove_node(tree, vw, 'checker')
+        case 'GRADIENT':
+            remove_node(tree, vw, 'gradient')
+        case 'MAGIC':
+            remove_node(tree, vw, 'magic')
+        case 'MUSGRAVE':
+            remove_node(tree, vw, 'musgrave')
+        case 'NOISE':
+            remove_node(tree, vw, 'noise')
+        case 'VORONOI':
+            remove_node(tree, vw, 'voronoi')
+        case 'WAVE':
+            remove_node(tree, vw, 'wave')
+        case 'GABOR':
+            remove_node(tree, vw, 'gabor')
 
 
 def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
@@ -153,67 +174,75 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
 
     # print("type=", vw.type)
     # Check the nodes
+
+    field_name = 'mapping'
+    node_name = vw.mapping
+    node_type = 'ShaderNodeMapping'
+
     match vw.type:
         case 'MAPPING':
-            if not vw.enable:
-                remove_node(tree, vw, 'mapping')
-            else:
-                if ref_tree:
-                    node_ref = ref_tree.nodes.get(vw.mapping)
-                    if node_ref: ref_tree.nodes.remove(node_ref)
-
-                    mp = new_node(tree, vw, 'mapping', 'ShaderNodeMapping', 'Mapping')
-                    dirty = True
-                else:
-                    mp, dirty = check_new_node(tree, vw, 'mapping', 'ShaderNodeMapping', 'Mapping', True)
+            field_name = 'mapping'
+            node_name = vw.mapping
+            node_type = 'ShaderNodeMapping'
         case 'IMAGE':
-            if not vw.enable:
-                remove_node(tree, vw, 'image')
-            else:
-                if ref_tree:
-                    node_ref = ref_tree.nodes.get(vw.image)
-                    if node_ref: ref_tree.nodes.remove(node_ref)
-
-                    img = new_node(tree, vw, 'image', layer_node_bl_idnames[vw.type], 'Image Texture')
-                    dirty = True
-                else:
-                    img, dirty = check_new_node(tree, vw, 'image', layer_node_bl_idnames[vw.type], 'Image Texture', True)
+            field_name = 'image'
+            node_name = vw.image
+            node_type = layer_node_bl_idnames[vw.type]
         case 'BRICK':
-            if not vw.enable:
-                remove_node(tree, vw, 'brick')
-            else:
-                if ref_tree:
-                    node_ref = ref_tree.nodes.get(vw.brick)
-                    if node_ref: ref_tree.nodes.remove(node_ref)
-
-                    img = new_node(tree, vw, 'brick', layer_node_bl_idnames[vw.type], 'Brick Texture')
-                    dirty = True
-                else:
-                    img, dirty = check_new_node(tree, vw, 'brick', layer_node_bl_idnames[vw.type], 'Brick Texture', True)
+            field_name = 'brick'
+            node_name = vw.brick
+            node_type = layer_node_bl_idnames[vw.type]
         case 'CHECKER':
-            if not vw.enable:
-                remove_node(tree, vw, 'checker')
-            else:
-                if ref_tree:
-                    node_ref = ref_tree.nodes.get(vw.checker)
-                    if node_ref: ref_tree.nodes.remove(node_ref)
-
-                    img = new_node(tree, vw, 'checker', layer_node_bl_idnames[vw.type], 'Checker Texture')
-                    dirty = True
-                else:
-                    img, dirty = check_new_node(tree, vw, 'checker', layer_node_bl_idnames[vw.type], 'Checker Texture', True)
+            field_name = 'checker'
+            node_name = vw.checker
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'GRADIENT':
+            field_name = 'gradient'
+            node_name = vw.gradient
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'MAGIC':
+            field_name = 'magic'
+            node_name = vw.magic
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'MUSGRAVE':
+            field_name = 'musgrave'
+            node_name = vw.musgrave
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'NOISE':
+            field_name = 'noise'
+            node_name = vw.noise
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'VORONOI':
+            field_name = 'voronoi'
+            node_name = vw.voronoi
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'WAVE':
+            field_name = 'wave'
+            node_name = vw.wave
+            node_type = layer_node_bl_idnames[vw.type]
+        case 'GABOR':
+            field_name = 'gabor'
+            node_name = vw.gabor
+            node_type = layer_node_bl_idnames[vw.type]
 
     if not vw.enable:
-            remove_node(tree, vw, 'mix')
+        remove_node(tree, vw, 'mix')
+        remove_node(tree, vw, field_name)
     else:
         if ref_tree:
             node_ref = ref_tree.nodes.get(vw.mix)
             if node_ref: ref_tree.nodes.remove(node_ref)
-
             mp = new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
+            
+            node_ref = ref_tree.nodes.get(node_name)
+            if node_ref: ref_tree.nodes.remove(node_ref)
+
+            current_node = new_node(tree, vw, field_name, node_type)
+
             dirty = True
         else:
             mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
+            current_node, dirty = check_new_node(tree, vw, field_name, node_type, '', True)
         
         if dirty:
             mp.blend_type = vw.blend_type
@@ -228,7 +257,7 @@ class YNewVectorWarp(bpy.types.Operator):
     type : EnumProperty(
         name = 'Vector Warp Type',
         items = warp_type_items,
-        default = 'MAPPING',
+        default = 'IMAGE',
     )
 
     @classmethod

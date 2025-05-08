@@ -312,9 +312,9 @@ def arrange_mask_modifier_nodes(tree, mask, loc):
 def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=False, use_modifier_1=False):
 
     ori_x = loc.x
-    offset_y = 0
 
     items = parent.warps
+    loc.y -= 30
 
     # Modifier loops
     for wp in reversed(items):
@@ -333,13 +333,34 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
                     loc.y -= 400.0
             case 'IMAGE':
                 if check_set_node_loc(tree, wp.image, loc):
-                    loc.y -= 210.0
+                    loc.y -= 240.0
             case 'BRICK':
                 if check_set_node_loc(tree, wp.brick, loc):
                     loc.y -= 400.0
             case 'CHECKER':
                 if check_set_node_loc(tree, wp.checker, loc):
-                    loc.y -= 170.0
+                    loc.y -= 240.0
+            case 'GRADIENT':
+                if check_set_node_loc(tree, wp.gradient, loc):
+                    loc.y -= 240.0
+            case 'MAGIC':
+                if check_set_node_loc(tree, wp.magic, loc):
+                    loc.y -= 240.0
+            # case 'MUSGRAVE':
+            #     if check_set_node_loc(tree, wp.musgrave, loc):
+            #         loc.y -= 400.0
+            case 'NOISE':
+                if check_set_node_loc(tree, wp.noise, loc):
+                    loc.y -= 280.0
+            case 'VORONOI':
+                if check_set_node_loc(tree, wp.voronoi, loc):
+                    loc.y -= 320.0
+            case 'WAVE':
+                if check_set_node_loc(tree, wp.wave, loc):
+                    loc.y -= 300.0
+            case 'GABOR':
+                if check_set_node_loc(tree, wp.gabor, loc):
+                    loc.y -= 240.0
 
 
     return loc
