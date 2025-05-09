@@ -625,7 +625,7 @@ def draw_tex_props(source, layout, entity=None, show_source_input=False):
         else: col.prop(source, 'coloring', text='')
 
         if is_bl_newer_than(2, 80):
-            if entity and is_bl_newer_than(2, 81):
+            if entity and is_bl_newer_than(2, 81) and hasattr(entity, 'voronoi_feature'):
                 col.prop(entity, 'voronoi_feature', text='')
             else: col.prop(source, 'feature', text='')
             if source.feature not in {'DISTANCE_TO_EDGE', 'N_SPHERE_RADIUS'}:
@@ -908,7 +908,7 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
         #     ypui.need_update = True
         #     return
 
-        # mod_tree = get_mod_tree(m)
+        mod_tree = get_mod_tree(m)
         # can_be_expanded = m.type in Modifier.can_be_expanded
         
         row = layout.row(align=True)
@@ -937,12 +937,53 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
 
         # if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
         
-        # row = layout.row(align=True)
-        # row.active = layout_active
-        # row.label(text='', icon='BLANK1')
-        # box = row.box()
-        # box.active = m.enable
-        # Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, box, False)
+        if m.enable:
+            row = layout.row(align=True)
+            row.active = layout_active
+            row.label(text='', icon='BLANK1')
+            box = row.box()
+            box.active = m.enable
+            # Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, box, False)
+            match m.type:
+                case 'MAPPING':
+                    src = mod_tree.nodes.get(m.mapping)
+                case 'IMAGE':
+                    src = mod_tree.nodes.get(m.image)
+                case 'BRICK':
+                    src = mod_tree.nodes.get(m.brick)
+                case 'CHECKER':
+                    src = mod_tree.nodes.get(m.checker)
+                case 'GRADIENT':
+                    src = mod_tree.nodes.get(m.gradient)
+                case 'MAGIC':
+                    src = mod_tree.nodes.get(m.magic)
+                # case 'MUSGRAVE':
+                #     if check_set_node_loc(tree, wp.musgrave, loc):
+                #         loc.y -= 400.0
+                case 'NOISE':
+                    src = mod_tree.nodes.get(m.noise)
+                case 'VORONOI':
+                    src = mod_tree.nodes.get(m.voronoi)
+                case 'WAVE':
+                    src = mod_tree.nodes.get(m.wave)
+                case 'GABOR':
+                    src = mod_tree.nodes.get(m.gabor)
+
+            if m.type == 'IMAGE':
+                # print('Image node:', src)
+                if src.image:
+                    draw_image_props(context, src, box, m, show_datablock=False)
+            else:
+                draw_tex_props(src, box, m)
+
+            rowb = box.row(align=True)
+
+            roww = rowb.row(align=True)
+            # roww.alignment = 'LEFT'
+            roww.label(text='Blend:')
+
+            roww = rowb.row(align=True)
+            roww.prop(m, 'blend_type', text='')
 
 
 def draw_bake_target_channel(context, layout, bt, letter='r'):

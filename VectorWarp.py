@@ -28,8 +28,9 @@ def update_warp_nodes_enable(self, context):
         reconnect_yp_nodes(self.id_data)
         rearrange_yp_nodes(self.id_data)
 
-
 class YVectorWarp(bpy.types.PropertyGroup):
+    # todo : drop down warp UI, new image picker for image warp, factor mix default 1.0
+
     enable: BoolProperty(
         name = 'Enable',
         description = 'Enable this warp',
@@ -54,6 +55,7 @@ class YVectorWarp(bpy.types.PropertyGroup):
     blend_type : EnumProperty(
         name = 'Blend',
         items = blend_type_items,
+        update = update_warp_nodes_enable,
     )
 
     mix: StringProperty(default='')
@@ -242,11 +244,13 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
             dirty = True
         else:
             mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
-            current_node, dirty = check_new_node(tree, vw, field_name, node_type, '', True)
-        
-        if dirty:
-            mp.blend_type = vw.blend_type
-            mp.data_type = 'RGBA'
+            current_node, node_dirty = check_new_node(tree, vw, field_name, node_type, '', True)
+            dirty = dirty or node_dirty
+
+        # if dirty:
+        mp.blend_type = vw.blend_type
+        print("mp.blend_type=", mp.blend_type)
+        mp.data_type = 'RGBA'
                 
 class YNewVectorWarp(bpy.types.Operator):
     bl_idname = "wm.y_new_vector_warp"

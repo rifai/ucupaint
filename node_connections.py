@@ -247,8 +247,8 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
         case 'GABOR':
             current_node = tree.nodes.get(vw.gabor)
 
-    create_link(tree, vector, mix_node.inputs['B'])
-    create_link(tree, current_node.outputs[0], mix_node.inputs['A'])
+    create_link(tree, vector, mix_node.inputs['A'])
+    create_link(tree, current_node.outputs[0], mix_node.inputs['B'])
 
     return mix_node.outputs['Result']
 
