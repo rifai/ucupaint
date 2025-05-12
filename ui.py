@@ -988,6 +988,10 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
 
             roww = rowb.row(align=True)
             roww.prop(m, 'blend_type', text='')
+            
+            roww = rowb.row(align=True)
+            draw_input_prop(roww, m, 'intensity_value')
+
 
 
 def draw_bake_target_channel(context, layout, bt, letter='r'):

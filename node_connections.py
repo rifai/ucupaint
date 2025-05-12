@@ -250,6 +250,9 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     create_link(tree, vector, mix_node.inputs['A'])
     create_link(tree, current_node.outputs[0], mix_node.inputs['B'])
 
+    intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
+    create_link(tree, intensity_value, mix_node.inputs['Factor'])
+
     return mix_node.outputs['Result']
 
 def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
