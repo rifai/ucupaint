@@ -67,6 +67,8 @@ class YVectorWarp(bpy.types.PropertyGroup):
     mix: StringProperty(default='')
 
     mapping : StringProperty(default='')
+    uniform_scale_value : FloatProperty(default=1)
+
     image : StringProperty(default='')
     brick : StringProperty(default='')
     checker : StringProperty(default='')
@@ -257,7 +259,6 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
         # if dirty:
         mp.blend_type = vw.blend_type
         mp.inputs[0].default_value = vw.intensity_value
-        print("mp.blend_type=", mp.blend_type)
         mp.data_type = 'RGBA'
                 
 class YNewVectorWarp(bpy.types.Operator):
@@ -302,6 +303,9 @@ class YNewVectorWarp(bpy.types.Operator):
         new_warp.name = get_unique_name(name, layer.warps)
         new_warp.type = self.type
         new_warp.blend_type = 'ADD'
+
+        if self.type == 'MAPPING':
+            new_warp.blend_type = 'MIX'
 
         check_vectorwarp_trees(parent)
 

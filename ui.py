@@ -977,6 +977,41 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
                 # print('Image node:', src)
                 if src.image:
                     draw_image_props(context, src, box, m, show_datablock=False)
+            elif m.type == 'MAPPING':
+                rrow = box.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow.label(text='Transform:')
+                rrow.prop(src, 'vector_type', text='')
+
+                rrow = box.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow = rrow.row()
+                if is_bl_newer_than(2, 81):
+                    mcol = rrow.column()
+                    mcol.prop(src.inputs[1], 'default_value', text='Offset')
+                    mcol = rrow.column()
+                    mcol.prop(src.inputs[2], 'default_value', text='Rotation')
+                    # if layer.enable_uniform_scale:
+                    #     mcol = rrow.column(align=True)
+                    #     mrow = mcol.row()
+                    #     mrow.label(text='Scale:')
+                    #     mrow.prop(layer, 'enable_uniform_scale', text='', icon='LOCKED')
+                    #     draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'X')
+                    #     draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Y')
+                    #     draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Z')
+                    # else:
+                    mcol = rrow.column(align=True)
+                    mrow = mcol.row()
+                    mrow.label(text='Scale:')
+                    # mrow.prop(layer, 'enable_uniform_scale', text='', icon='UNLOCKED')
+                    mcol.prop(src.inputs[3], 'default_value', text='')
+                else:
+                    mcol = rrow.column()
+                    mcol.prop(src, 'translation')
+                    mcol = rrow.column()
+                    mcol.prop(src, 'rotation')
+                    mcol = rrow.column()
+                    mcol.prop(src, 'scale')
             elif src:
                 draw_tex_props(src, box, m)
 
