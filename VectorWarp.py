@@ -1,4 +1,4 @@
-import bpy
+import bpy, time
 from .common import *
 from bpy.props import *
 
@@ -31,6 +31,35 @@ def update_warp_nodes_enable(self, context):
     #     channel = yp.channels[int(match3.group(1))]
     #     reconnect_yp_nodes(self.id_data)
     #     rearrange_yp_nodes(self.id_data)
+
+def update_uniform_scale_enabled(self, context):
+    yp = self.id_data.yp
+    if yp.halt_update: return
+
+    # match1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    # match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+
+    tree = get_mod_tree(self)
+
+
+    if match2:
+        layer = yp.layers[int(match2.group(1))]
+
+    scale_input = tree.nodes.get(self.mapping).inputs[3]
+
+    if self.uniform_scale_enable:
+        set_entity_prop_value(self, 'uniform_scale_value', min(map(abs, scale_input.default_value)))
+    else:
+        scale = get_entity_prop_value(self, 'uniform_scale_value')
+        scale_input.default_value = (scale, scale, scale)
+
+    check_layer_tree_ios(layer)
+
+    reconnect_layer_nodes(layer)
+    rearrange_layer_nodes(layer)
+
+    print("uniform scale enabled=", self.uniform_scale_enable, "uniform scale value=", self.uniform_scale_value)
 
 class YVectorWarp(bpy.types.PropertyGroup):
     # todo : new image picker for image warp, mapping (default mix, vector use prev vector)
@@ -68,8 +97,16 @@ class YVectorWarp(bpy.types.PropertyGroup):
 
     mapping : StringProperty(default='')
     uniform_scale_value : FloatProperty(default=1)
+    uniform_scale_enable : BoolProperty(
+        name = 'Enable Uniform Scale', 
+        description = 'Use the same value for all scale components',
+        default = False,
+        update = update_uniform_scale_enabled
+    )
 
     image : StringProperty(default='')
+    image_name : StringProperty(default='')
+
     brick : StringProperty(default='')
     checker : StringProperty(default='')
     gradient : StringProperty(default='')
@@ -260,6 +297,10 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
         mp.blend_type = vw.blend_type
         mp.inputs[0].default_value = vw.intensity_value
         mp.data_type = 'RGBA'
+
+        match vw.type:
+            case 'IMAGE':
+                current_node.image = bpy.data.images.get(vw.image_name)
                 
 class YNewVectorWarp(bpy.types.Operator):
     bl_idname = "wm.y_new_vector_warp"
@@ -308,19 +349,6 @@ class YNewVectorWarp(bpy.types.Operator):
             new_warp.blend_type = 'MIX'
 
         check_vectorwarp_trees(parent)
-
-
-        # mod = add_new_modifier(context.parent, self.type)
-
-        # #if self.type == 'RGB_TO_INTENSITY' and root_ch.type == 'RGB':
-        # #    mod.rgb2i_col = (1,0,1,1)
-
-        # # If RGB to intensity is added, bump base is better be 0.0
-        # if layer and self.type == 'RGB_TO_INTENSITY':
-        #     for i, ch in enumerate(yp.channels):
-        #         c = context.layer.channels[i]
-        #         if ch.type == 'NORMAL':
-        #             c.bump_base_value = 0.0
 
         # Expand channel content to see added modifier
         if m1:
@@ -467,12 +495,131 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         context.window_manager.ypui.need_update = True
 
         return {'FINISHED'}
+
+class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
+    """Open Available Image to Vector Warp"""
+    bl_idname = "wm.y_open_available_image_to_vector_warp"
+    bl_label = "Open Available Image to Vector Warp"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    interpolation : EnumProperty(
+        name = 'Image Interpolation Type',
+        description = 'Image interpolation type',
+        items = interpolation_type_items,
+        default = 'Linear'
+    )
+
+    blend_type : EnumProperty(
+        name = 'Blend',
+        items = blend_type_items,
+    )
+
+    image_name : StringProperty(name="Image")
+    image_coll : CollectionProperty(type=bpy.types.PropertyGroup)
+
+    # layer : PointerProperty(type=YLayer)
+    
+    @classmethod
+    def poll(cls, context):
+        print("has parent =", hasattr(context, 'parent'))
+        return get_active_ypaint_node() and hasattr(context, 'parent')
+
+    def invoke(self, context, event):
+        obj = context.object
+        node = get_active_ypaint_node()
+        yp = node.node_tree.yp
+
+        self.image_coll.clear()
+        imgs = bpy.data.images
+        baked_channel_images = get_all_baked_channel_images(node.node_tree)
+        for img in imgs:
+            if is_image_available_to_open(img) and img not in baked_channel_images:
+                self.image_coll.add().name = img.name
+        
+        print("has parent invoke =", hasattr(context, 'parent'))
+
+        return context.window_manager.invoke_props_dialog(self)
+
+    # def check(self, context):
+    #     return True
+
+    def draw(self, context):
+        # node = get_active_ypaint_node()
+        # yp = node.node_tree.yp
+        # obj = context.object
+
+        self.layout.prop_search(self, "image_name", self, "image_coll", icon='IMAGE_DATA')
+        row = self.layout.row()
+
+        col = row.column()
+        col.label(text='Interpolation:')
+        col.label(text='Vector:')
+
+        col = row.column()
+        col.prop(self, 'interpolation', text='')
+        
+        print("has parent draw =", hasattr(context, 'parent'))
+
+
+    def execute(self, context):
+        T = time.time()
+
+        node = get_active_ypaint_node()
+
+        group_tree = node.node_tree
+
+        yp = group_tree.yp
+
+        wm = context.window_manager
+
+        if self.image_name == '':
+            self.report({'ERROR'}, "No image selected!")
+            return {'CANCELLED'}
+
+        node.node_tree.yp.halt_update = True
+
+        # image = None
+        # image = bpy.data.images.get(self.image_name)
+        # name = image.name
+
+        parent = context.parent
+
+        # m1 = re.match(r'^yp\.layers\[(\d+)\]$', context.parent.path_from_id())
+        # m2 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', context.parent.path_from_id())
+        # m3 = re.match(r'^yp\.channels\[(\d+)\]$', context.parent.path_from_id())
+
+        layer = self.layer 
+        new_warp = parent.warps.add()
+
+        name = [mt[1] for mt in warp_type_items if mt[0] == self.type][0]
+
+        new_warp.name = get_unique_name(name, layer.warps)
+        new_warp.type = 'IMAGE'
+        new_warp.blend_type = 'ADD'
+        new_warp.image_name = self.image_name
+
+        check_vectorwarp_trees(parent)
+
+        node.node_tree.yp.halt_update = False
+
+        # Reconnect and rearrange nodes
+        reconnect_yp_nodes(node.node_tree)
+        rearrange_yp_nodes(node.node_tree)
+
+        # Update UI
+        wm.ypui.need_update = True
+
+        print('INFO: Image', self.image_name, 'is opened in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        wm.yptimer.time = str(time.time())
+
+        return {'FINISHED'}
     
 classes = (
     YVectorWarp,
     YNewVectorWarp,
     YMoveYPaintVectorWarp,
     YRemoveYPaintVectorWarp,
+    YOpenAvailableImageToVectorWarp,
 )
          
 def register():
