@@ -333,7 +333,7 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
                     loc.y -= 400.0
             case 'IMAGE':
                 if check_set_node_loc(tree, wp.image, loc):
-                    loc.y -= 240.0
+                    loc.y -= 300.0
             case 'BRICK':
                 if check_set_node_loc(tree, wp.brick, loc):
                     loc.y -= 400.0
