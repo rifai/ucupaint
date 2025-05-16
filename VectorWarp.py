@@ -667,6 +667,210 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
         wm.yptimer.time = str(time.time())
 
         return {'FINISHED'}
+
+def update_new_uv_map(self, context):
+    if not UDIM.is_udim_supported(): return
+
+    if get_user_preferences().enable_auto_udim_detection:
+        mat = get_active_material()
+        objs = get_all_objects_with_same_materials(mat)
+        self.use_udim = UDIM.is_uvmap_udim(objs, self.uv_map)
+
+class YNewImageToVectorWarp(bpy.types.Operator):
+    """New Image to Vector Warp"""
+    bl_idname = "wm.y_new_image_to_vector_warp"
+    bl_label = "New Image"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    name : StringProperty(default='')
+
+    # For image layer
+    width : IntProperty(name='Width', default=1024, min=1, max=16384)
+    height : IntProperty(name='Height', default=1024, min=1, max=16384)
+    #color : FloatVectorProperty(name='Color', size=4, subtype='COLOR', default=(0.0,0.0,0.0,0.0), min=0.0, max=1.0)
+    #alpha : BoolProperty(name='Alpha', default=True)
+    hdr : BoolProperty(name='32 bit Float', default=False)
+
+    image_resolution : EnumProperty(
+        name = 'Image Resolution',
+        items = image_resolution_items,
+        default = '1024'
+    )
+
+    use_custom_resolution : BoolProperty(
+        name= 'Custom Resolution',
+        description = 'Use custom Resolution to adjust the width and height individually',
+        default = False
+    )
+
+    use_udim : BoolProperty(
+        name = 'Use UDIM Tiles',
+        description = 'Use UDIM Tiles',
+        default = False
+    )
+
+    uv_map : StringProperty(default='', update=update_new_uv_map)
+    uv_map_coll : CollectionProperty(type=bpy.types.PropertyGroup)
+
+
+    @classmethod
+    def poll(cls, context):
+        return get_active_ypaint_node()
+
+    def invoke(self, context, event):
+        ypup = get_user_preferences()
+        obj = context.object
+        node = get_active_ypaint_node()
+
+        yp = self.yp = node.node_tree.yp
+
+        self.parent = context.parent
+
+        name = obj.active_material.name
+        items = bpy.data.images
+
+        # Use user preference default image size
+        if ypup.default_image_resolution == 'CUSTOM':
+            self.use_custom_resolution = True
+            self.width = self.height = ypup.default_new_image_size
+        elif ypup.default_image_resolution != 'DEFAULT':
+            self.image_resolution = ypup.default_image_resolution
+
+        # Layer name
+        self.name = get_unique_name(name, items)
+
+        if obj.type == 'MESH':
+            uv_name = get_default_uv_name(obj, yp)
+            self.uv_map = uv_name
+
+            # UV Map collections update
+            self.uv_map_coll.clear()
+            for uv in get_uv_layers(obj):
+                if not uv.name.startswith(TEMP_UV):
+                    self.uv_map_coll.add().name = uv.name
+
+        if get_user_preferences().skip_property_popups and not event.shift:
+            return self.execute(context)
+        return context.window_manager.invoke_props_dialog(self, width=320)
+    
+    def check(self, context):
+        ypup = get_user_preferences()
+
+        if not self.use_custom_resolution:
+            self.width = int(self.image_resolution)
+            self.height = int(self.image_resolution)
+
+        return True
+    
+    def draw(self, context):
+        #yp = self.group_node.node_tree.yp
+        node = get_active_ypaint_node()
+        yp = node.node_tree.yp
+        obj = context.object
+
+
+        row = split_layout(self.layout, 0.4)
+        col = row.column(align=False)
+        
+        col.label(text='Name:')
+
+        if self.use_custom_resolution == False:
+            col.label(text='')
+            col.label(text='Resolution:')
+        elif self.use_custom_resolution == True:
+            col.label(text='')
+            col.label(text='Width:')
+            col.label(text='Height:')
+
+        col = row.column(align=False)
+
+        col.prop(self, 'name', text='')
+
+        if self.use_custom_resolution == False:
+            crow = col.row(align=True)
+            crow.prop(self, 'use_custom_resolution')
+            crow = col.row(align=True)
+            crow.prop(self, 'image_resolution', expand= True,)
+        elif self.use_custom_resolution == True:
+            crow = col.row(align=True)
+            crow.prop(self, 'use_custom_resolution')
+            col.prop(self, 'width', text='')
+            col.prop(self, 'height', text='')
+
+        col.prop(self, 'hdr')
+
+        # crow = col.row(align=True)
+        # crow.prop_search(self, "uv_map", self, "uv_map_coll", text='', icon='GROUP_UVS')
+
+        # if UDIM.is_udim_supported():
+        #     col.prop(self, 'use_udim')
+
+    def execute(self, context):
+        T = time.time()
+
+        node = get_active_ypaint_node()
+        yp = node.node_tree.yp
+
+        same_name = [i for i in bpy.data.images if i.name == self.name]
+
+        if same_name:
+            self.report({'ERROR'}, "Image named '" + self.name +"' is already available!")
+            return {'CANCELLED'}
+        
+        if self.name == '':
+            self.report({'ERROR'}, "Name cannot be empty!")
+            return {'CANCELLED'}
+
+        img = None
+
+        alpha = True
+        color = (0, 0, 0, 0)
+        
+        obj = context.object
+        mat = obj.active_material
+
+        if self.use_udim:
+            objs = get_all_objects_with_same_materials(mat)
+            tilenums = UDIM.get_tile_numbers(objs, self.uv_map)
+
+       
+
+        if self.use_udim:
+            img = bpy.data.images.new(
+                name=self.name, width=self.width, height=self.height, 
+                alpha=alpha, float_buffer=self.hdr, tiled=True
+            )
+
+            # Fill tiles
+            for tilenum in tilenums:
+                UDIM.fill_tile(img, tilenum, color, self.width, self.height)
+            UDIM.initial_pack_udim(img, color)
+
+        else:
+            img = bpy.data.images.new(
+                name=self.name, width=self.width, height=self.height, 
+                alpha=alpha, float_buffer=self.hdr
+            )
+
+            #img.generated_type = self.generated_type
+            img.generated_type = 'BLANK'
+            img.generated_color = color
+            if hasattr(img, 'use_alpha'):
+                img.use_alpha = True
+
+
+        update_image_editor_image(context, img)
+
+        generate_image_warp_node(self.parent, node.node_tree.yp, self.name)
+
+        wm = context.window_manager
+
+        # Update UI
+        wm.ypui.need_update = True
+        print('INFO: Image', self.name, 'is opened in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        wm.yptimer.time = str(time.time())
+
+        return {'FINISHED'}
     
 classes = (
     YVectorWarp,
@@ -675,6 +879,7 @@ classes = (
     YRemoveYPaintVectorWarp,
     YOpenAvailableImageToVectorWarp,
     YOpenImageToVectorWarp,
+    YNewImageToVectorWarp,
 )
          
 def register():
