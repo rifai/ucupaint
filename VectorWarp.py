@@ -465,6 +465,33 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         context.window_manager.ypui.need_update = True
 
         return {'FINISHED'}
+    
+
+def generate_image_warp_node(parent, yp, image_name):
+    yp.halt_update = True
+
+    layer = parent # yp.layers[yp.active_layer_index]
+
+    new_warp = layer.warps.add()
+
+    type = 'IMAGE'
+
+    name = [mt[1] for mt in warp_type_items if mt[0] == type][0]
+
+    new_warp.name = get_unique_name(name, layer.warps)
+    new_warp.type = type
+    new_warp.blend_type = 'ADD'
+    new_warp.image_name = image_name
+
+    yp.halt_update = False
+
+    check_vectorwarp_trees(layer)
+
+    # Reconnect and rearrange nodes
+    reconnect_layer_nodes(layer)
+    rearrange_layer_nodes(layer)
+
+
 
 class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
     """Open Available Image to Vector Warp"""
@@ -534,33 +561,9 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
             self.report({'ERROR'}, "No image selected!")
             return {'CANCELLED'}
 
-        node.node_tree.yp.halt_update = True
-
-        layer = self.parent # yp.layers[yp.active_layer_index]
-
-        new_warp = layer.warps.add()
-
-
-        type = 'IMAGE'
-
-        name = [mt[1] for mt in warp_type_items if mt[0] == type][0]
-
-        new_warp.name = get_unique_name(name, layer.warps)
-        new_warp.type = type
-        new_warp.blend_type = 'ADD'
-        new_warp.image_name = self.image_name
-
-        node.node_tree.yp.halt_update = False
-
-        check_vectorwarp_trees(layer)
-
-        # Reconnect and rearrange nodes
-        reconnect_layer_nodes(layer)
-        rearrange_layer_nodes(layer)
-
+        generate_image_warp_node(self.parent, node.node_tree.yp, self.image_name)
         # Update UI
         wm.ypui.need_update = True
-
         print('INFO: Image', self.image_name, 'is opened in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
         wm.yptimer.time = str(time.time())
 
@@ -569,7 +572,7 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
 class YOpenImageToVectorWarp(bpy.types.Operator):
     """Open Image to Vector Warp"""
     bl_idname = "wm.y_open_image_to_vector_warp"
-    bl_label = "Open Image to Vector Warp"
+    bl_label = "Open Image"
     bl_options = {'REGISTER', 'UNDO'}
 
     # interpolation : EnumProperty(
@@ -584,6 +587,14 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
 
     filter_folder : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
     filter_image : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
+
+    relative : BoolProperty(name="Relative Path", default=True, description="Apply relative paths")
+
+    use_udim_detecting : BoolProperty(
+        name = 'Detect UDIMs',
+        description = 'Detect selected UDIM files and load all matching tiles.',
+        default = True
+    )
     
     @classmethod
     def poll(cls, context):
@@ -605,20 +616,11 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
     # def check(self, context):
     #     return True
 
-    # def draw(self, context):
-        # node = get_active_ypaint_node()
-        # yp = node.node_tree.yp
-        # obj = context.object
-        # self.layout.prop_search(self, "image_name", self, "image_coll", icon='IMAGE_DATA')
-        # row = self.layout.row()
-
-        # col = row.column()
-        # col.label(text='Interpolation:')
-
-        # col = row.column()
-        # col.prop(self, 'interpolation', text='')
-        
-        # print("has parent draw =", hasattr(context, 'parent'))
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, 'relative')
+        if UDIM.is_udim_supported():
+            layout.prop(self, 'use_udim_detecting')
 
 
     def execute(self, context):
@@ -638,7 +640,9 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
             bpy.context.area.type = 'IMAGE_EDITOR'
            
             bpy.ops.image.open(
-                filepath=self.filepath, directory=directory, relative_path=True,
+                filepath=self.filepath, directory=directory, 
+                relative_path=self.relative, 
+                use_udim_detecting=self.use_udim_detecting
             )
             image = bpy.context.space_data.image
             bpy.context.area.type = ori_ui_type
@@ -649,33 +653,12 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
         if self.image_name == '':
             self.report({'ERROR'}, "No image selected!")
             return {'CANCELLED'}
+        
         node = get_active_ypaint_node()
 
         wm = context.window_manager
 
-        node.node_tree.yp.halt_update = True
-
-        layer = self.parent # yp.layers[yp.active_layer_index]
-
-        new_warp = layer.warps.add()
-
-
-        type = 'IMAGE'
-
-        name = [mt[1] for mt in warp_type_items if mt[0] == type][0]
-
-        new_warp.name = get_unique_name(name, layer.warps)
-        new_warp.type = type
-        new_warp.blend_type = 'ADD'
-        new_warp.image_name = self.image_name
-
-        node.node_tree.yp.halt_update = False
-
-        check_vectorwarp_trees(layer)
-
-        # Reconnect and rearrange nodes
-        reconnect_layer_nodes(layer)
-        rearrange_layer_nodes(layer)
+        generate_image_warp_node(self.parent, node.node_tree.yp, self.image_name)
 
         # Update UI
         wm.ypui.need_update = True
