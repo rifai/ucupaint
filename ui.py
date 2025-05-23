@@ -914,10 +914,7 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
         row = layout.row(align=True)
         row.active = layout_active
 
-        label = m.name
-
         rrow = row.row(align=True)
-
         # if can_be_expanded:
         #     if modui.expand_content:
         #         icon_value = lib.get_icon('uncollapsed_modifier')
@@ -926,14 +923,22 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
         #     inbox_dropdown_button(rrow, modui, 'expand_content', label, scale_override=0.95, icon_value=icon_value)
         # else:
         rrow.label(text='', icon_value=lib.get_icon('modifier'))
-        rrow.label(text=label)
+        rrow = row.row(align=True)
+        rrow.label(text=m.name)
+
+        icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
+
+        # row.context_pointer_set('layer', layer)
+        row.context_pointer_set('parent', parent)
+        row.context_pointer_set('vector_warp', m)
+        row.menu("NODE_MT_y_vector_warp_menu", text='', icon=icon)
 
         if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
         
         
-        row = layout.row(align=True)
-        row.active = layout_active
-        row.label(text='', icon='BLANK1')
+        # row = layout.row(align=True)
+        # row.active = layout_active
+        # row.label(text='', icon='BLANK1')
         # box = row.box()
         # box.active = m.enable
         # Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, box, False)
@@ -6354,6 +6359,39 @@ class YModifierMenu(bpy.types.Menu):
         #    col.separator()
         #    col.prop(context.modifier, 'shortcut', text='Shortcut on layer list')
 
+class YVectorWarpMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_y_vector_warp_menu"
+    bl_label = "Vector Warp Menu"
+    bl_description = "Vector Warp Menu"
+
+    @classmethod
+    def poll(cls, context):
+        #return hasattr(context, 'modifier') and hasattr(context, 'parent') and get_active_ypaint_node()
+        return get_active_ypaint_node()
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+
+        # if not hasattr(context, 'parent') or not hasattr(context, 'modifier'):
+        #     col.label(text='ERROR: Context has no parent or modifier!', icon='ERROR')
+        #     return
+
+        op = col.operator('wm.y_move_ypaint_vector_warp', icon='TRIA_UP', text='Move Modifier Up')
+        op.direction = 'UP'
+
+        op = col.operator('wm.y_move_ypaint_vector_warp', icon='TRIA_DOWN', text='Move Modifier Down')
+        op.direction = 'DOWN'
+
+        col.separator()
+        if is_bl_newer_than(2, 80):
+            op = col.operator('wm.y_remove_ypaint_vector_warp', icon='REMOVE', text='Remove Modifier')
+        else: op = col.operator('wm.y_remove_ypaint_vector_warp', icon='ZOOMOUT', text='Remove Modifier')
+
+        #if hasattr(context, 'layer') and context.modifier.type in {'RGB_TO_INTENSITY', 'OVERRIDE_COLOR'}:
+        #    col.separator()
+        #    col.prop(context.modifier, 'shortcut', text='Shortcut on layer list')
+
 class YModifier1Menu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_modifier1_menu"
     bl_label = "Modifier Menu"
@@ -7275,7 +7313,7 @@ class YWarpSpecialMenu(bpy.types.Menu):
             col = row.column()
             col.label(text='Add Warp Vector')
             for mt in warp_type_items:
-                col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier'))
+                col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
 
 def update_modifier_ui(self, context):
     ypui = context.window_manager.ypui
@@ -7902,6 +7940,7 @@ def register():
     bpy.utils.register_class(YModifierMenu)
     bpy.utils.register_class(YModifier1Menu)
     bpy.utils.register_class(YMaskModifierMenu)
+    bpy.utils.register_class(YVectorWarpMenu)
     bpy.utils.register_class(YTransitionBumpMenu)
     bpy.utils.register_class(YTransitionRampMenu)
     bpy.utils.register_class(YTransitionAOMenu)
@@ -7985,6 +8024,7 @@ def unregister():
     bpy.utils.unregister_class(YUVSpecialMenu)
     bpy.utils.unregister_class(YModifierMenu)
     bpy.utils.unregister_class(YModifier1Menu)
+    bpy.utils.unregister_class(YVectorWarpMenu)
     bpy.utils.unregister_class(YMaskModifierMenu)
     bpy.utils.unregister_class(YTransitionBumpMenu)
     bpy.utils.unregister_class(YTransitionRampMenu)
