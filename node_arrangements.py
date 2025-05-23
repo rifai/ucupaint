@@ -330,12 +330,34 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
         if wp.map_range:
             check_set_node_loc(tree, wp.map_range, loc + Vector((200, 0)))
         check_set_node_loc(tree, wp.mix, loc + Vector((400, 0)))
+        check_set_node_loc(tree, wp.node, loc)
 
-        if check_set_node_loc(tree, wp.node, loc):
-            if wp.type in layer_node_bl_idnames:
-                loc.y -= 500.0
-            else:
+        match wp.type:
+            case 'MAPPING':
                 loc.y -= 400.0
+            case 'BLUR':
+                loc.y -= 300.0
+            case 'IMAGE':
+                loc.y -= 300.0
+            case 'BRICK':
+                loc.y -= 400.0
+            case 'CHECKER':
+                loc.y -= 240.0
+            case 'GRADIENT':
+                loc.y -= 240.0
+            case 'MAGIC':
+                loc.y -= 240.0
+            # case 'MUSGRAVE':
+            #     if check_set_node_loc(tree, wp.musgrave, loc):
+            #         loc.y -= 400.0
+            case 'NOISE':
+                loc.y -= 280.0
+            case 'VORONOI':
+                loc.y -= 320.0
+            case 'WAVE':
+                loc.y -= 300.0
+            case 'GABOR':
+                loc.y -= 240.0
 
     return loc
 

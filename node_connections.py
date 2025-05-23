@@ -234,7 +234,12 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
                     create_link(tree, uniform_scale_value, current_node.inputs['Scale'])
                 else:
                     break_link(tree, uniform_scale_value, current_node.inputs['Scale'])
+        case 'BLUR':
+            create_link(tree, vector, current_node.inputs['Vector'])
+            blur_vector_factor = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'blur_vector_factor'))
 
+            if blur_vector_factor:
+                create_link(tree, blur_vector_factor, current_node.inputs[0])
 
     create_link(tree, vector, mix_node.inputs['A'])
     node_output = current_node.outputs[0]

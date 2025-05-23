@@ -830,6 +830,10 @@ def check_warps_ios(parent, valid_inputs, input_index, dirty):
             # Create image socket
             dirty = create_prop_input(warp, 'uniform_scale_value', valid_inputs, input_index, dirty)
             input_index += 1
+        elif warp.type == 'BLUR':
+            # Create blur socket
+            dirty = create_prop_input(warp, 'blur_vector_factor', valid_inputs, input_index, dirty)
+            input_index += 1
 
     return input_index, dirty
 

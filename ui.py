@@ -954,14 +954,17 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                 # print('Image node:', src)
                 if src.image:
                     draw_image_props(context, src, box, m, show_datablock=False)
+            elif m.type == 'BLUR':
+                rowb = box.row(align=True)
+                roww = rowb.row(align=True)
+                roww.label(text='Factor:')
+                draw_input_prop(roww, m, 'blur_vector_factor')
             elif m.type == 'MAPPING':
                 rrow = box.row(align=True)
-                rrow.label(text='', icon='BLANK1')
                 rrow.label(text='Transform:')
                 rrow.prop(src, 'vector_type', text='')
 
                 rrow = box.row(align=True)
-                rrow.label(text='', icon='BLANK1')
                 rrow = rrow.row()
                 if is_bl_newer_than(2, 81):
                     mcol = rrow.column()

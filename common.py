@@ -252,7 +252,7 @@ mask_type_items = (
 
 warp_type_items = (
     ('MAPPING', 'Mapping', ''),
-    # ('BLUR', 'Blur', ''),
+    ('BLUR', 'Blur', ''),
     ('IMAGE', 'Image', ''),
     ('BRICK', 'Brick', ''),
     ('CHECKER', 'Checker', ''),
@@ -2193,6 +2193,37 @@ def get_mod_tree(entity):
         return entity.id_data
 
     m = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\].*', entity.path_from_id())
+    if m:
+        layer = yp.layers[int(m.group(1))]
+        ch = layer.channels[int(m.group(2))]
+        tree = get_tree(layer)
+
+        mod_group = tree.nodes.get(ch.mod_group)
+        if mod_group and mod_group.type == 'GROUP':
+            return mod_group.node_tree
+
+        return tree
+
+    m = re.match(r'^yp\.layers\[(\d+)\].*', entity.path_from_id())
+    if m:
+        layer = yp.layers[int(m.group(1))]
+        tree = get_tree(layer)
+
+        source_group = tree.nodes.get(layer.source_group)
+        if source_group and source_group.type == 'GROUP': 
+            tree = source_group.node_tree
+
+        mod_group = tree.nodes.get(layer.mod_group)
+        if mod_group and mod_group.type == 'GROUP':
+            return mod_group.node_tree
+
+        return tree
+
+def get_vw_tree(entity):
+
+    yp = entity.id_data.yp
+
+    m = re.match(r'^yp\.layers\[(\d+)\]\.warps\[(\d+)\].*', entity.path_from_id())
     if m:
         layer = yp.layers[int(m.group(1))]
         ch = layer.channels[int(m.group(2))]

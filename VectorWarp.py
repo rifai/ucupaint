@@ -10,7 +10,7 @@ from . import UDIM
 def update_warp_nodes_enable(self, context):
     yp = self.id_data.yp
     if yp.halt_update: return
-    tree = get_mod_tree(self)
+    tree = get_vw_tree(self)
 
     check_vectorwarp_nodes(self, tree)
 
@@ -40,7 +40,7 @@ def update_uniform_scale_enabled(self, context):
     match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     # match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
 
-    tree = get_mod_tree(self)
+    tree = get_vw_tree(self)
 
     if match2:
         layer = yp.layers[int(match2.group(1))]
@@ -60,7 +60,25 @@ def update_uniform_scale_enabled(self, context):
     reconnect_layer_nodes(layer)
     rearrange_layer_nodes(layer)
 
-    print("uniform scale enabled=", self.uniform_scale_enable, "uniform scale value=", self.uniform_scale_value)
+def update_blur_vector_factor(self, context):
+    yp = self.id_data.yp
+    if yp.halt_update: return
+
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+
+    if match2:
+        layer = yp.layers[int(match2.group(1))]
+    elif match1:
+        layer = yp.layers[int(match1.group(1))]
+
+    tree = get_tree(layer)
+
+    blur_vector = tree.nodes.get(self.node) 
+
+    if self.type == 'BLUR' and blur_vector:
+        blur_vector.inputs[0].default_value = self.blur_vector_factor
+
 
 class YVectorWarp(bpy.types.PropertyGroup):
     # todo : new image picker for image warp, mapping (default mix, vector use prev vector)
@@ -104,6 +122,13 @@ class YVectorWarp(bpy.types.PropertyGroup):
         description = 'Use the same value for all scale components',
         default = False,
         update = update_uniform_scale_enabled
+    )
+
+    blur_vector_factor : FloatProperty(
+        name = 'Blur Vector Factor', 
+        description = 'Blur vector factor',
+        default=1.0, min=0.0, max=100.0,
+        update = update_blur_vector_factor
     )
 
     node : StringProperty(default='')
@@ -226,6 +251,8 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
         node_type = layer_node_bl_idnames[vw.type]
     elif vw.type == 'MAPPING':
         node_type = 'ShaderNodeMapping'
+    elif vw.type == 'BLUR':
+        node_type = 'ShaderNodeGroup'
 
     if ref_tree:
         node_ref = ref_tree.nodes.get(vw.node)
@@ -234,6 +261,11 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
         dirty = True
     else:
         current_node, dirty = check_new_node(tree, vw, 'node', node_type, '', True)
+
+    if dirty:
+        match vw.type:
+            case 'BLUR':
+                current_node.node_tree = get_node_tree_lib(lib.BLUR_VECTOR)
 
     match vw.type:
         case 'IMAGE':
@@ -277,7 +309,7 @@ class YNewVectorWarp(bpy.types.Operator):
         new_warp.type = self.type
         new_warp.blend_type = 'ADD'
 
-        if self.type == 'MAPPING':
+        if self.type in {'MAPPING', 'BLUR'}:
             new_warp.blend_type = 'MIX'
 
         check_vectorwarp_trees(parent)
@@ -393,7 +425,7 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
 
         layer = context.layer if hasattr(context, 'layer') else None
 
-        tree = get_mod_tree(layer)
+        tree = get_vw_tree(layer)
 
         # Remove modifier fcurves first
         # remove_entity_fcurves(mod)
