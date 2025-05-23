@@ -46,7 +46,7 @@ def update_uniform_scale_enabled(self, context):
     if match2:
         layer = yp.layers[int(match2.group(1))]
 
-    scale_input = tree.nodes.get(self.mapping).inputs[3]
+    scale_input = tree.nodes.get(self.node).inputs[3]
 
     if self.uniform_scale_enable:
         set_entity_prop_value(self, 'uniform_scale_value', min(map(abs, scale_input.default_value)))
@@ -105,18 +105,9 @@ class YVectorWarp(bpy.types.PropertyGroup):
         update = update_uniform_scale_enabled
     )
 
-    image : StringProperty(default='')
-    image_name : StringProperty(default='')
+    node : StringProperty(default='')
 
-    brick : StringProperty(default='')
-    checker : StringProperty(default='')
-    gradient : StringProperty(default='')
-    magic : StringProperty(default='')
-    musgrave : StringProperty(default='')
-    noise : StringProperty(default='')
-    voronoi : StringProperty(default='')
-    wave : StringProperty(default='')
-    gabor : StringProperty(default='')
+    image_name : StringProperty(default='')
 
     expand_content : BoolProperty(default=True)
 
@@ -193,29 +184,7 @@ def delete_vectorwarp_nodes(tree, vw):
     # Delete the nodes
     remove_node(tree, vw, 'frame')
 
-    match vw.type:
-        case 'MAPPING':
-            remove_node(tree, vw, 'mapping')
-        case 'IMAGE':
-            remove_node(tree, vw, 'image')
-        case 'BRICK':
-            remove_node(tree, vw, 'brick')
-        case 'CHECKER':
-            remove_node(tree, vw, 'checker')
-        case 'GRADIENT':
-            remove_node(tree, vw, 'gradient')
-        case 'MAGIC':
-            remove_node(tree, vw, 'magic')
-        case 'MUSGRAVE':
-            remove_node(tree, vw, 'musgrave')
-        case 'NOISE':
-            remove_node(tree, vw, 'noise')
-        case 'VORONOI':
-            remove_node(tree, vw, 'voronoi')
-        case 'WAVE':
-            remove_node(tree, vw, 'wave')
-        case 'GABOR':
-            remove_node(tree, vw, 'gabor')
+    remove_node(tree, vw, 'node')
 
 def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
     if not vw.enable:
@@ -246,104 +215,24 @@ def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
             mr.inputs["To Min"].default_value = (-0.5, -0.5, -0.5)
             mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
 
-def save_brick_props(tree, vw):
-    brick_node = tree.nodes.get(vw.brick)
-    # root_tree = vw.id_data
-    if brick_node:
-        # for fcs in get_action_and_driver_fcurves(tree):
-        #     for fc in fcs:
-        #         match = re.match(r'^nodes\["' + vw.brick + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
-        #         if match:
-        #             index = int(match.group(1))
-        #             if index == 3:
-        #                 if root_tree != tree: copy_fcurves(fc, root_tree, m, 'rgb2i_col')
-        #                 else: fc.data_path = m.path_from_id() + '.rgb2i_col'
-        vw.brick_offset = brick_node.offset
-        vw.brick_offset_frequency = brick_node.offset_frequency
-        vw.brick_squash = brick_node.squash
-        vw.brick_squash_frequency = brick_node.squash_frequency
-
-        vw.brick_color1 = brick_node.inputs[1].default_value
-        vw.brick_color2 = brick_node.inputs[2].default_value
-        vw.brick_mortar = brick_node.inputs[3].default_value
-        vw.brick_scale = brick_node.inputs[4].default_value
-        vw.brick_mortar_size = brick_node.inputs[5].default_value
-        vw.brick_mortar_smooth = brick_node.inputs[6].default_value
-        vw.brick_bias = brick_node.inputs[7].default_value
-        vw.brick_width = brick_node.inputs[8].default_value
-        vw.brick_row_height = brick_node.inputs[9].default_value
-
-def save_mapping_props(tree, vw):
-    mapping_node = tree.nodes.get(vw.mapping)
-    # root_tree = vw.id_data
-    if mapping_node:
-        vw.mapping_type = mapping_node.vector_type
-        vw.mapping_location = mapping_node.inputs[1].default_value
-        vw.mapping_rotation = mapping_node.inputs[2].default_value
-        vw.mapping_scale = mapping_node.inputs[3].default_value
-
-
 def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
     
-    field_name = 'mapping'
-    node_name = vw.mapping
     node_type = 'ShaderNodeMapping'
     
     check_vectorwarp_extra_nodes(vw, tree, ref_tree)
 
-    match vw.type:
-        case 'MAPPING':
-            field_name = 'mapping'
-            node_name = vw.mapping
-            node_type = 'ShaderNodeMapping'
-        case 'IMAGE':
-            field_name = 'image'
-            node_name = vw.image
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'BRICK':
-            field_name = 'brick'
-            node_name = vw.brick
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'CHECKER':
-            field_name = 'checker'
-            node_name = vw.checker
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'GRADIENT':
-            field_name = 'gradient'
-            node_name = vw.gradient
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'MAGIC':
-            field_name = 'magic'
-            node_name = vw.magic
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'MUSGRAVE':
-            field_name = 'musgrave'
-            node_name = vw.musgrave
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'NOISE':
-            field_name = 'noise'
-            node_name = vw.noise
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'VORONOI':
-            field_name = 'voronoi'
-            node_name = vw.voronoi
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'WAVE':
-            field_name = 'wave'
-            node_name = vw.wave
-            node_type = layer_node_bl_idnames[vw.type]
-        case 'GABOR':
-            field_name = 'gabor'
-            node_name = vw.gabor
-            node_type = layer_node_bl_idnames[vw.type]
+    if vw.type in layer_node_bl_idnames:
+        node_type = layer_node_bl_idnames[vw.type]
+    elif vw.type == 'MAPPING':
+        node_type = 'ShaderNodeMapping'
 
     if ref_tree:
-        node_ref = ref_tree.nodes.get(node_name)
+        node_ref = ref_tree.nodes.get(vw.node)
         if node_ref: ref_tree.nodes.remove(node_ref)
-        current_node = new_node(tree, vw, field_name, node_type)
+        current_node = new_node(tree, vw, 'node', node_type)
         dirty = True
     else:
-        current_node, dirty = check_new_node(tree, vw, field_name, node_type, '', True)
+        current_node, dirty = check_new_node(tree, vw, 'node', node_type, '', True)
 
     match vw.type:
         case 'IMAGE':

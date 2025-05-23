@@ -224,35 +224,19 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     if vw.map_range:
         range_node = tree.nodes.get(vw.map_range)
 
+    current_node = tree.nodes.get(vw.node)
     match vw.type:
         case 'MAPPING':
-            current_node = tree.nodes.get(vw.mapping)
             create_link(tree, vector, current_node.inputs['Vector'])
             uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'uniform_scale_value'))
             if vw.uniform_scale_enable:
                 create_link(tree, uniform_scale_value, current_node.inputs['Scale'])
-            else:
-                break_link(tree, uniform_scale_value, current_node.inputs['Scale'])
-        case 'IMAGE':
-            current_node = tree.nodes.get(vw.image)
-        case "BRICK":
-            current_node = tree.nodes.get(vw.brick)
-        case "CHECKER":
-            current_node = tree.nodes.get(vw.checker)
-        case 'GRADIENT':
-            current_node = tree.nodes.get(vw.gradient)
-        case 'MAGIC':
-            current_node = tree.nodes.get(vw.magic)
-        case 'MUSGRAVE':
-            current_node = tree.nodes.get(vw.musgrave)
-        case 'NOISE':
-            current_node = tree.nodes.get(vw.noise)
-        case 'VORONOI':
-            current_node = tree.nodes.get(vw.voronoi)
-        case 'WAVE':
-            current_node = tree.nodes.get(vw.wave)
-        case 'GABOR':
-            current_node = tree.nodes.get(vw.gabor)
+            # else:
+            #     for inp in current_node.inputs:
+            #         print("input name", inp)
+            #     print("scale name", current_node.inputs['Scale'])
+            #     break_link(tree, uniform_scale_value, current_node.inputs['Scale'])
+
 
     create_link(tree, vector, mix_node.inputs['A'])
     node_output = current_node.outputs[0]

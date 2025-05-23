@@ -912,7 +912,6 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
         modui = ui.warps[i]
               
         mod_tree = get_mod_tree(m)
-        can_be_expanded = m.enable # True # m.type in Modifier.can_be_expanded
         
         row = layout.row(align=True)
         row.active = layout_active
@@ -921,16 +920,12 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
 
         rrow = row.row(align=True)
 
-        if can_be_expanded:
-            if modui.expand_content:
-                icon_value = lib.get_icon('uncollapsed_modifier')
-            else: icon_value = lib.get_icon('collapsed_modifier')
-            #row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
-            inbox_dropdown_button(rrow, modui, 'expand_content', label, scale_override=0.95, icon_value=icon_value)
-        else:
-            rrow.label(text='', icon_value=lib.get_icon('modifier'))
-            rrow.label(text=label)
-
+        if modui.expand_content:
+            icon_value = lib.get_icon('uncollapsed_modifier')
+        else: icon_value = lib.get_icon('collapsed_modifier')
+        #row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
+        inbox_dropdown_button(rrow, modui, 'expand_content', label, scale_override=0.95, icon_value=icon_value)
+        
         if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
 
         icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
@@ -945,37 +940,14 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
         # if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
         
         # if m.enable:
-        if m.enable and modui.expand_content and can_be_expanded:
+        if modui.expand_content:
             row = layout.row(align=True)
             row.active = layout_active
             row.label(text='', icon='BLANK1')
             box = row.box()
             box.active = m.enable
-            # Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, box, False)
-            match m.type:
-                case 'MAPPING':
-                    src = mod_tree.nodes.get(m.mapping)
-                case 'IMAGE':
-                    src = mod_tree.nodes.get(m.image)
-                case 'BRICK':
-                    src = mod_tree.nodes.get(m.brick)
-                case 'CHECKER':
-                    src = mod_tree.nodes.get(m.checker)
-                case 'GRADIENT':
-                    src = mod_tree.nodes.get(m.gradient)
-                case 'MAGIC':
-                    src = mod_tree.nodes.get(m.magic)
-                # case 'MUSGRAVE':
-                #     if check_set_node_loc(tree, wp.musgrave, loc):
-                #         loc.y -= 400.0
-                case 'NOISE':
-                    src = mod_tree.nodes.get(m.noise)
-                case 'VORONOI':
-                    src = mod_tree.nodes.get(m.voronoi)
-                case 'WAVE':
-                    src = mod_tree.nodes.get(m.wave)
-                case 'GABOR':
-                    src = mod_tree.nodes.get(m.gabor)
+
+            src = mod_tree.nodes.get(m.node)
 
             if m.type == 'IMAGE':
                 # print('Image node:', src)
