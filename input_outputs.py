@@ -890,6 +890,13 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
             dirty = create_prop_input(layer, 'ao_distance', valid_inputs, input_index, dirty)
             input_index += 1
 
+        for warp in layer.warps:
+            if not warp.enable: continue
+
+            # Create intensity socket
+            dirty = create_prop_input(warp, 'intensity_value', valid_inputs, input_index, dirty)
+            input_index += 1
+
         # Channel prop inputs
         for i, ch in enumerate(layer.channels):
             if not get_channel_enabled(ch): continue

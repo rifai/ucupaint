@@ -4,6 +4,7 @@ from bpy.props import *
 
 from .node_connections import reconnect_layer_nodes, reconnect_yp_nodes
 from .node_arrangements import rearrange_layer_nodes, rearrange_yp_nodes
+from .input_outputs import *
 
 def update_warp_nodes_enable(self, context):
     yp = self.id_data.yp
@@ -12,24 +13,27 @@ def update_warp_nodes_enable(self, context):
 
     check_vectorwarp_nodes(self, tree)
 
-    match1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    # match1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
-    match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    # match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
 
-    if match1 or match2:
-        if match1: layer = yp.layers[int(match1.group(1))]
-        else: layer = yp.layers[int(match2.group(1))]
+    if match2:
+        layer = yp.layers[int(match2.group(1))]
+
+        check_layer_tree_ios(layer)
 
         reconnect_layer_nodes(layer)
         rearrange_layer_nodes(layer)
 
-    elif match3:
-        channel = yp.channels[int(match3.group(1))]
-        reconnect_yp_nodes(self.id_data)
-        rearrange_yp_nodes(self.id_data)
+
+
+    # elif match3:
+    #     channel = yp.channels[int(match3.group(1))]
+    #     reconnect_yp_nodes(self.id_data)
+    #     rearrange_yp_nodes(self.id_data)
 
 class YVectorWarp(bpy.types.PropertyGroup):
-    # todo : drop down warp UI, new image picker for image warp, factor mix default 1.0
+    # todo : new image picker for image warp, mapping (default mix, vector use prev vector)
 
     enable: BoolProperty(
         name = 'Enable',
@@ -57,6 +61,8 @@ class YVectorWarp(bpy.types.PropertyGroup):
         items = blend_type_items,
         update = update_warp_nodes_enable,
     )
+
+    intensity_value: FloatProperty(name = 'Opacity', default=1.0, min=0.0, max=1.0, subtype='FACTOR', precision=3)
 
     mix: StringProperty(default='')
 
@@ -250,6 +256,7 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
 
         # if dirty:
         mp.blend_type = vw.blend_type
+        mp.inputs[0].default_value = vw.intensity_value
         print("mp.blend_type=", mp.blend_type)
         mp.data_type = 'RGBA'
                 
