@@ -919,6 +919,7 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
         label = m.name
 
         rrow = row.row(align=True)
+        rrow.active = m.enable
 
         if modui.expand_content:
             icon_value = lib.get_icon('uncollapsed_modifier')

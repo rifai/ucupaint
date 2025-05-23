@@ -229,13 +229,11 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
         case 'MAPPING':
             create_link(tree, vector, current_node.inputs['Vector'])
             uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'uniform_scale_value'))
-            if vw.uniform_scale_enable:
-                create_link(tree, uniform_scale_value, current_node.inputs['Scale'])
-            # else:
-            #     for inp in current_node.inputs:
-            #         print("input name", inp)
-            #     print("scale name", current_node.inputs['Scale'])
-            #     break_link(tree, uniform_scale_value, current_node.inputs['Scale'])
+            if uniform_scale_value:
+                if vw.uniform_scale_enable:
+                    create_link(tree, uniform_scale_value, current_node.inputs['Scale'])
+                else:
+                    break_link(tree, uniform_scale_value, current_node.inputs['Scale'])
 
 
     create_link(tree, vector, mix_node.inputs['A'])

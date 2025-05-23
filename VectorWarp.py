@@ -36,15 +36,16 @@ def update_uniform_scale_enabled(self, context):
     yp = self.id_data.yp
     if yp.halt_update: return
 
-    # match1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     # match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
 
     tree = get_mod_tree(self)
 
-
     if match2:
         layer = yp.layers[int(match2.group(1))]
+    elif match1:
+        layer = yp.layers[int(match1.group(1))]
 
     scale_input = tree.nodes.get(self.node).inputs[3]
 
