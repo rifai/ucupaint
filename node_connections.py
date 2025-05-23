@@ -226,6 +226,7 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     match vw.type:
         case 'MAPPING':
             current_node = tree.nodes.get(vw.mapping)
+            create_link(tree, vector, current_node.inputs['Vector'])
         case 'IMAGE':
             current_node = tree.nodes.get(vw.image)
         case "BRICK":
