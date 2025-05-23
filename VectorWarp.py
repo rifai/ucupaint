@@ -104,29 +104,11 @@ class YVectorWarp(bpy.types.PropertyGroup):
         default = False,
         update = update_uniform_scale_enabled
     )
-    mapping_type : StringProperty(default='POINT')#, items=('POINT', 'TEXTURE', 'VECTOR', 'NORMAL'))
-    mapping_location : FloatVectorProperty(name='Location', size=3, default=(0.0, 0.0, 0.0))
-    mapping_rotation : FloatVectorProperty(name='Rotation', size=3, default=(0.0, 0.0, 0.0))
-    mapping_scale : FloatVectorProperty(name='Scale', size=3, default=(1.0, 1.0, 1.0))
 
     image : StringProperty(default='')
     image_name : StringProperty(default='')
 
     brick : StringProperty(default='')
-    brick_offset : FloatProperty(default=0.5)
-    brick_offset_frequency : IntProperty(default=2)
-    brick_squash: FloatProperty(default=1.0)
-    brick_squash_frequency : IntProperty(default=2)
-    brick_color1 : FloatVectorProperty(name='Color 1', size=4, subtype='COLOR', default=(0.906, 0.906, 0.906, 1.0), min=0.0, max=1.0)
-    brick_color2 : FloatVectorProperty(name='Color 2', size=4, subtype='COLOR', default=(0.485, 0.485, 0.485, 1.0), min=0.0, max=1.0)
-    brick_mortar : FloatVectorProperty(name='Mortar', size=4, subtype='COLOR', default=(0.0, 0.0, 0.0, 1.0), min=0.0, max=1.0)
-    brick_scale : FloatProperty(name='Scale', default=5.0)
-    brick_mortar_size : FloatProperty(name='Mortar Size', default=0.02)
-    brick_mortar_smooth : FloatProperty(name='Mortar Smooth', default=0.1)
-    brick_bias : FloatProperty(name='Bias', default=0.0)
-    brick_width : FloatProperty(name='Brick Width', default=0.5)
-    brick_row_height : FloatProperty(name='Row Height', default=0.25)
-
     checker : StringProperty(default='')
     gradient : StringProperty(default='')
     magic : StringProperty(default='')
@@ -311,71 +293,17 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
 
     match vw.type:
         case 'MAPPING':
-            node_label = 'Mapping'
-            node_type = 'ShaderNodeMapping'
             field_name = 'mapping'
-
-            if not vw.enable:
-                save_mapping_props(tree, vw)
-                remove_node(tree, vw, field_name)
-            else:
-                if ref_tree:
-                    save_mapping_props(tree, vw)
-                    mapping_ref = ref_tree.nodes.get(vw.mapping)
-                    if mapping_ref: 
-                        ref_tree.nodes.remove(mapping_ref)
-
-                    mapping_node = new_node(tree, vw, field_name, node_type, node_label)
-                    dirty = True
-                else:
-                    mapping_node, dirty = check_new_node(tree, vw, field_name, node_type, node_label, True)
-
-                if dirty:
-                    mapping_node.vector_type = vw.mapping_type
-                    mapping_node.inputs[1].default_value = vw.mapping_location
-                    mapping_node.inputs[2].default_value = vw.mapping_rotation
-                    mapping_node.inputs[3].default_value = vw.mapping_scale
-
+            node_name = vw.mapping
+            node_type = 'ShaderNodeMapping'
         case 'IMAGE':
             field_name = 'image'
             node_name = vw.image
             node_type = layer_node_bl_idnames[vw.type]
         case 'BRICK':
             field_name = 'brick'
+            node_name = vw.brick
             node_type = layer_node_bl_idnames[vw.type]
-            node_label = layer_type_labels[vw.type]
-            if not vw.enable:
-                save_brick_props(tree, vw)
-                remove_node(tree, vw, field_name)
-            else:
-                if ref_tree:
-                    save_brick_props(tree, vw)
-                    brick_ref = ref_tree.nodes.get(vw.brick)
-                    if brick_ref: 
-                        ref_tree.nodes.remove(brick_ref)
-
-                    brick_node = new_node(tree, vw, field_name, node_type, node_label)
-                    dirty = True
-                else:
-                    brick_node, dirty = check_new_node(tree, vw, field_name, node_type, node_label, True)
-
-                if dirty:
-                    # brick_node.node_tree = get_node_tree_lib(lib.MOD_RGB2INT)
-
-                    brick_node.offset = vw.brick_offset
-                    brick_node.offset_frequency = vw.brick_offset_frequency
-                    brick_node.squash = vw.brick_squash
-                    brick_node.squash_frequency = vw.brick_squash_frequency
-                    brick_node.inputs[1].default_value = vw.brick_color1
-                    brick_node.inputs[2].default_value = vw.brick_color2
-                    brick_node.inputs[3].default_value = vw.brick_mortar
-                    brick_node.inputs[4].default_value = vw.brick_scale
-                    brick_node.inputs[5].default_value = vw.brick_mortar_size
-                    brick_node.inputs[6].default_value = vw.brick_mortar_smooth
-                    brick_node.inputs[7].default_value = vw.brick_bias
-                    brick_node.inputs[8].default_value = vw.brick_width
-                    brick_node.inputs[9].default_value = vw.brick_row_height
-                    # load_rgb2i_anim_props(tree, m)
         case 'CHECKER':
             field_name = 'checker'
             node_name = vw.checker
@@ -409,50 +337,17 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
             node_name = vw.gabor
             node_type = layer_node_bl_idnames[vw.type]
 
-    # if not vw.enable:
-    #     remove_node(tree, vw, 'mix')
-    #     remove_node(tree, vw, 'map_range')
-    #     remove_node(tree, vw, field_name)
-    # else:
+    if ref_tree:
+        node_ref = ref_tree.nodes.get(node_name)
+        if node_ref: ref_tree.nodes.remove(node_ref)
+        current_node = new_node(tree, vw, field_name, node_type)
+        dirty = True
+    else:
+        current_node, dirty = check_new_node(tree, vw, field_name, node_type, '', True)
 
-    #     is_rangeable = vw.type not in {'MAPPING', 'BLUR'}
-
-    #     if ref_tree:
-    #         node_ref = ref_tree.nodes.get(vw.mix)
-    #         if node_ref: ref_tree.nodes.remove(node_ref)
-    #         mp = new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
-
-    #         node_ref = ref_tree.nodes.get(vw.map_range)
-    #         if node_ref: ref_tree.nodes.remove(node_ref)
-    #         if is_rangeable:
-    #             mr = new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
-            
-    #         node_ref = ref_tree.nodes.get(node_name)
-    #         if node_ref: ref_tree.nodes.remove(node_ref)
-
-    #         current_node = new_node(tree, vw, field_name, node_type)
-
-    #         dirty = True
-    #     else:
-    #         mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
-    #         if is_rangeable:
-    #             mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
-    #         current_node, node_dirty = check_new_node(tree, vw, field_name, node_type, '', True)
-    #         dirty = dirty or node_dirty
-
-    #     # if dirty:
-    #     mp.blend_type = vw.blend_type
-    #     mp.inputs[0].default_value = vw.intensity_value
-    #     mp.data_type = 'RGBA'
-
-    #     if is_rangeable:
-    #         mr.data_type = 'FLOAT_VECTOR'
-    #         mr.inputs["To Min"].default_value = (-0.5, -0.5, -0.5)
-    #         mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
-
-    #     match vw.type:
-    #         case 'IMAGE':
-    #             current_node.image = bpy.data.images.get(vw.image_name)
+    match vw.type:
+        case 'IMAGE':
+            current_node.image = bpy.data.images.get(vw.image_name)
                 
 class YNewVectorWarp(bpy.types.Operator):
     bl_idname = "wm.y_new_vector_warp"
