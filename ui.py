@@ -6377,16 +6377,16 @@ class YVectorWarpMenu(bpy.types.Menu):
         #     col.label(text='ERROR: Context has no parent or modifier!', icon='ERROR')
         #     return
 
-        op = col.operator('wm.y_move_ypaint_vector_warp', icon='TRIA_UP', text='Move Modifier Up')
+        op = col.operator('wm.y_move_ypaint_vector_warp', icon='TRIA_UP', text='Move Vector Warp Up')
         op.direction = 'UP'
 
-        op = col.operator('wm.y_move_ypaint_vector_warp', icon='TRIA_DOWN', text='Move Modifier Down')
+        op = col.operator('wm.y_move_ypaint_vector_warp', icon='TRIA_DOWN', text='Move Vector Warp Down')
         op.direction = 'DOWN'
 
         col.separator()
         if is_bl_newer_than(2, 80):
-            op = col.operator('wm.y_remove_ypaint_vector_warp', icon='REMOVE', text='Remove Modifier')
-        else: op = col.operator('wm.y_remove_ypaint_vector_warp', icon='ZOOMOUT', text='Remove Modifier')
+            op = col.operator('wm.y_remove_ypaint_vector_warp', icon='REMOVE', text='Remove Vector Warp')
+        else: op = col.operator('wm.y_remove_ypaint_vector_warp', icon='ZOOMOUT', text='Remove Vector Warp')
 
         #if hasattr(context, 'layer') and context.modifier.type in {'RGB_TO_INTENSITY', 'OVERRIDE_COLOR'}:
         #    col.separator()
