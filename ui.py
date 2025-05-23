@@ -93,6 +93,11 @@ def update_yp_ui():
             ypui.layer_ui.channels.clear()
             ypui.layer_ui.masks.clear()
             ypui.layer_ui.modifiers.clear()
+            ypui.layer_ui.warps.clear()
+
+            for warp in layer.warps:
+                w = ypui.layer_ui.warps.add()
+                w.expand_content = warp.expand_content
 
             # Construct layer modifier UI objects
             for mod in layer.modifiers:
@@ -885,46 +890,44 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
 
             #row.label(text='', icon='BLANK1')
 
-def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra_blank=False, use_modifier_1=False, layout_active=True):
+def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra_blank=False, layout_active=True):
 
-    ypui = context.window_manager.ypui
+    # ypui = context.window_manager.ypui
 
     warps = parent.warps
-
     # Check if parent is layer channel
-    match = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]', parent.path_from_id())
-    if match:
-        yp = parent.id_data.yp
-        layer = yp.layers[int(match.group(1))]
-        root_ch = yp.channels[int(match.group(2))]
-        ch = layer.channels[int(match.group(2))]
+    # match = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]', parent.path_from_id())
+    # if match:
+    #     yp = parent.id_data.yp
+    #     layer = yp.layers[int(match.group(1))]
+    #     root_ch = yp.channels[int(match.group(2))]
+    #     ch = layer.channels[int(match.group(2))]
 
     for i, m in enumerate(warps):
-        # try: 
-        #     if use_modifier_1:
-        #         modui = ui.modifiers_1[i]
-        #     else: modui = ui.modifiers[i]
-        # except: 
-        #     ypui.need_update = True
-        #     return
-
+       
+        modui = ui.warps[i]
+              
         mod_tree = get_mod_tree(m)
-        # can_be_expanded = m.type in Modifier.can_be_expanded
+        can_be_expanded = m.enable # True # m.type in Modifier.can_be_expanded
         
         row = layout.row(align=True)
         row.active = layout_active
 
+        label = m.name
+
         rrow = row.row(align=True)
-        # if can_be_expanded:
-        #     if modui.expand_content:
-        #         icon_value = lib.get_icon('uncollapsed_modifier')
-        #     else: icon_value = lib.get_icon('collapsed_modifier')
-        #     #row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
-        #     inbox_dropdown_button(rrow, modui, 'expand_content', label, scale_override=0.95, icon_value=icon_value)
-        # else:
-        rrow.label(text='', icon_value=lib.get_icon('modifier'))
-        rrow = row.row(align=True)
-        rrow.label(text=m.name)
+
+        if can_be_expanded:
+            if modui.expand_content:
+                icon_value = lib.get_icon('uncollapsed_modifier')
+            else: icon_value = lib.get_icon('collapsed_modifier')
+            #row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
+            inbox_dropdown_button(rrow, modui, 'expand_content', label, scale_override=0.95, icon_value=icon_value)
+        else:
+            rrow.label(text='', icon_value=lib.get_icon('modifier'))
+            rrow.label(text=label)
+
+        if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
 
         icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
 
@@ -937,7 +940,8 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
 
         # if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
         
-        if m.enable:
+        # if m.enable:
+        if m.enable and modui.expand_content and can_be_expanded:
             row = layout.row(align=True)
             row.active = layout_active
             row.label(text='', icon='BLANK1')
@@ -973,7 +977,7 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
                 # print('Image node:', src)
                 if src.image:
                     draw_image_props(context, src, box, m, show_datablock=False)
-            else:
+            elif src:
                 draw_tex_props(src, box, m)
 
             rowb = box.row(align=True)
@@ -7392,6 +7396,33 @@ def update_modifier_ui(self, context):
 
     mod.expand_content = self.expand_content
 
+def update_vectorwarp_ui(self, context):
+    ypui = context.window_manager.ypui
+    if ypui.halt_prop_update: return
+
+    group_node =  get_active_ypaint_node()
+    if not group_node: return
+    yp = group_node.node_tree.yp
+
+    # match1 = re.match(r'ypui\.layer_ui\.channels\[(\d+)\]\.modifiers\[(\d+)\]', self.path_from_id())
+    # match2 = re.match(r'ypui\.layer_ui\.channels\[(\d+)\]\.modifiers_1\[(\d+)\]', self.path_from_id())
+    # match3 = re.match(r'ypui\.channel_ui\.modifiers\[(\d+)\]', self.path_from_id())
+    match4 = re.match(r'ypui\.layer_ui\.warps\[(\d+)\]', self.path_from_id())
+    # match5 = re.match(r'ypui\.layer_ui\.masks\[(\d+)\]\.modifiers\[(\d+)\]', self.path_from_id())
+    # if match1:
+    #     mod = yp.layers[yp.active_layer_index].channels[int(match1.group(1))].modifiers[int(match1.group(2))]
+    # elif match2:
+    #     mod = yp.layers[yp.active_layer_index].channels[int(match2.group(1))].modifiers_1[int(match2.group(2))]
+    # elif match3:
+    #     mod = yp.channels[yp.active_channel_index].modifiers[int(match3.group(1))]
+    if match4:
+        mod = yp.layers[yp.active_layer_index].warps[int(match4.group(1))]
+    # elif match5:
+    #     mod = yp.layers[yp.active_layer_index].masks[int(match5.group(1))].modifiers[int(match5.group(2))]
+    #else: return #yolo
+
+    mod.expand_content = self.expand_content
+
 def update_layer_ui(self, context):
     ypui = context.window_manager.ypui
     if ypui.halt_prop_update: return
@@ -7575,6 +7606,10 @@ class YBakeTargetUI(bpy.types.PropertyGroup):
 class YModifierUI(bpy.types.PropertyGroup):
     #name : StringProperty(default='')
     expand_content : BoolProperty(default=True, update=update_modifier_ui)
+
+class YVectorWarpUI(bpy.types.PropertyGroup):
+    #name : StringProperty(default='')
+    expand_content : BoolProperty(default=True, update=update_vectorwarp_ui)
 
 class YChannelUI(bpy.types.PropertyGroup):
     #name : StringProperty(default='')
@@ -7786,6 +7821,7 @@ class YLayerUI(bpy.types.PropertyGroup):
     channels : CollectionProperty(type=YChannelUI)
     masks : CollectionProperty(type=YMaskUI)
     modifiers : CollectionProperty(type=YModifierUI)
+    warps : CollectionProperty(type=YVectorWarpUI)
 
 #class YLayerItemUI(bpy.types.PropertyGroup):
 #
@@ -8006,6 +8042,7 @@ def register():
     bpy.utils.register_class(YLayerTypeMenu)
     bpy.utils.register_class(YMaskTypeMenu)
     bpy.utils.register_class(YModifierUI)
+    bpy.utils.register_class(YVectorWarpUI)
     bpy.utils.register_class(YBakeTargetUI)
     bpy.utils.register_class(YChannelUI)
     bpy.utils.register_class(YMaskChannelUI)
@@ -8091,6 +8128,7 @@ def unregister():
     bpy.utils.unregister_class(YLayerTypeMenu)
     bpy.utils.unregister_class(YMaskTypeMenu)
     bpy.utils.unregister_class(YModifierUI)
+    bpy.utils.unregister_class(YVectorWarpUI)
     bpy.utils.unregister_class(YBakeTargetUI)
     bpy.utils.unregister_class(YChannelUI)
     bpy.utils.unregister_class(YMaskChannelUI)

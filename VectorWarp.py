@@ -72,6 +72,8 @@ class YVectorWarp(bpy.types.PropertyGroup):
     wave : StringProperty(default='')
     gabor : StringProperty(default='')
 
+    expand_content : BoolProperty(default=True)
+
 def check_vectorwarp_trees(parent, rearrange=False):
     group_tree = parent.id_data
     yp = group_tree.yp
@@ -79,24 +81,23 @@ def check_vectorwarp_trees(parent, rearrange=False):
     enable_tree = False
     is_layer = False
 
-    match1 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', parent.path_from_id())
+    # match1 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', parent.path_from_id())
     match2 = re.match(r'^yp\.layers\[(\d+)\]$', parent.path_from_id())
 
-    if match1:
-        layer = yp.layers[int(match1.group(1))]
-        root_ch = yp.channels[int(match1.group(2))]
-        ch = parent
-        name = root_ch.name + ' ' + layer.name
-        if (
-            root_ch.type == 'NORMAL' and root_ch.enable_smooth_bump and (
-                (not ch.override and layer.type not in {'BACKGROUND', 'COLOR', 'OBJECT_INDEX'}) or 
-                (ch.override and ch.override_type not in {'DEFAULT'} and ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'})
-            )
-            ):
-            enable_tree = True
-        parent_tree = get_tree(layer)
-
-    elif match2:
+    # if match1:
+    #     layer = yp.layers[int(match1.group(1))]
+    #     root_ch = yp.channels[int(match1.group(2))]
+    #     ch = parent
+    #     name = root_ch.name + ' ' + layer.name
+    #     if (
+    #         root_ch.type == 'NORMAL' and root_ch.enable_smooth_bump and (
+    #             (not ch.override and layer.type not in {'BACKGROUND', 'COLOR', 'OBJECT_INDEX'}) or 
+    #             (ch.override and ch.override_type not in {'DEFAULT'} and ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'})
+    #         )
+    #         ):
+    #         enable_tree = True
+    #     parent_tree = get_tree(layer)
+    if match2:
         layer = parent
         name = layer.name
         if layer.type not in {'IMAGE', 'VCOL', 'BACKGROUND', 'COLOR', 'GROUP', 'HEMI', 'MUSGRAVE'}:
@@ -280,11 +281,11 @@ class YNewVectorWarp(bpy.types.Operator):
 
 
         m1 = re.match(r'^yp\.layers\[(\d+)\]$', context.parent.path_from_id())
-        m2 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', context.parent.path_from_id())
-        m3 = re.match(r'^yp\.channels\[(\d+)\]$', context.parent.path_from_id())
+        # m2 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', context.parent.path_from_id())
+        # m3 = re.match(r'^yp\.channels\[(\d+)\]$', context.parent.path_from_id())
 
         if m1: layer = yp.layers[int(m1.group(1))]
-        elif m2: layer = yp.layers[int(m2.group(1))]
+        # elif m2: layer = yp.layers[int(m2.group(1))]
         else: layer = None
 
         new_warp = parent.warps.add()
@@ -310,9 +311,9 @@ class YNewVectorWarp(bpy.types.Operator):
         #         if ch.type == 'NORMAL':
         #             c.bump_base_value = 0.0
 
-        # # Expand channel content to see added modifier
-        # if m1:
-        #     context.layer_ui.expand_content = True
+        # Expand channel content to see added modifier
+        if m1:
+            context.layer_ui.expand_content = True
         # elif m2:
         #     context.layer_ui.channels[int(m2.group(2))].expand_content = True
         # elif m3:
