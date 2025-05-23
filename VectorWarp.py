@@ -2,7 +2,8 @@ import bpy
 from .common import *
 from bpy.props import *
 
-from .node_arrangements import *
+from .node_connections import reconnect_layer_nodes, reconnect_yp_nodes
+from .node_arrangements import rearrange_layer_nodes, rearrange_yp_nodes
 
 class YVectorWarp(bpy.types.PropertyGroup):
     enable: BoolProperty(
@@ -81,20 +82,20 @@ def check_vectorwarp_trees(parent, rearrange=False):
     if hasattr(parent, 'mod_group'):
         mod_group = parent_tree.nodes.get(parent.mod_group)
 
-    print("mod_group=", mod_group, "enable_tree=", enable_tree, "is_layer=", 
-          is_layer, "parent_tree=", parent_tree, "parent=", parent, "name=", name)
+    # print("mod_group=", mod_group, "enable_tree=", enable_tree, "is_layer=", 
+    #       is_layer, "parent_tree=", parent_tree, "parent=", parent, "name=", name)
     
     if enable_tree:
         if mod_group:
-            for index, mod in enumerate(parent.warps):
-                check_vectorwarp_nodes(mod, index, mod_group.node_tree)
+            for mod in parent.warps:
+                check_vectorwarp_nodes(mod, mod_group.node_tree)
         else:
             # enable_modifiers_tree(parent, parent_tree, name, is_layer)
             pass
     else:
         if not mod_group:
-            for index, mod in enumerate(parent.warps):
-                check_vectorwarp_nodes(mod, index, parent_tree)
+            for mod in parent.warps:
+                check_vectorwarp_nodes(mod, parent_tree)
         else:
             # disable_modifiers_tree(parent, parent_tree)
             pass
@@ -104,7 +105,8 @@ def check_vectorwarp_trees(parent, rearrange=False):
     #     rearrange_layer_nodes(layer)
 
 def delete_vectorwarp_nodes(tree, vw):
-
+    # Delete the mix node
+    remove_node(tree, vw, 'mix')
     # Delete the nodes
     remove_node(tree, vw, 'frame')
 
@@ -119,12 +121,12 @@ def delete_vectorwarp_nodes(tree, vw):
             remove_node(tree, vw, 'checker')
 
 
-def check_vectorwarp_nodes(vw:YVectorWarp, index:int, tree, ref_tree=None):
+def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
 
     # yp = vw.id_data.yp
     # nodes = tree.nodes
 
-    print("type=", vw.type, "index=", index)
+    # print("type=", vw.type)
     # Check the nodes
     match vw.type:
         case 'MAPPING':
@@ -176,18 +178,21 @@ def check_vectorwarp_nodes(vw:YVectorWarp, index:int, tree, ref_tree=None):
                 else:
                     img, dirty = check_new_node(tree, vw, 'checker', layer_node_bl_idnames[vw.type], 'Checker Texture', True)
 
-    if index > 0:
-        if not vw.enable:
-                remove_node(tree, vw, 'mix')
-        else:
-            if ref_tree:
-                node_ref = ref_tree.nodes.get(vw.mix)
-                if node_ref: ref_tree.nodes.remove(node_ref)
+    if not vw.enable:
+            remove_node(tree, vw, 'mix')
+    else:
+        if ref_tree:
+            node_ref = ref_tree.nodes.get(vw.mix)
+            if node_ref: ref_tree.nodes.remove(node_ref)
 
-                mp = new_node(tree, vw, 'mix', 'ShaderNodeMapping', 'Mapping')
-                dirty = True
-            else:
-                mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
+            mp = new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
+            dirty = True
+        else:
+            mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
+        
+        if dirty:
+            mp.blend_type = vw.blend_type
+            mp.data_type = 'RGBA'
                 
 class YNewVectorWarp(bpy.types.Operator):
     bl_idname = "wm.y_new_vector_warp"
@@ -230,6 +235,7 @@ class YNewVectorWarp(bpy.types.Operator):
 
         new_warp.name = get_unique_name(name, layer.warps)
         new_warp.type = self.type
+        new_warp.blend_type = 'ADD'
 
         check_vectorwarp_trees(parent)
 
@@ -254,24 +260,19 @@ class YNewVectorWarp(bpy.types.Operator):
         # elif m3:
         #     context.channel_ui.expand_content = True
 
-        print("layer=", layer, "parent=", parent, "new_warp=", new_warp)
+        # print("layer=", layer, "parent=", parent, "new_warp=", new_warp)
         # Reconnect and rearrange nodes
         if layer:
-            # reconnect_layer_nodes(layer)
+            reconnect_layer_nodes(layer)
             rearrange_layer_nodes(layer)
         else: 
-            # reconnect_yp_nodes(group_tree)
+            reconnect_yp_nodes(group_tree)
             rearrange_yp_nodes(group_tree)
 
         # Update UI
         context.window_manager.ypui.need_update = True
 
         return {'FINISHED'}
-
-def draw_vector_warp_properties(context, channel_type, nodes, vectorWarp, layout, is_layer_ch=False):
-
-    pass
-
 
 class YMoveYPaintVectorWarp(bpy.types.Operator):
     bl_idname = "wm.y_move_ypaint_vector_warp"
@@ -319,19 +320,19 @@ class YMoveYPaintVectorWarp(bpy.types.Operator):
         else:
             return {'CANCELLED'}
 
-        # layer = context.layer if hasattr(context, 'layer') else None
+        layer = context.layer if hasattr(context, 'layer') else None
 
         # Swap modifier
         parent.warps.move(index, new_index)
         # swap_modifier_fcurves(parent, index, new_index)
 
-        # # Reconnect and rearrange nodes
-        # if layer: 
-        #     reconnect_layer_nodes(layer)
-        #     rearrange_layer_nodes(layer)
-        # else: 
-        #     reconnect_yp_nodes(group_tree)
-        #     rearrange_yp_nodes(group_tree)
+        # Reconnect and rearrange nodes
+        if layer: 
+            reconnect_layer_nodes(layer)
+            rearrange_layer_nodes(layer)
+        else: 
+            reconnect_yp_nodes(group_tree)
+            rearrange_yp_nodes(group_tree)
 
         # Update UI
         context.window_manager.ypui.need_update = True
@@ -382,17 +383,14 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         #if len(parent.modifiers) == 0:
         #    unset_modifier_pipeline_nodes(tree, parent)
 
-        # check_modifiers_trees(parent)
-
-        # if layer:
-        #     reconnect_layer_nodes(layer)
-        # else:
-        #     reconnect_yp_nodes(group_tree)
+        check_vectorwarp_trees(parent)
 
         # # Rearrange nodes
         if layer:
+            reconnect_layer_nodes(layer)
             rearrange_layer_nodes(layer)
         else: 
+            reconnect_yp_nodes(group_tree)
             rearrange_yp_nodes(group_tree)
 
         # Update UI

@@ -204,6 +204,38 @@ def reconnect_all_modifier_nodes(tree, parent, start_rgb, start_alpha, mod_group
 
     return rgb, alpha
 
+
+def reconnect_all_vectorwarp_nodes(tree, parent, start_vector):
+
+    vector = start_vector
+    # Connect all the nodes
+    for vw in parent.warps:
+        vector = reconnect_vectorwarp_nodes(tree, vw, vector)
+
+    return vector
+
+def reconnect_vectorwarp_nodes(tree, vw, start_vector):
+
+    if not vw.enable:
+        return start_vector
+
+    vector = start_vector
+
+    mix_node = tree.nodes.get(vw.mix)
+
+    match vw.type:
+        case 'IMAGE':
+            current_node = tree.nodes.get(vw.image)
+        case "BRICK":
+            current_node = tree.nodes.get(vw.brick)
+        case "CHECKER":
+            current_node = tree.nodes.get(vw.checker)
+
+    create_link(tree, vector, mix_node.inputs['B'])
+    create_link(tree, current_node.outputs[0], mix_node.inputs['A'])
+
+    return mix_node.outputs['Result']
+
 def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
 
     yp = layer.id_data.yp
@@ -1875,6 +1907,10 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                     break_link(tree, uniform_scale_value, mapping.inputs[3])
 
     if vector:
+
+        # warps
+        vector = reconnect_all_vectorwarp_nodes(tree, layer, vector)
+
         if 'Vector' in source.inputs:
             create_link(tree, vector, source.inputs['Vector'])
 
