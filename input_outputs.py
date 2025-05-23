@@ -897,6 +897,11 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
             dirty = create_prop_input(warp, 'intensity_value', valid_inputs, input_index, dirty)
             input_index += 1
 
+            if warp.type == 'MAPPING':
+                # Create image socket
+                dirty = create_prop_input(warp, 'uniform_scale_value', valid_inputs, input_index, dirty)
+                input_index += 1
+
         # Channel prop inputs
         for i, ch in enumerate(layer.channels):
             if not get_channel_enabled(ch): continue

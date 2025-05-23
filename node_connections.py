@@ -227,6 +227,11 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
         case 'MAPPING':
             current_node = tree.nodes.get(vw.mapping)
             create_link(tree, vector, current_node.inputs['Vector'])
+            uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'uniform_scale_value'))
+            if vw.uniform_scale_enable:
+                create_link(tree, uniform_scale_value, current_node.inputs['Scale'])
+            else:
+                break_link(tree, uniform_scale_value, current_node.inputs['Scale'])
         case 'IMAGE':
             current_node = tree.nodes.get(vw.image)
         case "BRICK":

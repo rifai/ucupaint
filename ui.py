@@ -991,20 +991,20 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
                     mcol.prop(src.inputs[1], 'default_value', text='Offset')
                     mcol = rrow.column()
                     mcol.prop(src.inputs[2], 'default_value', text='Rotation')
-                    # if layer.enable_uniform_scale:
-                    #     mcol = rrow.column(align=True)
-                    #     mrow = mcol.row()
-                    #     mrow.label(text='Scale:')
-                    #     mrow.prop(layer, 'enable_uniform_scale', text='', icon='LOCKED')
-                    #     draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'X')
-                    #     draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Y')
-                    #     draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Z')
-                    # else:
-                    mcol = rrow.column(align=True)
-                    mrow = mcol.row()
-                    mrow.label(text='Scale:')
-                    # mrow.prop(layer, 'enable_uniform_scale', text='', icon='UNLOCKED')
-                    mcol.prop(src.inputs[3], 'default_value', text='')
+                    if m.uniform_scale_enable:
+                        mcol = rrow.column(align=True)
+                        mrow = mcol.row()
+                        mrow.label(text='Scale:')
+                        mrow.prop(m, 'uniform_scale_enable', text='', icon='LOCKED')
+                        draw_input_prop(mcol, m, 'uniform_scale_value', None, 'X')
+                        draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Y')
+                        draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Z')
+                    else:
+                        mcol = rrow.column(align=True)
+                        mrow = mcol.row()
+                        mrow.label(text='Scale:')
+                        mrow.prop(m, 'uniform_scale_enable', text='', icon='UNLOCKED')
+                        mcol.prop(src.inputs[3], 'default_value', text='')
                 else:
                     mcol = rrow.column()
                     mcol.prop(src, 'translation')
@@ -7391,9 +7391,9 @@ class YWarpSpecialMenu(bpy.types.Menu):
         return get_active_ypaint_node()
 
     def draw(self, context):
-        yp = context.parent.id_data.yp
-        ypui = context.window_manager.ypui
-        ypup = get_user_preferences()
+        # yp = context.parent.id_data.yp
+        # ypui = context.window_manager.ypui
+        # ypup = get_user_preferences()
 
         row = self.layout.row()
 
@@ -7406,7 +7406,15 @@ class YWarpSpecialMenu(bpy.types.Menu):
             col = row.column()
             col.label(text='Add Warp Vector')
             for mt in warp_type_items:
-                col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
+                if mt[0] == 'IMAGE':
+                    pass
+                else:
+                    col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
+            col.separator()
+            col.label(text='Add Image')
+            col.operator("wm.y_open_available_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image'))
+            col.operator("wm.y_open_available_image_to_vector_warp", text="Available Image")
+            col.operator("wm.y_open_available_image_to_vector_warp", text="Open Image")
 
 def update_modifier_ui(self, context):
     ypui = context.window_manager.ypui
