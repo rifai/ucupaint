@@ -5,11 +5,36 @@ from bpy.props import *
 from .node_connections import reconnect_layer_nodes, reconnect_yp_nodes
 from .node_arrangements import rearrange_layer_nodes, rearrange_yp_nodes
 
+def update_warp_nodes_enable(self, context):
+    yp = self.id_data.yp
+    if yp.halt_update: return
+    tree = get_mod_tree(self)
+
+    check_vectorwarp_nodes(self, tree)
+
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+
+    if match1 or match2:
+        if match1: layer = yp.layers[int(match1.group(1))]
+        else: layer = yp.layers[int(match2.group(1))]
+
+        reconnect_layer_nodes(layer)
+        rearrange_layer_nodes(layer)
+
+    elif match3:
+        channel = yp.channels[int(match3.group(1))]
+        reconnect_yp_nodes(self.id_data)
+        rearrange_yp_nodes(self.id_data)
+
+
 class YVectorWarp(bpy.types.PropertyGroup):
     enable: BoolProperty(
         name = 'Enable',
         description = 'Enable this warp',
         default = True,
+        update=update_warp_nodes_enable,
     )
 
     name : StringProperty(
