@@ -141,6 +141,10 @@ def update_yp_ui():
                 for mod in mask.modifiers:
                     mm = m.modifiers.add()
                     mm.expand_content = mod.expand_content
+                
+                for warp in mask.warps:
+                    w = m.warps.add()
+                    w.expand_content = warp.expand_content
 
         ypui.halt_prop_update = False
 
@@ -890,18 +894,18 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
 
             #row.label(text='', icon='BLANK1')
 
-def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra_blank=False, layout_active=True):
+def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, layout_active=True):
 
     # ypui = context.window_manager.ypui
 
     warps = parent.warps
-    # Check if parent is layer channel
-    # match = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]', parent.path_from_id())
-    # if match:
-    #     yp = parent.id_data.yp
-    #     layer = yp.layers[int(match.group(1))]
-    #     root_ch = yp.channels[int(match.group(2))]
-    #     ch = layer.channels[int(match.group(2))]
+    # Check if parent is layer masks
+    match = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]', parent.path_from_id())
+    if match:
+        yp = parent.id_data.yp
+        layer = yp.layers[int(match.group(1))]
+        # root_ch = yp.channels[int(match.group(2))]
+        # ch = layer.channels[int(match.group(2))]
 
     for i, m in enumerate(warps):
        
@@ -931,7 +935,7 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
 
         icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
 
-        # row.context_pointer_set('layer', layer)
+        row.context_pointer_set('layer', layer)
         row.context_pointer_set('parent', parent)
         row.context_pointer_set('vector_warp', m)
 
@@ -1904,7 +1908,7 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
             bbox = row.box()
             boxcol = bbox.column()
 
-            draw_warp_stack(context, layer, 'RGB', boxcol, lui, layer)
+            draw_warp_stack(context, layer, boxcol, lui, layer)
 
             rrow = boxcol.row(align=True)
             rrow.label(text='', icon='BLANK1')
@@ -3187,6 +3191,8 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
             texcoord = layer_tree.nodes.get(mask.texcoord)
 
             rrow = srow.row(align=True)
+            rrow.context_pointer_set('parent', mask)
+
             if mask.texcoord_type == 'UV' and not maskui.expand_vector:
 
                 if obj.type == 'MESH':
@@ -3195,6 +3201,11 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
                     rrrow.prop_search(mask, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
                 else:
                     rrow.prop(mask, 'texcoord_type', text='')
+
+                icon = 'MODIFIER_ON' if is_bl_newer_than(2, 80) else 'MODIFIER'
+                rrrow = rrow.row()
+                rrrow.menu("NODE_MT_y_warp_special_menu", icon=icon, text='')
+                rrrow.alignment = 'RIGHT'
 
                 #rrow.context_pointer_set('mask', mask)
                 #icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
@@ -3211,6 +3222,10 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
                     ssplit.prop(texcoord, 'object', text='')
             else:
                 rrow.prop(mask, 'texcoord_type', text='')
+                icon = 'MODIFIER_ON' if is_bl_newer_than(2, 80) else 'MODIFIER'
+                rrrow = rrow.row()
+                rrrow.menu("NODE_MT_y_warp_special_menu", icon=icon, text='')
+                rrrow.alignment = 'RIGHT'
 
             if maskui.expand_vector and mask.texcoord_type != 'Layer':
                 rrow = rrcol.row(align=True)
@@ -3219,6 +3234,8 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
                 #boxcol = rbox.column()
                 boxcol = rrow.column()
                 boxcol.active = not mask.use_baked
+                
+                draw_warp_stack(context, mask, boxcol, maskui)
 
                 is_using_image_atlas = mask_image and (mask_image.yia.is_image_atlas or mask_image.yua.is_udim_atlas)
 
@@ -7451,11 +7468,11 @@ def update_vectorwarp_ui(self, context):
     if not group_node: return
     yp = group_node.node_tree.yp
 
-    # match1 = re.match(r'ypui\.layer_ui\.channels\[(\d+)\]\.modifiers\[(\d+)\]', self.path_from_id())
+    # match1 = re.match(r'ypui\.layer_ui\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     # match2 = re.match(r'ypui\.layer_ui\.channels\[(\d+)\]\.modifiers_1\[(\d+)\]', self.path_from_id())
     # match3 = re.match(r'ypui\.channel_ui\.modifiers\[(\d+)\]', self.path_from_id())
     match4 = re.match(r'ypui\.layer_ui\.warps\[(\d+)\]', self.path_from_id())
-    # match5 = re.match(r'ypui\.layer_ui\.masks\[(\d+)\]\.modifiers\[(\d+)\]', self.path_from_id())
+    match5 = re.match(r'ypui\.layer_ui\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     # if match1:
     #     mod = yp.layers[yp.active_layer_index].channels[int(match1.group(1))].modifiers[int(match1.group(2))]
     # elif match2:
@@ -7464,8 +7481,8 @@ def update_vectorwarp_ui(self, context):
     #     mod = yp.channels[yp.active_channel_index].modifiers[int(match3.group(1))]
     if match4:
         mod = yp.layers[yp.active_layer_index].warps[int(match4.group(1))]
-    # elif match5:
-    #     mod = yp.layers[yp.active_layer_index].masks[int(match5.group(1))].modifiers[int(match5.group(2))]
+    elif match5:
+        mod = yp.layers[yp.active_layer_index].masks[int(match5.group(1))].warps[int(match5.group(2))]
     #else: return #yolo
 
     mod.expand_content = self.expand_content
@@ -7826,6 +7843,7 @@ class YMaskUI(bpy.types.PropertyGroup):
 
     channels : CollectionProperty(type=YMaskChannelUI)
     modifiers : CollectionProperty(type=YModifierUI)
+    warps : CollectionProperty(type=YVectorWarpUI)
 
 class YLayerUI(bpy.types.PropertyGroup):
     #name : StringProperty(default='')

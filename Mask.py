@@ -1,7 +1,7 @@
 import bpy, re, time, random
 from bpy.props import *
 from bpy_extras.io_utils import ImportHelper
-from . import lib, ImageAtlas, MaskModifier, UDIM, ListItem
+from . import lib, ImageAtlas, MaskModifier, UDIM, ListItem, VectorWarp
 from .common import *
 from .node_connections import *
 from .node_arrangements import *
@@ -2636,6 +2636,9 @@ class YLayerMask(bpy.types.PropertyGroup):
     bitangent : StringProperty(default='')
     tangent_flip : StringProperty(default='')
     bitangent_flip : StringProperty(default='')
+
+    # Warps
+    warps: CollectionProperty(type=VectorWarp.YVectorWarp)
 
     # UI related
     expand_content : BoolProperty(default=False)

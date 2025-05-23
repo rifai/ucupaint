@@ -818,6 +818,21 @@ def create_prop_input(entity, prop_name, valid_inputs, input_index, dirty):
 
     return dirty
 
+def check_warps_ios(parent, valid_inputs, input_index, dirty):
+    for warp in parent.warps:
+        if not warp.enable: continue
+
+        # Create intensity socket
+        dirty = create_prop_input(warp, 'intensity_value', valid_inputs, input_index, dirty)
+        input_index += 1
+
+        if warp.type == 'MAPPING':
+            # Create image socket
+            dirty = create_prop_input(warp, 'uniform_scale_value', valid_inputs, input_index, dirty)
+            input_index += 1
+
+    return input_index, dirty
+
 def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False):
 
     yp = layer.id_data.yp
@@ -890,17 +905,7 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
             dirty = create_prop_input(layer, 'ao_distance', valid_inputs, input_index, dirty)
             input_index += 1
 
-        for warp in layer.warps:
-            if not warp.enable: continue
-
-            # Create intensity socket
-            dirty = create_prop_input(warp, 'intensity_value', valid_inputs, input_index, dirty)
-            input_index += 1
-
-            if warp.type == 'MAPPING':
-                # Create image socket
-                dirty = create_prop_input(warp, 'uniform_scale_value', valid_inputs, input_index, dirty)
-                input_index += 1
+        input_index, dirty = check_warps_ios(layer, valid_inputs, input_index, dirty)
 
         # Channel prop inputs
         for i, ch in enumerate(layer.channels):
@@ -1013,6 +1018,7 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
         # Mask prop inputs
         for mask in layer.masks:
             if not mask.enable: continue
+            input_index, dirty = check_warps_ios(mask, valid_inputs, input_index, dirty)
 
             # Create intensity socket
             dirty = create_prop_input(mask, 'intensity_value', valid_inputs, input_index, dirty)

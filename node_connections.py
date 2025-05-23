@@ -2217,6 +2217,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
                     if mask_mapping and mask.texcoord_type != 'Decal':
                         mask_vector = create_link(tree, mask_vector, mask_mapping.inputs[0])[0]
+                        mask_vector = reconnect_all_vectorwarp_nodes(tree, mask, mask_vector)
 
                 create_link(tree, mask_vector, mask_source.inputs[0])
 

@@ -14,19 +14,18 @@ def update_warp_nodes_enable(self, context):
 
     check_vectorwarp_nodes(self, tree)
 
-    # match1 = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
     # match3 = re.match(r'yp\.channels\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
 
-    if match2:
-        layer = yp.layers[int(match2.group(1))]
+    if match2 or match1:
+        if match1: layer = yp.layers[int(match1.group(1))]
+        else: layer = yp.layers[int(match2.group(1))]
 
         check_layer_tree_ios(layer)
 
         reconnect_layer_nodes(layer)
         rearrange_layer_nodes(layer)
-
-
 
     # elif match3:
     #     channel = yp.channels[int(match3.group(1))]
@@ -127,23 +126,23 @@ def check_vectorwarp_trees(parent, rearrange=False):
     enable_tree = False
     is_layer = False
 
-    # match1 = re.match(r'^yp\.layers\[(\d+)\]\.channels\[(\d+)\]$', parent.path_from_id())
+    match1 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', parent.path_from_id())
     match2 = re.match(r'^yp\.layers\[(\d+)\]$', parent.path_from_id())
 
-    # if match1:
-    #     layer = yp.layers[int(match1.group(1))]
-    #     root_ch = yp.channels[int(match1.group(2))]
-    #     ch = parent
-    #     name = root_ch.name + ' ' + layer.name
-    #     if (
-    #         root_ch.type == 'NORMAL' and root_ch.enable_smooth_bump and (
-    #             (not ch.override and layer.type not in {'BACKGROUND', 'COLOR', 'OBJECT_INDEX'}) or 
-    #             (ch.override and ch.override_type not in {'DEFAULT'} and ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'})
-    #         )
-    #         ):
-    #         enable_tree = True
-    #     parent_tree = get_tree(layer)
-    if match2:
+    if match1:
+        layer = yp.layers[int(match1.group(1))]
+        # root_ch = yp.channels[int(match1.group(2))]
+        # ch = parent
+        # name = root_ch.name + ' ' + layer.name
+        # if (
+        #     root_ch.type == 'NORMAL' and root_ch.enable_smooth_bump and (
+        #         (not ch.override and layer.type not in {'BACKGROUND', 'COLOR', 'OBJECT_INDEX'}) or 
+        #         (ch.override and ch.override_type not in {'DEFAULT'} and ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'})
+        #     )
+        #     ):
+        #     enable_tree = True
+        parent_tree = get_tree(layer)
+    elif match2:
         layer = parent
         name = layer.name
         if layer.type not in {'IMAGE', 'VCOL', 'BACKGROUND', 'COLOR', 'GROUP', 'HEMI', 'MUSGRAVE'}:
@@ -214,7 +213,6 @@ def delete_vectorwarp_nodes(tree, vw):
             remove_node(tree, vw, 'wave')
         case 'GABOR':
             remove_node(tree, vw, 'gabor')
-
 
 def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
 
@@ -324,25 +322,39 @@ class YNewVectorWarp(bpy.types.Operator):
         group_tree = node.node_tree
         yp = group_tree.yp
 
-        layer = yp.layers[yp.active_layer_index]
+        parent = context.parent
 
-        new_warp = layer.warps.add()
+        m1 = re.match(r'^yp\.layers\[(\d+)\]$', context.parent.path_from_id())
+        m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', context.parent.path_from_id())
+        
+        if m1: layer = yp.layers[int(m1.group(1))]
+        elif m2: layer = yp.layers[int(m2.group(1))]
+        else: layer = None
+    
+        new_warp = parent.warps.add()
 
         name = [mt[1] for mt in warp_type_items if mt[0] == self.type][0]
 
-        new_warp.name = get_unique_name(name, layer.warps)
+        new_warp.name = get_unique_name(name, parent.warps)
         new_warp.type = self.type
         new_warp.blend_type = 'ADD'
 
         if self.type == 'MAPPING':
             new_warp.blend_type = 'MIX'
 
-        check_vectorwarp_trees(layer)
+        check_vectorwarp_trees(parent)
 
-        context.layer_ui.expand_content = True
-       
-        reconnect_layer_nodes(layer)
-        rearrange_layer_nodes(layer)
+        if m1:
+            context.layer_ui.expand_content = True
+        elif m2:
+            context.layer_ui.masks[int(m2.group(2))].expand_content = True
+
+        if layer:
+            reconnect_layer_nodes(layer)
+            rearrange_layer_nodes(layer)
+        else: 
+            reconnect_yp_nodes(group_tree)
+            rearrange_yp_nodes(group_tree)
        
         # Update UI
         context.window_manager.ypui.need_update = True
@@ -374,14 +386,14 @@ class YMoveYPaintVectorWarp(bpy.types.Operator):
         group_tree = node.node_tree
         yp = group_tree.yp
 
-        layer = yp.layers[yp.active_layer_index]
+        parent = context.parent
 
-        num_mods = len(layer.warps)
+        num_mods = len(parent.warps)
         if num_mods < 2: return {'CANCELLED'}
 
         mod = context.vector_warp
         index = -1
-        for i, m in enumerate(layer.warps):
+        for i, m in enumerate(parent.warps):
             if m == mod:
                 index = i
                 break
@@ -394,14 +406,19 @@ class YMoveYPaintVectorWarp(bpy.types.Operator):
             new_index = index+1
         else:
             return {'CANCELLED'}
+        
+        layer = context.layer if hasattr(context, 'layer') else None
 
         # Swap modifier
-        layer.warps.move(index, new_index)
+        parent.warps.move(index, new_index)
 
         # Reconnect and rearrange nodes
-        reconnect_layer_nodes(layer)
-        rearrange_layer_nodes(layer)
-
+        if layer: 
+            reconnect_layer_nodes(layer)
+            rearrange_layer_nodes(layer)
+        else: 
+            reconnect_yp_nodes(group_tree)
+            rearrange_yp_nodes(group_tree)
 
         # Update UI
         context.window_manager.ypui.need_update = True
@@ -423,18 +440,18 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         group_tree = node.node_tree
         yp = group_tree.yp
 
-        layer = yp.layers[yp.active_layer_index]
+        parent = context.parent
 
         vw = context.vector_warp
 
         index = -1
-        for i, m in enumerate(layer.warps):
+        for i, m in enumerate(parent.warps):
             if m == vw:
                 index = i
                 break
         if index == -1: return {'CANCELLED'}
 
-        if len(layer.warps) < 1: return {'CANCELLED'}
+        if len(parent.warps) < 1: return {'CANCELLED'}
 
         layer = context.layer if hasattr(context, 'layer') else None
 
@@ -448,7 +465,7 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         delete_vectorwarp_nodes(tree, vw)
 
         # Delete the modifier
-        layer.warps.remove(index)
+        parent.warps.remove(index)
 
         # Delete modifier pipeline if no modifier left
         #if len(parent.modifiers) == 0:
@@ -457,9 +474,9 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         check_vectorwarp_trees(layer)
 
         # # Rearrange nodes
-       
-        reconnect_layer_nodes(layer)
-        rearrange_layer_nodes(layer)
+        if layer:
+            rearrange_layer_nodes(layer)
+        else: rearrange_yp_nodes(group_tree)
 
         # Update UI
         context.window_manager.ypui.need_update = True
