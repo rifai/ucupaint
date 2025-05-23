@@ -907,6 +907,7 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
         # root_ch = yp.channels[int(match.group(2))]
         # ch = layer.channels[int(match.group(2))]
 
+    obj = context.object
     for i, m in enumerate(warps):
        
         modui = ui.warps[i]
@@ -946,25 +947,26 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             row.active = layout_active
             row.label(text='', icon='BLANK1')
             box = row.box()
-            box.active = m.enable
+            col = box.column()
+            col.active = m.enable
 
             src = mod_tree.nodes.get(m.node)
 
             if m.type == 'IMAGE':
                 # print('Image node:', src)
                 if src.image:
-                    draw_image_props(context, src, box, m, show_datablock=False)
+                    draw_image_props(context, src, col, m, show_datablock=False)
             elif m.type == 'BLUR':
-                rowb = box.row(align=True)
+                rowb = col.row(align=True)
                 roww = rowb.row(align=True)
                 roww.label(text='Factor:')
                 draw_input_prop(roww, m, 'blur_vector_factor')
             elif m.type == 'MAPPING':
-                rrow = box.row(align=True)
+                rrow = col.row(align=True)
                 rrow.label(text='Transform:')
                 rrow.prop(src, 'vector_type', text='')
 
-                rrow = box.row(align=True)
+                rrow = col.row(align=True)
                 rrow = rrow.row()
                 if is_bl_newer_than(2, 81):
                     mcol = rrow.column()
@@ -993,19 +995,24 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                     mcol = rrow.column()
                     mcol.prop(src, 'scale')
             elif src:
-                draw_tex_props(src, box, m)
+                draw_tex_props(src, col, m)
 
-            rowb = box.row(align=True)
+            rowb = col.row(align=True)
 
-            roww = rowb.row(align=True)
+            rowb.label(text='Blend:')
+            rowb.prop(m, 'blend_type', text='')
+            draw_input_prop(rowb, m, 'intensity_value')
+
+            rowb = col.row(align=True)
             # roww.alignment = 'LEFT'
-            roww.label(text='Blend:')
+            rowb.label(text='Vector:')
+            if obj.type == 'MESH':
+                split = split_layout(rowb, 0.33, align=True)
+                split.prop(m, 'texcoord_type', text='')
+                split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+            else:
+                rowb.prop(m, 'texcoord_type', text='')
 
-            roww = rowb.row(align=True)
-            roww.prop(m, 'blend_type', text='')
-            
-            roww = rowb.row(align=True)
-            draw_input_prop(roww, m, 'intensity_value')
 
 
 

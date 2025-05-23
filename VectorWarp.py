@@ -102,6 +102,21 @@ class YVectorWarp(bpy.types.PropertyGroup):
         default = 'IMAGE'
     )
 
+    texcoord_type : EnumProperty(
+        name = 'Layer Coordinate Type',
+        description = 'Layer Coordinate Type',
+        items = texcoord_type_items,
+        default = 'UV',
+        # update = update_texcoord_type
+    )
+
+    uv_name : StringProperty(
+        name = 'UV Name',
+        description = 'UV Name to use for layer coordinate',
+        default = '',
+        # update = update_uv_name
+    )
+
     source : StringProperty(default='')
 
     blend_type : EnumProperty(
