@@ -2,7 +2,7 @@ import bpy, re, time, os, sys
 from bpy.props import *
 from bpy.app.handlers import persistent
 from bpy.app.translations import pgettext_iface
-from . import lib, Modifier, MaskModifier, UDIM, ListItem
+from . import lib, Modifier, MaskModifier, UDIM, ListItem, VectorWarp
 from .common import *
 
 
@@ -885,6 +885,60 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
 
             #row.label(text='', icon='BLANK1')
 
+def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra_blank=False, use_modifier_1=False, layout_active=True):
+
+    ypui = context.window_manager.ypui
+
+    warps = parent.warps
+
+    # Check if parent is layer channel
+    match = re.match(r'yp\.layers\[(\d+)\]\.channels\[(\d+)\]', parent.path_from_id())
+    if match:
+        yp = parent.id_data.yp
+        layer = yp.layers[int(match.group(1))]
+        root_ch = yp.channels[int(match.group(2))]
+        ch = layer.channels[int(match.group(2))]
+
+    for i, m in enumerate(warps):
+        # try: 
+        #     if use_modifier_1:
+        #         modui = ui.modifiers_1[i]
+        #     else: modui = ui.modifiers[i]
+        # except: 
+        #     ypui.need_update = True
+        #     return
+
+        # mod_tree = get_mod_tree(m)
+        # can_be_expanded = m.type in Modifier.can_be_expanded
+        
+        row = layout.row(align=True)
+        row.active = layout_active
+
+        label = m.name
+
+        rrow = row.row(align=True)
+
+        # if can_be_expanded:
+        #     if modui.expand_content:
+        #         icon_value = lib.get_icon('uncollapsed_modifier')
+        #     else: icon_value = lib.get_icon('collapsed_modifier')
+        #     #row.prop(modui, 'expand_content', text='', emboss=False, icon_value=icon_value)
+        #     inbox_dropdown_button(rrow, modui, 'expand_content', label, scale_override=0.95, icon_value=icon_value)
+        # else:
+        rrow.label(text='', icon_value=lib.get_icon('modifier'))
+        rrow.label(text=label)
+
+        if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
+        
+        
+        row = layout.row(align=True)
+        row.active = layout_active
+        row.label(text='', icon='BLANK1')
+        # box = row.box()
+        # box.active = m.enable
+        # Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, box, False)
+
+
 def draw_bake_target_channel(context, layout, bt, letter='r'):
     yp = bt.id_data.yp
     ypui = context.window_manager.ypui
@@ -1739,11 +1793,20 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
         #    icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
         #    rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
 
+        row.context_pointer_set('parent', layer)
+                
+        icon = 'MODIFIER_ON' if is_bl_newer_than(2, 80) else 'MODIFIER'
+        rrow = row.row()
+        rrow.alignment = 'RIGHT'
+        rrow.menu("NODE_MT_y_warp_special_menu", icon=icon, text='')
+
         if lui.expand_vector:
             row = col.row(align=True)
             row.label(text='', icon='BLANK1')
             bbox = row.box()
             boxcol = bbox.column()
+
+            draw_warp_stack(context, layer, 'RGB', boxcol, lui, layer)
 
             rrow = boxcol.row(align=True)
             rrow.label(text='', icon='BLANK1')
@@ -7186,6 +7249,34 @@ class YLayerSpecialMenu(bpy.types.Menu):
         #col.prop(ypui, 'disable_auto_temp_uv_update')
         #col.prop(yp, 'disable_quick_toggle')
 
+class YWarpSpecialMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_y_warp_special_menu"
+    bl_label = "Layer Special Menu"
+    bl_description = 'Layer Special Menu'
+
+    @classmethod
+    def poll(cls, context):
+        #return hasattr(context, 'parent') and get_active_ypaint_node()
+        return get_active_ypaint_node()
+
+    def draw(self, context):
+        yp = context.parent.id_data.yp
+        ypui = context.window_manager.ypui
+        ypup = get_user_preferences()
+
+        row = self.layout.row()
+
+        if not hasattr(context, 'parent'):
+            col = row.column()
+            col.label(text='ERROR: Context has no parent!', icon='ERROR')
+            return
+
+        if context.parent.type != 'GROUP':
+            col = row.column()
+            col.label(text='Add Warp Vector')
+            for mt in warp_type_items:
+                col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier'))
+
 def update_modifier_ui(self, context):
     ypui = context.window_manager.ypui
     if ypui.halt_prop_update: return
@@ -7822,6 +7913,7 @@ def register():
     bpy.utils.register_class(YReplaceChannelOverrideMenu)
     bpy.utils.register_class(YReplaceChannelOverride1Menu)
     bpy.utils.register_class(YLayerSpecialMenu)
+    bpy.utils.register_class(YWarpSpecialMenu)
     bpy.utils.register_class(YLayerTypeMenu)
     bpy.utils.register_class(YMaskTypeMenu)
     bpy.utils.register_class(YModifierUI)
@@ -7905,6 +7997,7 @@ def unregister():
     bpy.utils.unregister_class(YReplaceChannelOverrideMenu)
     bpy.utils.unregister_class(YReplaceChannelOverride1Menu)
     bpy.utils.unregister_class(YLayerSpecialMenu)
+    bpy.utils.unregister_class(YWarpSpecialMenu)
     bpy.utils.unregister_class(YLayerTypeMenu)
     bpy.utils.unregister_class(YMaskTypeMenu)
     bpy.utils.unregister_class(YModifierUI)
