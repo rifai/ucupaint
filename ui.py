@@ -7414,7 +7414,7 @@ class YWarpSpecialMenu(bpy.types.Menu):
             col.label(text='Add Image')
             col.operator("wm.y_open_available_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image'))
             col.operator("wm.y_open_available_image_to_vector_warp", text="Available Image")
-            col.operator("wm.y_open_available_image_to_vector_warp", text="Open Image")
+            col.operator("wm.y_open_image_to_vector_warp", text="Open Image")
 
 def update_modifier_ui(self, context):
     ypui = context.window_manager.ypui
