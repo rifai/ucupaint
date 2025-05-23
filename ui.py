@@ -7412,7 +7412,7 @@ class YWarpSpecialMenu(bpy.types.Menu):
                     col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
             col.separator()
             col.label(text='Add Image')
-            col.operator("wm.y_open_available_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image'))
+            col.operator("wm.y_new_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image'))
             col.operator("wm.y_open_available_image_to_vector_warp", text="Available Image")
             col.operator("wm.y_open_image_to_vector_warp", text="Open Image")
 
