@@ -210,26 +210,42 @@ def reconnect_all_vectorwarp_nodes(tree, parent, start_vector):
     vector = start_vector
     # Connect all the nodes
     for vw in parent.warps:
-        vector = reconnect_vectorwarp_nodes(tree, vw, vector)
+        vector = reconnect_vectorwarp_node(tree, vw, vector)
 
     return vector
 
-def reconnect_vectorwarp_nodes(tree, vw, start_vector):
+def reconnect_vectorwarp_node(tree, vw, start_vector):
 
     if not vw.enable:
         return start_vector
 
     vector = start_vector
-
     mix_node = tree.nodes.get(vw.mix)
+    print("reconnect=", vw.type, "okey")
 
     match vw.type:
+        case 'MAPPING':
+            current_node = tree.nodes.get(vw.mapping)
         case 'IMAGE':
             current_node = tree.nodes.get(vw.image)
         case "BRICK":
             current_node = tree.nodes.get(vw.brick)
         case "CHECKER":
             current_node = tree.nodes.get(vw.checker)
+        case 'GRADIENT':
+            current_node = tree.nodes.get(vw.gradient)
+        case 'MAGIC':
+            current_node = tree.nodes.get(vw.magic)
+        case 'MUSGRAVE':
+            current_node = tree.nodes.get(vw.musgrave)
+        case 'NOISE':
+            current_node = tree.nodes.get(vw.noise)
+        case 'VORONOI':
+            current_node = tree.nodes.get(vw.voronoi)
+        case 'WAVE':
+            current_node = tree.nodes.get(vw.wave)
+        case 'GABOR':
+            current_node = tree.nodes.get(vw.gabor)
 
     create_link(tree, vector, mix_node.inputs['B'])
     create_link(tree, current_node.outputs[0], mix_node.inputs['A'])
