@@ -252,6 +252,7 @@ mask_type_items = (
 
 warp_type_items = (
     ('MAPPING', 'Mapping', ''),
+    ('BLUR', 'Blur', ''),
     ('IMAGE', 'Image', ''),
     ('BRICK', 'Brick', ''),
     ('CHECKER', 'Checker', ''),
@@ -262,7 +263,6 @@ warp_type_items = (
     ('VORONOI', 'Voronoi', ''),
     ('WAVE', 'Wave', ''),
     ('VCOL', 'Vertex Color', ''),
-    ('BACKGROUND', 'Background', ''),
     ('HEMI', 'Fake Lighting', ''),
     ('GABOR', 'Gabor', ''),
     ('EDGE_DETECT', 'Edge Detect', ''),

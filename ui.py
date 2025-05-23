@@ -931,10 +931,11 @@ def draw_warp_stack(context, parent, channel_type, layout, ui, layer=None, extra
         # row.context_pointer_set('layer', layer)
         row.context_pointer_set('parent', parent)
         row.context_pointer_set('vector_warp', m)
-        row.menu("NODE_MT_y_vector_warp_menu", text='', icon=icon)
 
-        if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
-        
+        row.menu("NODE_MT_y_vector_warp_menu", text='', icon=icon)
+        row.prop(m, 'enable', text='')
+
+        # if is_bl_newer_than(2, 80): rrow = row.row(align=True) # To make sure the next row align right
         
         # row = layout.row(align=True)
         # row.active = layout_active
@@ -1756,7 +1757,7 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
         col = layout.column()
         col.active = not layer.use_baked
 
-        row = col.row(align=False)
+        row = col.row(align=True)
 
         icon_value = lib.get_icon('uv')
         rrow = row.row(align=True)
@@ -1799,13 +1800,21 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
         #    rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
 
         row.context_pointer_set('parent', layer)
-                
+        
         icon = 'MODIFIER_ON' if is_bl_newer_than(2, 80) else 'MODIFIER'
         rrow = row.row()
-        rrow.alignment = 'RIGHT'
         rrow.menu("NODE_MT_y_warp_special_menu", icon=icon, text='')
+        rrow.alignment = 'RIGHT'
 
         if lui.expand_vector:
+
+            # if len(layer.warps) > 0:
+            #     row = col.row(align=True)
+            #     row.label(text='', icon='BLANK1')
+            #     bbox = row.box()
+            #     boxcol = bbox.column()
+            #     draw_warp_stack(context, layer, 'RGB', boxcol, lui, layer)
+
             row = col.row(align=True)
             row.label(text='', icon='BLANK1')
             bbox = row.box()
