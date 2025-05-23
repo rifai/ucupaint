@@ -6957,6 +6957,11 @@ def update_layer_use_baked(self, context):
     rearrange_yp_nodes(self.id_data)
 
 class YLayer(bpy.types.PropertyGroup):
+    # warps
+    # YVectorWarp (name, type, source, blend)
+    # VectorWarp.py
+    # YLayer, YLayerMask
+
     name : StringProperty(
         name = 'Layer Name',
         description = 'Layer name',
