@@ -500,25 +500,26 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         return {'FINISHED'}
     
 
-def generate_image_warp_node(parent, yp, image_name):
-    yp.halt_update = True
-
-    layer = parent # yp.layers[yp.active_layer_index]
-
-    new_warp = layer.warps.add()
+def generate_image_warp_node(parent, layer, layer_ui, image_name):
+    new_warp = parent.warps.add()
 
     type = 'IMAGE'
 
     name = [mt[1] for mt in warp_type_items if mt[0] == type][0]
 
-    new_warp.name = get_unique_name(name, layer.warps)
+    new_warp.name = get_unique_name(name, parent.warps)
     new_warp.type = type
     new_warp.blend_type = 'ADD'
     new_warp.image_name = image_name
 
-    yp.halt_update = False
+    check_vectorwarp_trees(parent)
 
-    check_vectorwarp_trees(layer)
+    m1 = re.match(r'^yp\.layers\[(\d+)\]$', parent.path_from_id())
+    m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', parent.path_from_id())
+    if m1:
+        layer_ui.expand_vector = True
+    elif m2:
+        layer_ui.masks[int(m2.group(2))].expand_vector = True
 
     # Reconnect and rearrange nodes
     reconnect_layer_nodes(layer)
@@ -552,6 +553,8 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
         yp = node.node_tree.yp
 
         self.parent = context.parent
+        self.layer = context.layer if hasattr(context, 'layer') else None
+        self.layer_ui = context.layer_ui if hasattr(context, 'layer_ui') else None
 
         self.image_coll.clear()
         imgs = bpy.data.images
@@ -592,7 +595,7 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
             self.report({'ERROR'}, "No image selected!")
             return {'CANCELLED'}
 
-        generate_image_warp_node(self.parent, node.node_tree.yp, self.image_name)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name)
         # Update UI
         wm.ypui.need_update = True
         print('INFO: Image', self.image_name, 'is opened in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
@@ -640,6 +643,8 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
         #         return self.execute(context)
         #     return context.window_manager.invoke_props_dialog(self)
         self.parent = context.parent
+        self.layer = context.layer if hasattr(context, 'layer') else None
+        self.layer_ui = context.layer_ui if hasattr(context, 'layer_ui') else None
 
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
@@ -689,7 +694,7 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
 
         wm = context.window_manager
 
-        generate_image_warp_node(self.parent, node.node_tree.yp, self.image_name)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name)
 
         # Update UI
         wm.ypui.need_update = True
@@ -756,6 +761,8 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         yp = self.yp = node.node_tree.yp
 
         self.parent = context.parent
+        self.layer = context.layer if hasattr(context, 'layer') else None
+        self.layer_ui = context.layer_ui if hasattr(context, 'layer_ui') else None
 
         name = obj.active_material.name
         items = bpy.data.images
@@ -891,7 +898,7 @@ class YNewImageToVectorWarp(bpy.types.Operator):
 
         update_image_editor_image(context, img)
 
-        generate_image_warp_node(self.parent, node.node_tree.yp, self.name)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.name)
 
         wm = context.window_manager
 
