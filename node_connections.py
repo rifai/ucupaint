@@ -221,7 +221,8 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
 
     vector = start_vector
     mix_node = tree.nodes.get(vw.mix)
-    print("reconnect=", vw.type, "okey")
+    if vw.map_range:
+        range_node = tree.nodes.get(vw.map_range)
 
     match vw.type:
         case 'MAPPING':
@@ -254,7 +255,16 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
             current_node = tree.nodes.get(vw.gabor)
 
     create_link(tree, vector, mix_node.inputs['A'])
-    create_link(tree, current_node.outputs[0], mix_node.inputs['B'])
+    node_output = current_node.outputs[0]
+    # contain color0
+    if current_node.outputs.get('Color'):
+        node_output = current_node.outputs['Color']
+
+    if vw.map_range:
+        create_link(tree, node_output, range_node.inputs['Vector'])
+        node_output = range_node.outputs['Vector']
+
+    create_link(tree, node_output, mix_node.inputs['B'])
 
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
     create_link(tree, intensity_value, mix_node.inputs['Factor'])

@@ -325,7 +325,11 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
         # mod_y_offset = get_mod_y_offsets(m, is_value)
         # if offset_y < mod_y_offset:
         #     offset_y = mod_y_offset
-        check_set_node_loc(tree, wp.mix, loc + Vector((300, 0)))
+
+
+        if wp.map_range:
+            check_set_node_loc(tree, wp.map_range, loc + Vector((200, 0)))
+        check_set_node_loc(tree, wp.mix, loc + Vector((400, 0)))
 
         match wp.type:
             case 'MAPPING':

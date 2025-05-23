@@ -94,6 +94,7 @@ class YVectorWarp(bpy.types.PropertyGroup):
     intensity_value: FloatProperty(name = 'Opacity', default=1.0, min=0.0, max=1.0, subtype='FACTOR', precision=3)
 
     mix: StringProperty(default='')
+    map_range: StringProperty(default='')
 
     mapping : StringProperty(default='')
     uniform_scale_value : FloatProperty(default=1)
@@ -187,6 +188,8 @@ def check_vectorwarp_trees(parent, rearrange=False):
 def delete_vectorwarp_nodes(tree, vw):
     # Delete the mix node
     remove_node(tree, vw, 'mix')
+    # Delete the map range node
+    remove_node(tree, vw, 'map_range')
     # Delete the nodes
     remove_node(tree, vw, 'frame')
 
@@ -215,13 +218,7 @@ def delete_vectorwarp_nodes(tree, vw):
             remove_node(tree, vw, 'gabor')
 
 def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
-
-    # yp = vw.id_data.yp
-    # nodes = tree.nodes
-
-    # print("type=", vw.type)
-    # Check the nodes
-
+    
     field_name = 'mapping'
     node_name = vw.mapping
     node_type = 'ShaderNodeMapping'
@@ -274,12 +271,21 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
 
     if not vw.enable:
         remove_node(tree, vw, 'mix')
+        remove_node(tree, vw, 'map_range')
         remove_node(tree, vw, field_name)
     else:
+
+        is_rangeable = vw.type not in {'MAPPING', 'BLUR'}
+
         if ref_tree:
             node_ref = ref_tree.nodes.get(vw.mix)
             if node_ref: ref_tree.nodes.remove(node_ref)
             mp = new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
+
+            node_ref = ref_tree.nodes.get(vw.map_range)
+            if node_ref: ref_tree.nodes.remove(node_ref)
+            if is_rangeable:
+                mr = new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
             
             node_ref = ref_tree.nodes.get(node_name)
             if node_ref: ref_tree.nodes.remove(node_ref)
@@ -289,6 +295,8 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
             dirty = True
         else:
             mp, dirty = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix', True)
+            if is_rangeable:
+                mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
             current_node, node_dirty = check_new_node(tree, vw, field_name, node_type, '', True)
             dirty = dirty or node_dirty
 
@@ -296,6 +304,11 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
         mp.blend_type = vw.blend_type
         mp.inputs[0].default_value = vw.intensity_value
         mp.data_type = 'RGBA'
+
+        if is_rangeable:
+            mr.data_type = 'FLOAT_VECTOR'
+            mr.inputs["To Min"].default_value = (-0.5, -0.5, -0.5)
+            mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
 
         match vw.type:
             case 'IMAGE':
@@ -345,9 +358,9 @@ class YNewVectorWarp(bpy.types.Operator):
         check_vectorwarp_trees(parent)
 
         if m1:
-            context.layer_ui.expand_content = True
+            context.layer_ui.expand_vector = True
         elif m2:
-            context.layer_ui.masks[int(m2.group(2))].expand_content = True
+            context.layer_ui.masks[int(m2.group(2))].expand_vector = True
 
         if layer:
             reconnect_layer_nodes(layer)
@@ -476,7 +489,10 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         # # Rearrange nodes
         if layer:
             rearrange_layer_nodes(layer)
-        else: rearrange_yp_nodes(group_tree)
+            reconnect_layer_nodes(layer)
+        else: 
+            rearrange_yp_nodes(group_tree)
+            reconnect_yp_nodes(group_tree)
 
         # Update UI
         context.window_manager.ypui.need_update = True
@@ -544,8 +560,6 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
             if is_image_available_to_open(img) and img not in baked_channel_images:
                 self.image_coll.add().name = img.name
         
-        print("has parent invoke =", hasattr(context, 'parent'))
-
         return context.window_manager.invoke_props_dialog(self)
 
     # def check(self, context):
@@ -841,7 +855,7 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         img = None
 
         alpha = True
-        color = (0, 0, 0, 0)
+        color = (0.5, 0.5, 0.5, 1.0)
         
         obj = context.object
         mat = obj.active_material
@@ -849,8 +863,6 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         if self.use_udim:
             objs = get_all_objects_with_same_materials(mat)
             tilenums = UDIM.get_tile_numbers(objs, self.uv_map)
-
-       
 
         if self.use_udim:
             img = bpy.data.images.new(
@@ -872,6 +884,7 @@ class YNewImageToVectorWarp(bpy.types.Operator):
             #img.generated_type = self.generated_type
             img.generated_type = 'BLANK'
             img.generated_color = color
+            img.colorspace_settings.name = get_noncolor_name()
             if hasattr(img, 'use_alpha'):
                 img.use_alpha = True
 
