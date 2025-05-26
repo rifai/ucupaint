@@ -5124,6 +5124,10 @@ def is_uv_input_needed(layer, uv_name):
 
                     if ch.normal_map_type in {'NORMAL_MAP', 'BUMP_NORMAL_MAP'} and ch.override_1 and ch.override_1_type != 'DEFAULT':
                         return True
+                    
+        for vw in layer.warps:
+            if vw.texcoord_type == 'UV' and vw.uv_name == uv_name:
+                return True
         
         for mask in layer.masks:
             if not get_mask_enabled(mask): continue
@@ -5132,6 +5136,10 @@ def is_uv_input_needed(layer, uv_name):
             if mask.type in {'VCOL', 'HEMI', 'OBJECT_INDEX', 'COLOR_ID', 'BACKFACE', 'EDGE_DETECT', 'AO'}: continue
             if (not mask.use_baked or mask.baked_source == '') and mask.texcoord_type == 'UV' and mask.uv_name == uv_name:
                 return True
+            
+            for vw in mask.warps:
+                if vw.texcoord_type == 'UV' and vw.uv_name == uv_name:
+                    return True
 
     return False
 

@@ -1661,6 +1661,17 @@ def check_uv_nodes(yp, generate_missings=False):
             if uv.name not in uv_names: 
                 uv_names.append(uv.name)
 
+            for vw in layer.warps:
+                if vw.uv_name != '':
+                    uv = yp.uvs.get(vw.uv_name)
+                    if not uv: 
+                        dirty = True
+                        uv = yp.uvs.add()
+                        uv.name = vw.uv_name
+
+                    if uv.name not in uv_names: 
+                        uv_names.append(uv.name)
+
         for mask in layer.masks:
             if mask.texcoord_type == 'UV' and mask.uv_name != '':
                 uv = yp.uvs.get(mask.uv_name)
@@ -1671,6 +1682,17 @@ def check_uv_nodes(yp, generate_missings=False):
 
                 if uv.name not in uv_names: 
                     uv_names.append(uv.name)
+
+                for vw in mask.warps:
+                    if vw.uv_name != '':
+                        uv = yp.uvs.get(vw.uv_name)
+                        if not uv: 
+                            dirty = True
+                            uv = yp.uvs.add()
+                            uv.name = vw.uv_name
+
+                        if uv.name not in uv_names: 
+                            uv_names.append(uv.name)
 
     # Get unused uv objects
     unused_uvs = []

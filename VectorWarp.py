@@ -79,9 +79,144 @@ def update_blur_vector_factor(self, context):
     if self.type == 'BLUR' and blur_vector:
         blur_vector.inputs[0].default_value = self.blur_vector_factor
 
+def update_uv_name(self, context):
+    yp = self.id_data.yp
+    if yp.halt_update: return
+
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+
+    if match2:
+        layer = yp.layers[int(match2.group(1))]
+    elif match1:
+        layer = yp.layers[int(match1.group(1))]
+
+    active_layer = yp.layers[yp.active_layer_index]
+
+    tree = get_tree(layer)
+
+    obj = context.object
+    mat = obj.active_material
+    group_tree = layer.id_data
+
+    nodes = tree.nodes
+
+    # Use first uv if temp uv or empty is selected
+    if self.uv_name in {TEMP_UV, ''}:
+        if len(yp.uvs) > 0:
+            for uv in yp.uvs:
+                self.uv_name = uv.name
+                break
+
+    # Update uv layer
+    # if obj.type == 'MESH' and not any([m for m in layer.masks if m.active_edit]) and layer == active_layer:
+
+    #     if layer.segment_name != '':
+    #         refresh_temp_uv(obj, layer)
+    #     else:
+    #         uv_layers = get_uv_layers(obj)
+    #         uv_layers.active = uv_layers.get(layer.uv_name)
+
+    #         if is_layer_vdm(layer):
+    #             uv_layers.active.active_render = True
+
+    #     # Check for other objects with same material
+    #     check_uvmap_on_other_objects_with_same_mat(mat, layer.uv_name)
+
+    # Update global uv
+    check_uv_nodes(yp)
+
+    # Update uv neighbor
+    # smooth_bump_ch = get_smooth_bump_channel(layer)
+    # if smooth_bump_ch and smooth_bump_ch.enable and (smooth_bump_ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} or smooth_bump_ch.enable_transition_bump):
+    #     uv_neighbor = replace_new_node(
+    #         tree, layer, 'uv_neighbor', 'ShaderNodeGroup', 'Neighbor UV', 
+    #         lib.get_neighbor_uv_tree_name(layer.texcoord_type, entity=layer), 
+    #         return_status=False, hard_replace=True
+    #     )
+    #     set_uv_neighbor_resolution(layer, uv_neighbor)
+    #     if smooth_bump_ch.override and smooth_bump_ch.override_type != 'DEFAULT':
+    #         uv_neighbor = replace_new_node(
+    #             tree, smooth_bump_ch, 'uv_neighbor', 'ShaderNodeGroup', 'Neighbor UV', 
+    #             lib.get_neighbor_uv_tree_name(layer.texcoord_type, entity=layer), 
+    #             return_status=False, hard_replace=True
+    #         )
+    #         set_uv_neighbor_resolution(smooth_bump_ch, uv_neighbor)
+
+    #     # Update neighbor uv if mask bump is active
+    #     for i, mask in enumerate(layer.masks):
+    #         check_mask_uv_neighbor(tree, layer, mask, i)
+
+    # # Update normal process uv
+    # normal_ch = get_height_channel(layer)
+    # if normal_ch:
+    #     normal_proc = nodes.get(normal_ch.normal_proc)
+    #     if hasattr(normal_proc, 'uv_map'):
+    #         normal_proc.uv_map = layer.uv_name
+
+    # Update layer tree inputs
+    check_layer_tree_ios(layer, tree)
+
+    #if yp_dirty or layer_dirty: #and not yp.halt_reconnect:
+    reconnect_layer_nodes(layer)
+    rearrange_layer_nodes(layer)
+
+    # Update layer tree inputs
+    #if yp_dirty:
+    reconnect_yp_nodes(group_tree)
+    rearrange_yp_nodes(group_tree)
+
+def update_texcoord_type(self, context):
+    yp = self.id_data.yp
+    if yp.halt_update: return
+
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+
+    if match2:
+        layer = yp.layers[int(match2.group(1))]
+    elif match1:
+        layer = yp.layers[int(match1.group(1))]
+
+    tree = get_tree(layer)
+
+    if yp.halt_update: return
+
+    # Update global uv
+    check_uv_nodes(yp)
+
+    # Update uv neighbor
+    # smooth_bump_ch = get_smooth_bump_channel(layer)
+    # if smooth_bump_ch and smooth_bump_ch.enable and (smooth_bump_ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} or smooth_bump_ch.enable_transition_bump):
+    #     uv_neighbor = replace_new_node(
+    #         tree, layer, 'uv_neighbor', 'ShaderNodeGroup', 'Neighbor UV', 
+    #         lib.get_neighbor_uv_tree_name(layer.texcoord_type, entity=layer), hard_replace=True
+    #     )
+    #     set_uv_neighbor_resolution(layer, uv_neighbor)
+    #     if smooth_bump_ch.override and smooth_bump_ch.override_type != 'DEFAULT':
+    #         uv_neighbor = replace_new_node(
+    #             tree, smooth_bump_ch, 'uv_neighbor', 'ShaderNodeGroup', 'Neighbor UV', 
+    #             lib.get_neighbor_uv_tree_name(layer.texcoord_type, entity=layer), hard_replace=True
+    #         )
+    #         set_uv_neighbor_resolution(smooth_bump_ch, uv_neighbor)
+
+    # Update layer tree inputs
+    #check_layer_tree_ios(layer, tree)
+    check_all_layer_channel_io_and_nodes(layer, tree)
+
+    # Check layer projections
+    check_layer_projections(layer)
+
+    #if not yp.halt_reconnect:
+    reconnect_layer_nodes(layer)
+    rearrange_layer_nodes(layer)
+
+    # Update layer tree inputs
+    #if yp_dirty:
+    reconnect_yp_nodes(layer.id_data)
+    rearrange_yp_nodes(layer.id_data)
 
 class YVectorWarp(bpy.types.PropertyGroup):
-    # todo : new image picker for image warp, mapping (default mix, vector use prev vector)
 
     enable: BoolProperty(
         name = 'Enable',
@@ -107,14 +242,14 @@ class YVectorWarp(bpy.types.PropertyGroup):
         description = 'Layer Coordinate Type',
         items = texcoord_type_items,
         default = 'UV',
-        # update = update_texcoord_type
+        update = update_texcoord_type
     )
 
     uv_name : StringProperty(
         name = 'UV Name',
         description = 'UV Name to use for layer coordinate',
         default = '',
-        # update = update_uv_name
+        update = update_uv_name
     )
 
     source : StringProperty(default='')
@@ -323,6 +458,10 @@ class YNewVectorWarp(bpy.types.Operator):
         new_warp.name = get_unique_name(name, parent.warps)
         new_warp.type = self.type
         new_warp.blend_type = 'ADD'
+
+        if layer:
+            new_warp.texcoord_type = layer.texcoord_type
+            new_warp.uv_name = layer.uv_name
 
         if self.type in {'MAPPING', 'BLUR'}:
             new_warp.blend_type = 'MIX'

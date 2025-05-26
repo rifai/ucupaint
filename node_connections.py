@@ -256,6 +256,10 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
     create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
+    uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
+    if uv_target:
+        create_link(tree, uv_target, current_node.inputs['Vector'])
+
     return mix_node.outputs['Result']
 
 def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
@@ -1295,12 +1299,20 @@ def reconnect_yp_nodes(tree, merged_layer_ids = []):
             if layer.use_baked and layer.baked_uv_name != '' and layer.baked_uv_name not in uv_names:
                 uv_names.append(layer.baked_uv_name)
 
+            for vw in layer.warps:
+                if vw.texcoord_type == 'UV' and vw.uv_name not in uv_names:
+                    uv_names.append(vw.uv_name)
+
             for mask in layer.masks:
                 if mask.texcoord_type == 'UV' and mask.uv_name not in uv_names:
                     uv_names.append(mask.uv_name)
 
                 if mask.use_baked and mask.baked_uv_name != '' and mask.baked_uv_name not in uv_names:
                     uv_names.append(mask.baked_uv_name)
+
+                for vw in mask.warps:
+                    if vw.texcoord_type == 'UV' and vw.uv_name not in uv_names:
+                        uv_names.append(vw.uv_name)
 
             for uv_name in uv_names:
                 uv = yp.uvs.get(uv_name)
