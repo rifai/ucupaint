@@ -1006,7 +1006,7 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             rowb = col.row(align=True)
             # roww.alignment = 'LEFT'
             rowb.label(text='Vector:')
-            if obj.type == 'MESH':
+            if obj.type == 'MESH' and m.texcoord_type == 'UV':
                 split = split_layout(rowb, 0.5, align=True)
                 split.prop(m, 'texcoord_type', text='')
                 split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')

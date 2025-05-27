@@ -1247,12 +1247,24 @@ def check_layer_tree_ios(layer, tree=None, remove_props=False, hard_reset=False)
     texcoords = []
 
     # Check layer texcoords
-    if layer_enabled and layer.texcoord_type not in {'UV', 'Decal'} and is_layer_using_vector(layer):
-        texcoords.append(layer.texcoord_type)
+    if layer_enabled and is_layer_using_vector(layer):
+        if layer.texcoord_type not in {'UV', 'Decal'}:
+            texcoords.append(layer.texcoord_type)
+
+        for vw in layer.warps:
+            vw_type = vw.texcoord_type
+            if vw_type not in texcoords and vw_type not in {'UV', 'Decal'}:
+                texcoords.append(vw.texcoord_type)
 
     for mask in layer.masks:
-        if get_mask_enabled(mask, layer) and mask.texcoord_type not in {'UV', 'Decal', 'Layer'} and mask.type not in {'VCOL', 'COLOR_ID', 'OBJECT_INDEX', 'HEMI'} and mask.texcoord_type not in texcoords:
-            texcoords.append(mask.texcoord_type)
+        if get_mask_enabled(mask, layer):
+            if mask.texcoord_type not in {'UV', 'Decal', 'Layer'} and mask.type not in {'VCOL', 'COLOR_ID', 'OBJECT_INDEX', 'HEMI'} and mask.texcoord_type not in texcoords:
+                texcoords.append(mask.texcoord_type)
+
+            for vw in mask.warps:
+                vw_type = vw.texcoord_type
+                if vw_type not in texcoords and vw_type not in {'UV', 'Decal'}:
+                    texcoords.append(vw.texcoord_type)
 
     for texcoord in texcoords:
         name = io_names[texcoord]

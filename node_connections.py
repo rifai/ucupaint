@@ -256,9 +256,16 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
     create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
-    uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
-    if uv_target:
-        create_link(tree, uv_target, current_node.inputs['Vector'])
+    if vw.texcoord_type == 'UV':
+        uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
+        if uv_target:
+            create_link(tree, uv_target, current_node.inputs['Vector'])
+    elif vw.texcoord_type != 'DECAL':
+        name = io_names[vw.texcoord_type]
+        target = get_essential_node(tree, TREE_START).get(name)
+        if target:
+            create_link(tree, target, current_node.inputs['Vector'])
+
 
     return mix_node.outputs['Result']
 
@@ -1339,9 +1346,17 @@ def reconnect_yp_nodes(tree, merged_layer_ids = []):
             if layer.texcoord_type not in {'UV', 'Decal'}:
                 texcoords.append(layer.texcoord_type)
 
+            for vw in layer.warps:
+                if vw.texcoord_type not in {'UV', 'Decal'} and vw.texcoord_type not in texcoords:
+                    texcoords.append(vw.texcoord_type)
+
             for mask in layer.masks:
                 if mask.texcoord_type not in {'UV', 'Decal', 'Layer'} and mask.texcoord_type not in texcoords:
                     texcoords.append(mask.texcoord_type)
+
+                for vw in mask.warps:
+                    if vw.texcoord_type not in {'UV', 'Decal'} and vw.texcoord_type not in texcoords:
+                        texcoords.append(vw.texcoord_type)
 
             for tc in texcoords:
                 inp = node.inputs.get(io_names[tc])
