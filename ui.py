@@ -950,68 +950,101 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             col = box.column()
             col.active = m.enable
 
-            src = mod_tree.nodes.get(m.node)
-
-            if m.type == 'IMAGE':
-                # print('Image node:', src)
-                if src.image:
-                    draw_image_props(context, src, col, m, show_datablock=False)
-            elif m.type == 'BLUR':
-                rowb = col.row(align=True)
-                roww = rowb.row(align=True)
-                roww.label(text='Factor:')
-                draw_input_prop(roww, m, 'blur_vector_factor')
-            elif m.type == 'MAPPING':
-                rrow = col.row(align=True)
-                rrow.label(text='Transform:')
-                rrow.prop(src, 'vector_type', text='')
-
-                rrow = col.row(align=True)
-                rrow = rrow.row()
-                if is_bl_newer_than(2, 81):
-                    mcol = rrow.column()
-                    mcol.prop(src.inputs[1], 'default_value', text='Offset')
-                    mcol = rrow.column()
-                    mcol.prop(src.inputs[2], 'default_value', text='Rotation')
-                    if m.uniform_scale_enable:
-                        mcol = rrow.column(align=True)
-                        mrow = mcol.row()
-                        mrow.label(text='Scale:')
-                        mrow.prop(m, 'uniform_scale_enable', text='', icon='LOCKED')
-                        draw_input_prop(mcol, m, 'uniform_scale_value', None, 'X')
-                        draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Y')
-                        draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Z')
-                    else:
-                        mcol = rrow.column(align=True)
-                        mrow = mcol.row()
-                        mrow.label(text='Scale:')
-                        mrow.prop(m, 'uniform_scale_enable', text='', icon='UNLOCKED')
-                        mcol.prop(src.inputs[3], 'default_value', text='')
-                else:
-                    mcol = rrow.column()
-                    mcol.prop(src, 'translation')
-                    mcol = rrow.column()
-                    mcol.prop(src, 'rotation')
-                    mcol = rrow.column()
-                    mcol.prop(src, 'scale')
-            elif src:
-                draw_tex_props(src, col, m)
-
-            rowb = col.row(align=True)
-
-            rowb.label(text='Blend:')
+            srow = split_layout(col, 0.35, align=False)
+            rowb = srow.row(align=True)
+            inbox_dropdown_button(rowb, m, 'expand_blend', "Blend:")
+            rowb = srow.row(align=True)
+            # rowb.label(text='Blend:')
             rowb.prop(m, 'blend_type', text='')
-            draw_input_prop(rowb, m, 'intensity_value')
-
-            rowb = col.row(align=True)
-            # roww.alignment = 'LEFT'
-            rowb.label(text='Vector:')
-            if obj.type == 'MESH' and m.texcoord_type == 'UV':
-                split = split_layout(rowb, 0.5, align=True)
-                split.prop(m, 'texcoord_type', text='')
-                split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+            if m.expand_blend:
+                bcol = col.column() #align=True)
+                rrow = bcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow.label(text='Opacity:')
+                draw_input_prop(rrow, m, 'intensity_value')
             else:
-                rowb.prop(m, 'texcoord_type', text='')
+                draw_input_prop(rowb, m, 'intensity_value')
+
+            srow = split_layout(col, 0.35, align=False)
+            rowb = srow.row(align=True)
+            inbox_dropdown_button(rowb, m, 'expand_source', "Source:")
+            rowb = srow.row(align=True)
+
+            if m.expand_source:
+                src = mod_tree.nodes.get(m.node)
+
+                rrow = col.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rbcol = rrow.column()
+
+                if m.type == 'IMAGE':
+                    # print('Image node:', src)
+                    if src.image:
+                        draw_image_props(context, src, rbcol, m, show_datablock=False)
+                elif m.type == 'BLUR':
+                    rowb = rbcol.row(align=True)
+                    roww = rowb.row(align=True)
+                    roww.label(text='Factor:')
+                    draw_input_prop(roww, m, 'blur_vector_factor')
+                elif m.type == 'MAPPING':
+                    rrow = rbcol.row(align=True)
+                    rrow.label(text='Transform:')
+                    rrow.prop(src, 'vector_type', text='')
+
+                    rrow = rbcol.row(align=True)
+                    rrow = rrow.row()
+                    if is_bl_newer_than(2, 81):
+                        mcol = rrow.column()
+                        mcol.prop(src.inputs[1], 'default_value', text='Offset')
+                        mcol = rrow.column()
+                        mcol.prop(src.inputs[2], 'default_value', text='Rotation')
+                        if m.uniform_scale_enable:
+                            mcol = rrow.column(align=True)
+                            mrow = mcol.row()
+                            mrow.label(text='Scale:')
+                            mrow.prop(m, 'uniform_scale_enable', text='', icon='LOCKED')
+                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'X')
+                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Y')
+                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Z')
+                        else:
+                            mcol = rrow.column(align=True)
+                            mrow = mcol.row()
+                            mrow.label(text='Scale:')
+                            mrow.prop(m, 'uniform_scale_enable', text='', icon='UNLOCKED')
+                            mcol.prop(src.inputs[3], 'default_value', text='')
+                    else:
+                        mcol = rrow.column()
+                        mcol.prop(src, 'translation')
+                        mcol = rrow.column()
+                        mcol.prop(src, 'rotation')
+                        mcol = rrow.column()
+                        mcol.prop(src, 'scale')
+                elif src:
+                    draw_tex_props(src, rbcol, m)
+
+            srow = split_layout(col, 0.35, align=False)
+            rowb = srow.row(align=True)
+            inbox_dropdown_button(rowb, m, 'expand_vector', "Vector:")
+            rowb = srow.row(align=True)
+
+            if m.expand_vector:
+                bcol = col.column() 
+                rrow = bcol.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                rrow.label(text='Coordinate:')
+                rrow.prop(m, 'texcoord_type', text='')
+                if obj.type == 'MESH' and m.texcoord_type == 'UV':
+                    rrow = bcol.row(align=True)
+                    rrow.label(text='', icon='BLANK1')
+                    rrow.label(text='UV Map:')
+                    rrow.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+            else:
+                if obj.type == 'MESH' and m.texcoord_type == 'UV':
+                    split = split_layout(rowb, 0.5, align=True)
+                    split.prop(m, 'texcoord_type', text='')
+                    split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                else:
+                    rowb.prop(m, 'texcoord_type', text='')
 
 
 

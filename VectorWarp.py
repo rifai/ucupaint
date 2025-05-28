@@ -286,6 +286,10 @@ class YVectorWarp(bpy.types.PropertyGroup):
     image_name : StringProperty(default='')
 
     expand_content : BoolProperty(default=True)
+    
+    expand_blend : BoolProperty(default=False)
+    expand_source : BoolProperty(default=False)
+    expand_vector : BoolProperty(default=False)
 
 def check_vectorwarp_trees(parent, rearrange=False):
     group_tree = parent.id_data
