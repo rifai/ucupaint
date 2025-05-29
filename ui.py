@@ -970,6 +970,10 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             inbox_dropdown_button(rowb, m, 'expand_source', "Source:")
             rowb = srow.row(align=True)
 
+            icon = 'image' if m.type == 'IMAGE' else 'texture'
+            rowb.prop(m, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(icon))
+            rowb.alignment = 'RIGHT'
+
             if m.expand_source:
                 src = mod_tree.nodes.get(m.node)
 
@@ -4886,6 +4890,9 @@ def layer_listing(layout, layer, show_expand=False):
                     active_override = c
                 if c.active_edit_1:
                     override_idx = 1
+        for vw in layer.warps:
+            if vw.active_edit:
+                active_override = vw
 
     # Try to get image masks
     all_masks = []
@@ -4900,6 +4907,9 @@ def layer_listing(layout, layer, show_expand=False):
                 active_mask = m
                 active_override = m
 
+            for vw in m.warps:
+                if vw.active_edit:
+                    active_override = vw
     row = master.row(align=True)
 
     # Image icon
@@ -4968,6 +4978,32 @@ def layer_listing(layout, layer, show_expand=False):
                 row.label(text='', icon_value=lib.get_icon('group'))
             else: 
                 row.label(text='', icon_value=lib.get_icon('texture'))
+
+    for vw in layer.warps:
+        row = master.row(align=True)
+        row.active = vw.active_edit
+        src = layer_tree.nodes.get(vw.node)
+        if vw.active_edit:
+            if vw.type == 'IMAGE':
+                if ypup.use_image_preview and src.image.preview: 
+                    #if not src.image.preview: src.image.preview_ensure()
+                    row.label(text='', icon_value=src.image.preview.icon_id)
+                else: 
+                    icon_name = 'image'
+                    row.label(text='', icon_value=lib.get_icon(icon_name))
+            else:
+                row.label(text='', icon_value=lib.get_icon('texture'))
+        else:
+            if vw.type == 'IMAGE':
+                if src: 
+                    if ypup.use_image_preview and src.image.preview: 
+                        #if not src.image.preview: src.image.preview_ensure()
+                        row.prop(vw, 'active_edit', text='', emboss=False, icon_value=src.image.preview.icon_id)
+                    else: 
+                        icon_name = 'image'
+                        row.prop(vw, 'active_edit', text='', emboss=False, icon_value=lib.get_icon(icon_name))
+            else:
+                row.prop(vw, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('texture'))
 
     # Override icons
     active_override_image = None

@@ -4935,6 +4935,24 @@ def set_active_paint_slot_entity(yp):
                         layer_tree.nodes.active = source
 
                     image = source.image
+            for vw in mask.warps:
+                if vw.active_edit:
+                    if vw.type == 'IMAGE':
+                        source = tree.nodes.get(vw.node)
+                        if source:
+                            source.select = True
+                        layer_tree.nodes.active = source
+                        image = source.image
+
+
+        for vw in layer.warps:
+            if vw.active_edit:
+                if vw.type == 'IMAGE':
+                    source = tree.nodes.get(vw.node)
+                    if source:
+                        source.select = True
+                    layer_tree.nodes.active = source
+                    image = source.image
 
         for ch in layer.channels:
             if ch.active_edit and ch.override and ch.override_type != 'DEFAULT' and ch.override_type == 'IMAGE':
@@ -5071,6 +5089,17 @@ def get_active_image_and_stuffs(obj, yp):
                 source_1 = get_channel_source_1(ch)
                 image = source_1.image
                 src_of_img = ch
+                mapping = get_layer_mapping(layer)
+
+    for vw in layer.warps:
+        if vw.active_edit:
+            source = tree.nodes.get(vw.node)
+            entity = vw
+
+            if vw.type == 'IMAGE':
+                uv_name = layer.uv_name
+                image = source.image
+                src_of_img = vw
                 mapping = get_layer_mapping(layer)
 
     if not entity: 

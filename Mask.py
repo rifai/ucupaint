@@ -1903,11 +1903,15 @@ def update_mask_active_edit(self, context):
             c.active_edit_1 = False
 
         for m in layer.masks:
+            for vw in m.warps:
+                vw.active_edit = False
             if m == self: continue
             #m.halt_update = True
             m.active_edit = False
             #m.halt_update = False
 
+        for vw in layer.warps:
+            vw.active_edit = False
         yp.halt_update = False
 
     # Refresh

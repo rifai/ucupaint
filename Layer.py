@@ -6299,6 +6299,10 @@ def update_channel_active_edit(self, context):
             c.prev_active_edit_idx = 0
         for m in layer.masks:
             m.active_edit = False
+            for vw in m.warps:
+                vw.active_edit = False
+        for vw in layer.warps:
+            vw.active_edit = False
 
     else:
         self.active_edit = False

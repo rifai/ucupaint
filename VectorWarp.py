@@ -5,7 +5,7 @@ from bpy.props import *
 from .node_connections import reconnect_layer_nodes, reconnect_yp_nodes
 from .node_arrangements import rearrange_layer_nodes, rearrange_yp_nodes
 from .input_outputs import *
-from . import UDIM
+from . import UDIM, ListItem
 
 def update_warp_nodes_enable(self, context):
     yp = self.id_data.yp
@@ -216,6 +216,50 @@ def update_texcoord_type(self, context):
     reconnect_yp_nodes(layer.id_data)
     rearrange_yp_nodes(layer.id_data)
 
+
+def update_active_edit(self, context):
+    yp = self.id_data.yp
+    if yp.halt_update: return
+
+    match1 = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+    match2 = re.match(r'yp\.layers\[(\d+)\]\.warps\[(\d+)\]', self.path_from_id())
+
+    if match2:
+        layer_idx = int(match2.group(1))
+        layer = yp.layers[layer_idx]
+    elif match1:
+        layer_idx = int(match1.group(1))
+        layer = yp.layers[layer_idx]
+    else:
+        # If not a layer warp, do nothing
+        return
+
+    # Disable other active edits
+    if self.active_edit: 
+        yp.halt_update = True
+        for c in layer.channels:
+            c.active_edit = False
+            c.active_edit_1 = False
+
+        for m in layer.masks:
+            m.active_edit = False
+
+            for vw in m.warps:
+                if vw != self:
+                    vw.active_edit = False
+
+        for vw in layer.warps:
+            if vw != self:
+                vw.active_edit = False
+        
+        yp.halt_update = False
+
+    # Refresh
+    yp.active_layer_index = layer_idx
+
+    # Set active subitem
+    ListItem.set_active_entity_item(self)
+
 class YVectorWarp(bpy.types.PropertyGroup):
 
     enable: BoolProperty(
@@ -252,7 +296,13 @@ class YVectorWarp(bpy.types.PropertyGroup):
         update = update_uv_name
     )
 
-    source : StringProperty(default='')
+    # source : StringProperty(default='')
+    active_edit : BoolProperty(
+        name = 'Active Edit',
+        description = 'Enable active edit mode for this warp',
+        default = False,
+        update = update_active_edit
+    )
 
     blend_type : EnumProperty(
         name = 'Blend',
