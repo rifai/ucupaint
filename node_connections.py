@@ -3053,6 +3053,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                         end_chain_s = alpha_s
                         end_chain_e = alpha_e
                         end_chain_w = alpha_w
+                        
+                if yp.layer_preview_mode and yp.layer_preview_mode_type == 'SPECIFIC_MASK' and alpha_preview:
+                    for vw in mask.warps:
+                        if vw.enable and vw.active_edit:
+                            vw_node = nodes.get(vw.node)
+                            node_output = vw_node.outputs[0]
+                            if vw_node.outputs.get('Color'):
+                                node_output = vw_node.outputs['Color']
+                            create_link(tree, node_output, alpha_preview)
 
             if ch_bump_distance:
                 bump_distance_ignorer = nodes.get(ch.bump_distance_ignorer)
@@ -3789,6 +3798,10 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                     if mask.active_edit:
                         active_found = True
                         break
+                    for vw in mask.warps:
+                        if vw.enable and vw.active_edit:
+                            active_found = True
+                            break
 
                 for ch in layer.channels:
                     if ch.override and ch.override_type != 'DEFAULT' and ch.active_edit:
@@ -3796,6 +3809,11 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                         break
 
                     if ch.override_1 and ch.override_1_type != 'DEFAULT' and ch.active_edit_1:
+                        active_found = True
+                        break
+
+                for vw in layer.warps:
+                    if vw.enable and vw.active_edit:
                         active_found = True
                         break
                 
@@ -3810,5 +3828,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 if alpha_preview and yp.layer_preview_mode_type != 'SPECIFIC_MASK':
                     create_link(tree, alpha, alpha_preview)
                 
+    if yp.layer_preview_mode and yp.layer_preview_mode_type == 'SPECIFIC_MASK' and alpha_preview:
+        for vw in layer.warps:
+            if vw.enable and vw.active_edit:
+                vw_node = nodes.get(vw.node)
+                node_output = vw_node.outputs[0]
+                # contain color0
+                if vw_node.outputs.get('Color'):
+                    node_output = vw_node.outputs['Color']
+                create_link(tree, node_output, alpha_preview)
+    
     # Clean unused essential nodes
     clean_essential_nodes(tree, exclude_texcoord=True)

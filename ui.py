@@ -4876,6 +4876,7 @@ def layer_listing(layout, layer, show_expand=False):
 
     all_overrides = []
     selectable_overrides = []
+    all_warps = []
     active_override = None
     override_idx = 0
     if show_inline_subitems:
@@ -4891,8 +4892,10 @@ def layer_listing(layout, layer, show_expand=False):
                 if c.active_edit_1:
                     override_idx = 1
         for vw in layer.warps:
-            if vw.active_edit:
-                active_override = vw
+            if vw.enable:
+                all_warps.append(vw)
+                if vw.active_edit:
+                    active_override = vw
 
     # Try to get image masks
     all_masks = []
@@ -4901,15 +4904,18 @@ def layer_listing(layout, layer, show_expand=False):
     if show_inline_subitems:
         for m in layer.masks:
             #if m.type in {'IMAGE', 'VCOL'}:
-            if m.enable: selectable_masks.append(m)
+            if m.enable: 
+                selectable_masks.append(m)
+                for vw in m.warps:
+                    if vw.enable:
+                        all_warps.append(vw)
+                        if vw.active_edit:
+                            active_override = vw
             all_masks.append(m)
             if m.active_edit:
                 active_mask = m
                 active_override = m
 
-            for vw in m.warps:
-                if vw.active_edit:
-                    active_override = vw
     row = master.row(align=True)
 
     # Image icon
@@ -4978,32 +4984,6 @@ def layer_listing(layout, layer, show_expand=False):
                 row.label(text='', icon_value=lib.get_icon('group'))
             else: 
                 row.label(text='', icon_value=lib.get_icon('texture'))
-
-    for vw in layer.warps:
-        row = master.row(align=True)
-        row.active = vw.active_edit
-        src = layer_tree.nodes.get(vw.node)
-        if vw.active_edit:
-            if vw.type == 'IMAGE':
-                if ypup.use_image_preview and src.image.preview: 
-                    #if not src.image.preview: src.image.preview_ensure()
-                    row.label(text='', icon_value=src.image.preview.icon_id)
-                else: 
-                    icon_name = 'image'
-                    row.label(text='', icon_value=lib.get_icon(icon_name))
-            else:
-                row.label(text='', icon_value=lib.get_icon('texture'))
-        else:
-            if vw.type == 'IMAGE':
-                if src: 
-                    if ypup.use_image_preview and src.image.preview: 
-                        #if not src.image.preview: src.image.preview_ensure()
-                        row.prop(vw, 'active_edit', text='', emboss=False, icon_value=src.image.preview.icon_id)
-                    else: 
-                        icon_name = 'image'
-                        row.prop(vw, 'active_edit', text='', emboss=False, icon_value=lib.get_icon(icon_name))
-            else:
-                row.prop(vw, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('texture'))
 
     # Override icons
     active_override_image = None
@@ -5136,11 +5116,41 @@ def layer_listing(layout, layer, show_expand=False):
             else:
                 row.prop(m, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('texture'))
 
+    active_warp_img = None
+    active_warp = None
+    for vw in all_warps:
+        row = master.row(align=True)
+        row.active = vw.active_edit
+        src = layer_tree.nodes.get(vw.node)
+        if vw.active_edit:
+            active_warp = vw
+            if vw.type == 'IMAGE':
+                if ypup.use_image_preview and src.image.preview: 
+                    #if not src.image.preview: src.image.preview_ensure()
+                    row.label(text='', icon_value=src.image.preview.icon_id)
+                else: 
+                    icon_name = 'image'
+                    row.label(text='', icon_value=lib.get_icon(icon_name))
+                active_warp_img = src.image
+            else:
+                row.label(text='', icon_value=lib.get_icon('texture'))
+        else:
+            if vw.type == 'IMAGE':
+                if src: 
+                    if ypup.use_image_preview and src.image.preview: 
+                        #if not src.image.preview: src.image.preview_ensure()
+                        row.prop(vw, 'active_edit', text='', emboss=False, icon_value=src.image.preview.icon_id)
+                    else: 
+                        icon_name = 'image'
+                        row.prop(vw, 'active_edit', text='', emboss=False, icon_value=lib.get_icon(icon_name))
+            else:
+                row.prop(vw, 'active_edit', text='', emboss=False, icon_value=lib.get_icon('texture'))
+
     # Debug parent
     #row.label(text=str(index) + ' (' + str(layer.parent_idx) + ')')
 
     # Active image/layer label
-    if len(selectable_masks) > 0 or len(selectable_overrides) > 0:
+    if len(selectable_masks) > 0 or len(selectable_overrides) > 0 or len(all_warps) > 0:
         row = master.row(align=True)
         row.active = is_active
         if override_ch:
@@ -5162,6 +5172,10 @@ def layer_listing(layout, layer, show_expand=False):
             row.prop(active_vcol_mask, 'name', text='', emboss=False)
         elif active_mask:
             row.prop(active_mask, 'name', text='', emboss=False)
+        elif active_warp_img:
+            row.prop(active_warp_img, 'name', text='', emboss=False)
+        elif active_warp:
+            row.prop(active_warp, 'name', text='', emboss=False)
         else: 
             if image and not image.yia.is_image_atlas and not image.yua.is_udim_atlas: 
                 row.prop(image, 'name', text='', emboss=False)
