@@ -260,6 +260,14 @@ def update_active_edit(self, context):
     # Set active subitem
     ListItem.set_active_entity_item(self)
 
+class YVectorWarpCache(bpy.types.PropertyGroup):
+    type : EnumProperty(
+        name = 'Warp Type',
+        items = warp_type_items,
+        default = 'IMAGE'
+    )
+
+
 class YVectorWarp(bpy.types.PropertyGroup):
 
     enable: BoolProperty(
@@ -334,6 +342,8 @@ class YVectorWarp(bpy.types.PropertyGroup):
     node : StringProperty(default='')
 
     image_name : StringProperty(default='')
+
+    cache_nodes : CollectionProperty(type=YVectorWarpCache)
 
     expand_content : BoolProperty(default=True)
     
@@ -446,7 +456,7 @@ def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
             mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
 
 def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
-    
+
     node_type = 'ShaderNodeMapping'
     
     check_vectorwarp_extra_nodes(vw, tree, ref_tree)
@@ -1074,7 +1084,146 @@ class YNewImageToVectorWarp(bpy.types.Operator):
 
         return {'FINISHED'}
     
+def get_cache_name(type):
+    name = 'cache_' + type.lower()
+    return name
+
+def replace_vector_warp_type(context, vw, new_type, item_name=''):
+
+    yp = vw.id_data.yp
+    node = get_active_ypaint_node()
+    group_tree = node.node_tree
+
+    # Current source
+    tree = get_vw_tree(vw)
+    source = tree.nodes.get(vw.node)
+
+    print("replace vector warp type", vw.name, "from", vw.type, "to", new_type)
+    # Save source to cache
+    existing = None
+    for c in vw.cache_nodes:
+        if c.type == vw.type:
+            existing = c
+            print("has existing cache node", existing.name)
+            break
+    
+    if not existing:
+        print("no existing cache node", vw.node)
+        existing = vw.cache_nodes.add()
+        existing.type = vw.type
+        existing.name = vw.node
+    
+    # Remove uv input link
+    if any(source.inputs) and any(source.inputs[0].links):
+        tree.links.remove(source.inputs[0].links[0])
+    
+    vw.type = new_type
+    vw.node = ''
+
+    # check cache
+    for c in vw.cache_nodes:
+        if c.type == vw.type:
+            vw.node = c.name
+
+    parent = context.parent
+
+    m1 = re.match(r'^yp\.layers\[(\d+)\]$', parent.path_from_id())
+    m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', parent.path_from_id())
+    
+    if m1: layer = yp.layers[int(m1.group(1))]
+    elif m2: layer = yp.layers[int(m2.group(1))]
+    else: layer = None
+
+    check_vectorwarp_trees(parent)
+
+    if m1:
+        context.layer_ui.expand_vector = True
+    elif m2:
+        context.layer_ui.masks[int(m2.group(2))].expand_vector = True
+
+    if layer:
+        reconnect_layer_nodes(layer)
+        rearrange_layer_nodes(layer)
+    else: 
+        reconnect_yp_nodes(group_tree)
+        rearrange_yp_nodes(group_tree)
+        
+    # Update UI
+    bpy.context.window_manager.ypui.need_update = True
+
+class YReplaceVectorWarpType(bpy.types.Operator):
+    bl_idname = "wm.y_replace_vector_warp_type"
+    bl_label = "Replace Vector Warp Type"
+    bl_description = "Replace Vector Warp Type"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    type : EnumProperty(
+        name = 'Layer Type',
+        items = warp_type_items,
+        default = 'IMAGE'
+    )
+
+    item_name : StringProperty(name="Item")
+    item_coll : CollectionProperty(type=bpy.types.PropertyGroup)
+
+    load_item : BoolProperty(default=False)
+
+    @classmethod
+    def poll(cls, context):
+        group_node = get_active_ypaint_node()
+        return context.object and group_node and len(group_node.node_tree.yp.layers) > 0
+
+    def invoke(self, context, event):
+        if self.load_item and self.type in {'IMAGE'}:
+
+            self.item_coll.clear()
+            self.item_name = ''
+
+            # Update image names
+            if self.type == 'IMAGE':
+                baked_channel_images = get_all_baked_channel_images(self.layer.id_data)
+                for img in bpy.data.images:
+                    if not img.yia.is_image_atlas and not img.yua.is_udim_atlas and img not in baked_channel_images:
+                        self.item_coll.add().name = img.name
+
+            return context.window_manager.invoke_props_dialog(self)
+
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+
+        split = split_layout(layout, 0.35, align=True)
+
+        #row = self.layout.row()
+        if self.type == 'IMAGE':
+            split.label(text='Image:')
+            split.prop_search(self, "item_name", self, "item_coll", text='', icon='IMAGE_DATA')
+
+    def execute(self, context):
+
+        T = time.time()
+
+        wm = context.window_manager
+
+        vw = context.vector_warp
+
+        if self.type == vw.type and self.type not in {'IMAGE'}: 
+            return {'CANCELLED'}
+
+        if self.load_item and self.type in {'IMAGE'} and self.item_name == '':
+            self.report({'ERROR'}, "Form is cannot be empty!")
+            return {'CANCELLED'}
+
+        replace_vector_warp_type(context, vw, self.type, self.item_name)
+
+        print('INFO: Vector Warp', vw.name, 'is updated in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        wm.yptimer.time = str(time.time())
+
+        return {'FINISHED'}
+    
 classes = (
+    YVectorWarpCache,
     YVectorWarp,
     YNewVectorWarp,
     YMoveYPaintVectorWarp,
@@ -1082,6 +1231,7 @@ classes = (
     YOpenAvailableImageToVectorWarp,
     YOpenImageToVectorWarp,
     YNewImageToVectorWarp,
+    YReplaceVectorWarpType,
 )
          
 def register():

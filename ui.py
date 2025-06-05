@@ -970,6 +970,15 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             inbox_dropdown_button(rowb, m, 'expand_source', "Source:")
             rowb = srow.row(align=True)
 
+            label_dropdown = m.name
+            if m.type == 'IMAGE':
+                current_node = mod_tree.nodes.get(m.node)
+                if current_node and current_node.image:
+                    label_dropdown = current_node.image.name
+
+            rowb.context_pointer_set('vector_warp', m)
+            rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
+
             icon = 'image' if m.type == 'IMAGE' else 'texture'
             rowb.prop(m, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(icon))
             rowb.alignment = 'RIGHT'
@@ -7271,6 +7280,57 @@ class YLayerTypeMenu(bpy.types.Menu):
         icon = 'RADIOBUT_ON' if layer.type == 'EDGE_DETECT' else 'RADIOBUT_OFF'
         col.operator("wm.y_replace_layer_type", icon=icon, text='Edge Detect').type = 'EDGE_DETECT'
 
+class YVectorWarpTypeMenu(bpy.types.Menu):
+    bl_idname = "NODE_MT_y_vector_warp_type_menu"
+    bl_label = "Vector Warp Type Menu"
+    bl_description = 'Vector Warp Type Menu'
+
+    @classmethod
+    def poll(cls, context):
+        #return hasattr(context, 'parent') and get_active_ypaint_node()
+        return get_active_ypaint_node()
+
+    def draw(self, context):
+        # layer = context.layer
+
+        vw = context.vector_warp
+        tree = get_vw_tree(vw)
+        
+        col = self.layout.column()
+        col.label(text='Vector Warp Source')
+        col.separator()
+
+        folder_emoji = '🗁  ' if is_bl_newer_than(3, 4) else '>  '
+
+        # cache_node = tree.nodes.get(vw.cache_node)
+        # if vw.type != 'IMAGE' and cache_node and cache_node.image:
+        #     op = col.operator('wm.y_replace_vector_warp_type', text='Image: ' + cache_node.image.name, icon='RADIOBUT_OFF')
+        #     op.type = 'IMAGE'
+        #     op.load_item = False
+        #     op.item_name = ''
+        # else:
+
+        suffix = ''
+        source = tree.nodes.get(vw.node)
+        if vw.type == 'IMAGE' and source and source.image:
+            suffix += ': ' + source.image.name
+        icon = 'RADIOBUT_ON' if vw.type == 'IMAGE' else 'RADIOBUT_OFF'
+        col.label(text='Image' + suffix, icon=icon)
+
+        label = 'Open Available Image' if vw.type != 'IMAGE' else 'Replace Image'
+        op = col.operator('wm.y_replace_vector_warp_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
+        op.type = 'IMAGE'
+        op.load_item = True
+
+        col.separator()
+        for mt in warp_type_items:
+            icon = 'RADIOBUT_ON' if vw.type == mt[0] else 'RADIOBUT_OFF'
+            if mt[0] == 'IMAGE':
+                pass
+            else:
+                col.operator('wm.y_replace_vector_warp_type', text=mt[1], icon=icon).type = mt[0]
+
+
 class YMaskTypeMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_mask_type_menu"
     bl_label = "Mask Type Menu"
@@ -8171,6 +8231,7 @@ def register():
     bpy.utils.register_class(YLayerSpecialMenu)
     bpy.utils.register_class(YWarpSpecialMenu)
     bpy.utils.register_class(YLayerTypeMenu)
+    bpy.utils.register_class(YVectorWarpTypeMenu)
     bpy.utils.register_class(YMaskTypeMenu)
     bpy.utils.register_class(YModifierUI)
     bpy.utils.register_class(YVectorWarpUI)
@@ -8257,6 +8318,7 @@ def unregister():
     bpy.utils.unregister_class(YLayerSpecialMenu)
     bpy.utils.unregister_class(YWarpSpecialMenu)
     bpy.utils.unregister_class(YLayerTypeMenu)
+    bpy.utils.unregister_class(YVectorWarpTypeMenu)
     bpy.utils.unregister_class(YMaskTypeMenu)
     bpy.utils.unregister_class(YModifierUI)
     bpy.utils.unregister_class(YVectorWarpUI)
