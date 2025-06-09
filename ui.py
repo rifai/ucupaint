@@ -970,11 +970,12 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             inbox_dropdown_button(rowb, m, 'expand_source', "Source:")
             rowb = srow.row(align=True)
 
-            label_dropdown = m.name
+            label_dropdown = [mt[1] for mt in warp_type_items if mt[0] == m.type][0]
+            
             if m.type == 'IMAGE':
                 current_node = mod_tree.nodes.get(m.node)
                 if current_node and current_node.image:
-                    label_dropdown = current_node.image.name
+                    label_dropdown = label_dropdown + ": " + current_node.image.name
 
             rowb.context_pointer_set('vector_warp', m)
             rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
@@ -1060,9 +1061,6 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                         split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
                     else:
                         rowb.prop(m, 'texcoord_type', text='')
-
-
-
 
 def draw_bake_target_channel(context, layout, bt, letter='r'):
     yp = bt.id_data.yp

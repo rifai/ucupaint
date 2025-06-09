@@ -7,6 +7,7 @@ from .node_arrangements import rearrange_layer_nodes, rearrange_yp_nodes
 from .input_outputs import *
 from . import UDIM, ListItem
 
+# todo : better name
 special_vector_warps = [ 
     'MAPPING', 'BLUR',
 ]
@@ -1097,8 +1098,6 @@ def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
     tree = get_vw_tree(vw)
     source = tree.nodes.get(vw.node)
 
-    print("replace vector warp type", vw.name, "from", vw.type, "to", new_type)
-    # Save source to cache
     existing = None
     for c in vw.cache_nodes:
         if c.type == vw.type:
@@ -1106,13 +1105,11 @@ def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
             break
     
     if not existing:
-        print("no existing cache node", vw.node)
         existing = vw.cache_nodes.add()
         existing.type = vw.type
         existing.node = vw.node
         existing.name = vw.name
     
-    # Remove uv input link
     if any(source.inputs) and any(source.inputs[0].links):
         tree.links.remove(source.inputs[0].links[0])
     
@@ -1121,15 +1118,17 @@ def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
     vw.image_name = image_name
 
     # check cache
-    has_cache = False
-    for c in vw.cache_nodes:
+    cache_index = -1
+    for i, c in enumerate(vw.cache_nodes):
         if c.type == vw.type:
             vw.node = c.node
-            has_cache = True
+            vw.name = c.name
+            cache_index = i
             break
     
-    # new node
-    if not has_cache:
+    if cache_index >= 0:
+        vw.cache_nodes.remove(cache_index)
+    else:
         name = [mt[1] for mt in warp_type_items if mt[0] == new_type][0]
         vw.name = get_unique_name(name, all_warps)
 

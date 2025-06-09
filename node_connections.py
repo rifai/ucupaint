@@ -221,8 +221,6 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
 
     vector = start_vector
     mix_node = tree.nodes.get(vw.mix)
-    if vw.map_range:
-        range_node = tree.nodes.get(vw.map_range)
 
     current_node = tree.nodes.get(vw.node)
     match vw.type:
@@ -247,7 +245,12 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     if current_node.outputs.get('Color'):
         node_output = current_node.outputs['Color']
 
-    if vw.map_range:
+    from .VectorWarp import special_vector_warps
+
+    is_rangeable = vw.type not in special_vector_warps
+
+    if vw.map_range and is_rangeable:
+        range_node = tree.nodes.get(vw.map_range)
         create_link(tree, node_output, range_node.inputs['Vector'])
         node_output = range_node.outputs['Vector']
 
@@ -256,9 +259,8 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
     create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
-    from .VectorWarp import special_vector_warps
 
-    if vw.type not in special_vector_warps:
+    if is_rangeable:
         if vw.texcoord_type == 'UV':
             uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
             if uv_target:
