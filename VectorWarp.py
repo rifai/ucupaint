@@ -7,6 +7,10 @@ from .node_arrangements import rearrange_layer_nodes, rearrange_yp_nodes
 from .input_outputs import *
 from . import UDIM, ListItem
 
+special_vector_warps = [ 
+    'MAPPING', 'BLUR',
+]
+
 def update_warp_nodes_enable(self, context):
     yp = self.id_data.yp
     if yp.halt_update: return
@@ -266,6 +270,7 @@ class YVectorWarpCache(bpy.types.PropertyGroup):
         items = warp_type_items,
         default = 'IMAGE'
     )
+    node: StringProperty(name = '')
 
 
 class YVectorWarp(bpy.types.PropertyGroup):
@@ -431,7 +436,7 @@ def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
         remove_node(tree, vw, 'mix')
         remove_node(tree, vw, 'map_range')
     else:
-        is_rangeable = vw.type not in {'MAPPING', 'BLUR'}
+        is_rangeable = vw.type not in special_vector_warps
         if ref_tree:
             node_ref = ref_tree.nodes.get(vw.mix)
             if node_ref: ref_tree.nodes.remove(node_ref)
@@ -723,9 +728,7 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
         return get_active_ypaint_node() 
 
     def invoke(self, context, event):
-        obj = context.object
         node = get_active_ypaint_node()
-        yp = node.node_tree.yp
 
         self.parent = context.parent
         self.layer = context.layer if hasattr(context, 'layer') else None
@@ -1088,11 +1091,7 @@ def get_cache_name(type):
     name = 'cache_' + type.lower()
     return name
 
-def replace_vector_warp_type(context, vw, new_type, item_name=''):
-
-    yp = vw.id_data.yp
-    node = get_active_ypaint_node()
-    group_tree = node.node_tree
+def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
 
     # Current source
     tree = get_vw_tree(vw)
@@ -1104,14 +1103,14 @@ def replace_vector_warp_type(context, vw, new_type, item_name=''):
     for c in vw.cache_nodes:
         if c.type == vw.type:
             existing = c
-            print("has existing cache node", existing.name)
             break
     
     if not existing:
         print("no existing cache node", vw.node)
         existing = vw.cache_nodes.add()
         existing.type = vw.type
-        existing.name = vw.node
+        existing.node = vw.node
+        existing.name = vw.name
     
     # Remove uv input link
     if any(source.inputs) and any(source.inputs[0].links):
@@ -1119,37 +1118,20 @@ def replace_vector_warp_type(context, vw, new_type, item_name=''):
     
     vw.type = new_type
     vw.node = ''
+    vw.image_name = image_name
 
     # check cache
+    has_cache = False
     for c in vw.cache_nodes:
         if c.type == vw.type:
-            vw.node = c.name
-
-    parent = context.parent
-
-    m1 = re.match(r'^yp\.layers\[(\d+)\]$', parent.path_from_id())
-    m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', parent.path_from_id())
+            vw.node = c.node
+            has_cache = True
+            break
     
-    if m1: layer = yp.layers[int(m1.group(1))]
-    elif m2: layer = yp.layers[int(m2.group(1))]
-    else: layer = None
-
-    check_vectorwarp_trees(parent)
-
-    if m1:
-        context.layer_ui.expand_vector = True
-    elif m2:
-        context.layer_ui.masks[int(m2.group(2))].expand_vector = True
-
-    if layer:
-        reconnect_layer_nodes(layer)
-        rearrange_layer_nodes(layer)
-    else: 
-        reconnect_yp_nodes(group_tree)
-        rearrange_yp_nodes(group_tree)
-        
-    # Update UI
-    bpy.context.window_manager.ypui.need_update = True
+    # new node
+    if not has_cache:
+        name = [mt[1] for mt in warp_type_items if mt[0] == new_type][0]
+        vw.name = get_unique_name(name, all_warps)
 
 class YReplaceVectorWarpType(bpy.types.Operator):
     bl_idname = "wm.y_replace_vector_warp_type"
@@ -1174,14 +1156,20 @@ class YReplaceVectorWarpType(bpy.types.Operator):
         return context.object and group_node and len(group_node.node_tree.yp.layers) > 0
 
     def invoke(self, context, event):
+        self.vector_warp = context.vector_warp if hasattr(context, 'vector_warp') else None
+        self.parent = context.parent if hasattr(context, 'parent') else None
+        self.layer_ui = context.layer_ui if hasattr(context, 'layer_ui') else None
+
         if self.load_item and self.type in {'IMAGE'}:
 
             self.item_coll.clear()
             self.item_name = ''
 
+            node = get_active_ypaint_node()
+
             # Update image names
             if self.type == 'IMAGE':
-                baked_channel_images = get_all_baked_channel_images(self.layer.id_data)
+                baked_channel_images = get_all_baked_channel_images(node.node_tree)
                 for img in bpy.data.images:
                     if not img.yia.is_image_atlas and not img.yua.is_udim_atlas and img not in baked_channel_images:
                         self.item_coll.add().name = img.name
@@ -1206,7 +1194,7 @@ class YReplaceVectorWarpType(bpy.types.Operator):
 
         wm = context.window_manager
 
-        vw = context.vector_warp
+        vw = self.vector_warp
 
         if self.type == vw.type and self.type not in {'IMAGE'}: 
             return {'CANCELLED'}
@@ -1215,7 +1203,36 @@ class YReplaceVectorWarpType(bpy.types.Operator):
             self.report({'ERROR'}, "Form is cannot be empty!")
             return {'CANCELLED'}
 
-        replace_vector_warp_type(context, vw, self.type, self.item_name)
+        replace_vector_warp_type(vw, self.type, self.parent.warps, self.item_name)
+
+        node = get_active_ypaint_node()
+        group_tree = node.node_tree
+
+        yp = vw.id_data.yp
+
+        m1 = re.match(r'^yp\.layers\[(\d+)\]$', self.parent.path_from_id())
+        m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', self.parent.path_from_id())
+        
+        if m1: layer = yp.layers[int(m1.group(1))]
+        elif m2: layer = yp.layers[int(m2.group(1))]
+        else: layer = None
+
+        check_vectorwarp_trees(self.parent)
+
+        if m1:
+            self.layer_ui.expand_vector = True
+        elif m2:
+            self.layer_ui.masks[int(m2.group(2))].expand_vector = True
+
+        if layer:
+            reconnect_layer_nodes(layer)
+            rearrange_layer_nodes(layer)
+        else: 
+            reconnect_yp_nodes(group_tree)
+            rearrange_yp_nodes(group_tree)
+            
+        # Update UI
+        bpy.context.window_manager.ypui.need_update = True
 
         print('INFO: Vector Warp', vw.name, 'is updated in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
         wm.yptimer.time = str(time.time())

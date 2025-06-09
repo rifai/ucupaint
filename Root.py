@@ -2419,6 +2419,14 @@ class YCleanYPCaches(bpy.types.Operator):
                 for prop in dir(mask):
                     if prop.startswith('cache_'):
                         remove_node(layer_tree, mask, prop)
+                
+                for vw in mask.warps:
+                    for c in vw.cache_nodes:
+                        remove_node(layer_tree, c, 'node')
+
+            for vw in layer.warps:
+                for c in vw.cache_nodes:
+                    remove_node(layer_tree, c, 'node')
 
         # Remove tangent and bitangent images
         for image in reversed(bpy.data.images):

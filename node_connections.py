@@ -256,15 +256,18 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
     create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
-    if vw.texcoord_type == 'UV':
-        uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
-        if uv_target:
-            create_link(tree, uv_target, current_node.inputs['Vector'])
-    elif vw.texcoord_type != 'DECAL':
-        name = io_names[vw.texcoord_type]
-        target = get_essential_node(tree, TREE_START).get(name)
-        if target:
-            create_link(tree, target, current_node.inputs['Vector'])
+    from .VectorWarp import special_vector_warps
+
+    if vw.type not in special_vector_warps:
+        if vw.texcoord_type == 'UV':
+            uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
+            if uv_target:
+                create_link(tree, uv_target, current_node.inputs['Vector'])
+        elif vw.texcoord_type != 'DECAL':
+            name = io_names[vw.texcoord_type]
+            target = get_essential_node(tree, TREE_START).get(name)
+            if target:
+                create_link(tree, target, current_node.inputs['Vector'])
 
 
     return mix_node.outputs['Result']

@@ -1037,27 +1037,29 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
 
             srow = split_layout(col, 0.35, align=False)
             rowb = srow.row(align=True)
-            inbox_dropdown_button(rowb, m, 'expand_vector', "Vector:")
-            rowb = srow.row(align=True)
 
-            if m.expand_vector:
-                bcol = col.column() 
-                rrow = bcol.row(align=True)
-                rrow.label(text='', icon='BLANK1')
-                rrow.label(text='Coordinate:')
-                rrow.prop(m, 'texcoord_type', text='')
-                if obj.type == 'MESH' and m.texcoord_type == 'UV':
+            if m.type not in VectorWarp.special_vector_warps:
+                inbox_dropdown_button(rowb, m, 'expand_vector', "Vector:")
+                rowb = srow.row(align=True)
+
+                if m.expand_vector:
+                    bcol = col.column() 
                     rrow = bcol.row(align=True)
                     rrow.label(text='', icon='BLANK1')
-                    rrow.label(text='UV Map:')
-                    rrow.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
-            else:
-                if obj.type == 'MESH' and m.texcoord_type == 'UV':
-                    split = split_layout(rowb, 0.5, align=True)
-                    split.prop(m, 'texcoord_type', text='')
-                    split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                    rrow.label(text='Coordinate:')
+                    rrow.prop(m, 'texcoord_type', text='')
+                    if obj.type == 'MESH' and m.texcoord_type == 'UV':
+                        rrow = bcol.row(align=True)
+                        rrow.label(text='', icon='BLANK1')
+                        rrow.label(text='UV Map:')
+                        rrow.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
                 else:
-                    rowb.prop(m, 'texcoord_type', text='')
+                    if obj.type == 'MESH' and m.texcoord_type == 'UV':
+                        split = split_layout(rowb, 0.5, align=True)
+                        split.prop(m, 'texcoord_type', text='')
+                        split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                    else:
+                        rowb.prop(m, 'texcoord_type', text='')
 
 
 
