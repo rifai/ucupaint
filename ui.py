@@ -98,6 +98,9 @@ def update_yp_ui():
             for warp in layer.warps:
                 w = ypui.layer_ui.warps.add()
                 w.expand_content = warp.expand_content
+                w.expand_vector = warp.expand_vector
+                w.expand_source = warp.expand_source
+                w.expand_blend = warp.expand_blend
 
             # Construct layer modifier UI objects
             for mod in layer.modifiers:
@@ -145,6 +148,9 @@ def update_yp_ui():
                 for warp in mask.warps:
                     w = m.warps.add()
                     w.expand_content = warp.expand_content
+                    w.expand_vector = warp.expand_vector
+                    w.expand_source = warp.expand_source
+                    w.expand_blend = warp.expand_blend
 
         ypui.halt_prop_update = False
 
@@ -975,7 +981,7 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             if m.type == 'IMAGE':
                 current_node = mod_tree.nodes.get(m.node)
                 if current_node and current_node.image:
-                    label_dropdown = label_dropdown + ": " + current_node.image.name
+                    label_dropdown = current_node.image.name
 
             rowb.context_pointer_set('vector_warp', m)
             rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
@@ -7310,12 +7316,25 @@ class YVectorWarpTypeMenu(bpy.types.Menu):
         #     op.item_name = ''
         # else:
 
+        has_image_cache = False
+        for c in vw.cache_nodes:
+            if c.type == 'IMAGE':
+                has_image_cache = True
+
         suffix = ''
         source = tree.nodes.get(vw.node)
-        if vw.type == 'IMAGE' and source and source.image:
-            suffix += ': ' + source.image.name
+        if vw.type == 'IMAGE': 
+            if source and source.image:
+                suffix += ': ' + source.image.name
+        elif vw.image_name != '':
+            suffix += ': ' + vw.image_name
         icon = 'RADIOBUT_ON' if vw.type == 'IMAGE' else 'RADIOBUT_OFF'
-        col.label(text='Image' + suffix, icon=icon)
+        if not has_image_cache:
+            col.label(text='Image' + suffix, icon=icon)
+        else:
+            imop = col.operator('wm.y_replace_vector_warp_type', text='Image'+ suffix, icon=icon)
+            imop.load_item = False
+            imop.type = 'IMAGE'
 
         label = 'Open Available Image' if vw.type != 'IMAGE' else 'Replace Image'
         op = col.operator('wm.y_replace_vector_warp_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
@@ -7612,6 +7631,9 @@ def update_vectorwarp_ui(self, context):
     #else: return #yolo
 
     mod.expand_content = self.expand_content
+    mod.expand_source = self.expand_source
+    mod.expand_vector = self.expand_vector
+    mod.expand_blend = self.expand_blend
 
 def update_layer_ui(self, context):
     ypui = context.window_manager.ypui
@@ -7800,6 +7822,9 @@ class YModifierUI(bpy.types.PropertyGroup):
 class YVectorWarpUI(bpy.types.PropertyGroup):
     #name : StringProperty(default='')
     expand_content : BoolProperty(default=True, update=update_vectorwarp_ui)
+    expand_source : BoolProperty(default=False, update=update_vectorwarp_ui)
+    expand_vector : BoolProperty(default=True, update=update_vectorwarp_ui)
+    expand_blend : BoolProperty(default=True, update=update_vectorwarp_ui)
 
 class YChannelUI(bpy.types.PropertyGroup):
     #name : StringProperty(default='')

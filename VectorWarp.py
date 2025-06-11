@@ -12,6 +12,8 @@ special_vector_warps = [
     'MAPPING', 'BLUR',
 ]
 
+
+
 def update_warp_nodes_enable(self, context):
     yp = self.id_data.yp
     if yp.halt_update: return
@@ -96,15 +98,8 @@ def update_uv_name(self, context):
     elif match1:
         layer = yp.layers[int(match1.group(1))]
 
-    active_layer = yp.layers[yp.active_layer_index]
-
     tree = get_tree(layer)
-
-    obj = context.object
-    mat = obj.active_material
     group_tree = layer.id_data
-
-    nodes = tree.nodes
 
     # Use first uv if temp uv or empty is selected
     if self.uv_name in {TEMP_UV, ''}:
@@ -113,51 +108,8 @@ def update_uv_name(self, context):
                 self.uv_name = uv.name
                 break
 
-    # Update uv layer
-    # if obj.type == 'MESH' and not any([m for m in layer.masks if m.active_edit]) and layer == active_layer:
-
-    #     if layer.segment_name != '':
-    #         refresh_temp_uv(obj, layer)
-    #     else:
-    #         uv_layers = get_uv_layers(obj)
-    #         uv_layers.active = uv_layers.get(layer.uv_name)
-
-    #         if is_layer_vdm(layer):
-    #             uv_layers.active.active_render = True
-
-    #     # Check for other objects with same material
-    #     check_uvmap_on_other_objects_with_same_mat(mat, layer.uv_name)
-
     # Update global uv
     check_uv_nodes(yp)
-
-    # Update uv neighbor
-    # smooth_bump_ch = get_smooth_bump_channel(layer)
-    # if smooth_bump_ch and smooth_bump_ch.enable and (smooth_bump_ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} or smooth_bump_ch.enable_transition_bump):
-    #     uv_neighbor = replace_new_node(
-    #         tree, layer, 'uv_neighbor', 'ShaderNodeGroup', 'Neighbor UV', 
-    #         lib.get_neighbor_uv_tree_name(layer.texcoord_type, entity=layer), 
-    #         return_status=False, hard_replace=True
-    #     )
-    #     set_uv_neighbor_resolution(layer, uv_neighbor)
-    #     if smooth_bump_ch.override and smooth_bump_ch.override_type != 'DEFAULT':
-    #         uv_neighbor = replace_new_node(
-    #             tree, smooth_bump_ch, 'uv_neighbor', 'ShaderNodeGroup', 'Neighbor UV', 
-    #             lib.get_neighbor_uv_tree_name(layer.texcoord_type, entity=layer), 
-    #             return_status=False, hard_replace=True
-    #         )
-    #         set_uv_neighbor_resolution(smooth_bump_ch, uv_neighbor)
-
-    #     # Update neighbor uv if mask bump is active
-    #     for i, mask in enumerate(layer.masks):
-    #         check_mask_uv_neighbor(tree, layer, mask, i)
-
-    # # Update normal process uv
-    # normal_ch = get_height_channel(layer)
-    # if normal_ch:
-    #     normal_proc = nodes.get(normal_ch.normal_proc)
-    #     if hasattr(normal_proc, 'uv_map'):
-    #         normal_proc.uv_map = layer.uv_name
 
     # Update layer tree inputs
     check_layer_tree_ios(layer, tree)
@@ -354,7 +306,7 @@ class YVectorWarp(bpy.types.PropertyGroup):
     expand_content : BoolProperty(default=True)
     
     expand_blend : BoolProperty(default=False)
-    expand_source : BoolProperty(default=False)
+    expand_source : BoolProperty(default=True)
     expand_vector : BoolProperty(default=False)
 
 def check_vectorwarp_trees(parent, rearrange=False):
@@ -432,6 +384,9 @@ def delete_vectorwarp_nodes(tree, vw):
 
     remove_node(tree, vw, 'node')
 
+    for cache in vw.cache_nodes:
+        remove_node(tree, cache, "node")
+
 def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
     if not vw.enable:
         remove_node(tree, vw, 'mix')
@@ -447,10 +402,14 @@ def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
             if node_ref: ref_tree.nodes.remove(node_ref)
             if is_rangeable:
                 mr = new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
+            else:
+                remove_node(tree, vw, 'map_range')
         else:
             mp = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
             if is_rangeable:
                 mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
+            else:
+                remove_node(tree, vw, 'map_range')
 
         mp.blend_type = vw.blend_type
         mp.inputs[0].default_value = vw.intensity_value
@@ -692,6 +651,11 @@ def generate_image_warp_node(parent, layer, layer_ui, image_name):
     new_warp.type = type
     new_warp.blend_type = 'ADD'
     new_warp.image_name = image_name
+    new_warp.expand_source = False
+
+    if layer:
+        new_warp.texcoord_type = layer.texcoord_type
+        new_warp.uv_name = layer.uv_name
 
     check_vectorwarp_trees(parent)
 
@@ -765,8 +729,6 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
 
     def execute(self, context):
         T = time.time()
-
-        node = get_active_ypaint_node()
 
         wm = context.window_manager
 
@@ -869,8 +831,6 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
             self.report({'ERROR'}, "No image selected!")
             return {'CANCELLED'}
         
-        node = get_active_ypaint_node()
-
         wm = context.window_manager
 
         generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name)
@@ -1112,10 +1072,11 @@ def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
     
     if any(source.inputs) and any(source.inputs[0].links):
         tree.links.remove(source.inputs[0].links[0])
-    
     vw.type = new_type
     vw.node = ''
-    vw.image_name = image_name
+    
+    if new_type == 'IMAGE': 
+        vw.image_name = image_name
 
     # check cache
     cache_index = -1
@@ -1162,7 +1123,6 @@ class YReplaceVectorWarpType(bpy.types.Operator):
         if self.load_item and self.type in {'IMAGE'}:
 
             self.item_coll.clear()
-            self.item_name = ''
 
             node = get_active_ypaint_node()
 
