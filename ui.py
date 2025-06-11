@@ -4934,7 +4934,7 @@ def layer_listing(layout, layer, show_expand=False):
     row = master.row(align=True)
 
     # Image icon
-    if len(selectable_masks) == 0 and len(selectable_overrides) == 0:
+    if len(selectable_masks) == 0 and len(selectable_overrides) == 0 and len(all_warps) == 0:
         row = master.row(align=True)
         row.active = is_active
         if image and (image.yia.is_image_atlas or image.yua.is_udim_atlas): 

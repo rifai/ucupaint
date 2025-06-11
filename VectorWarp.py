@@ -12,8 +12,6 @@ special_vector_warps = [
     'MAPPING', 'BLUR',
 ]
 
-
-
 def update_warp_nodes_enable(self, context):
     yp = self.id_data.yp
     if yp.halt_update: return
@@ -1077,6 +1075,7 @@ def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
     
     if new_type == 'IMAGE': 
         vw.image_name = image_name
+        vw.expand_source = False
 
     # check cache
     cache_index = -1
