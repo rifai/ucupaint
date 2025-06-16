@@ -307,70 +307,35 @@ class YVectorWarp(bpy.types.PropertyGroup):
     expand_source : BoolProperty(default=True)
     expand_vector : BoolProperty(default=False)
 
-def check_vectorwarp_trees(parent, rearrange=False):
+def check_vectorwarp_trees(parent):
     group_tree = parent.id_data
     yp = group_tree.yp
-
-    enable_tree = False
-    is_layer = False
 
     match1 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', parent.path_from_id())
     match2 = re.match(r'^yp\.layers\[(\d+)\]$', parent.path_from_id())
 
     if match1:
         layer = yp.layers[int(match1.group(1))]
-        # root_ch = yp.channels[int(match1.group(2))]
-        # ch = parent
-        # name = root_ch.name + ' ' + layer.name
-        # if (
-        #     root_ch.type == 'NORMAL' and root_ch.enable_smooth_bump and (
-        #         (not ch.override and layer.type not in {'BACKGROUND', 'COLOR', 'OBJECT_INDEX'}) or 
-        #         (ch.override and ch.override_type not in {'DEFAULT'} and ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'})
-        #     )
-        #     ):
-        #     enable_tree = True
         parent_tree = get_tree(layer)
     elif match2:
         layer = parent
-        name = layer.name
-        if layer.type not in {'IMAGE', 'VCOL', 'BACKGROUND', 'COLOR', 'GROUP', 'HEMI', 'MUSGRAVE'}:
-            enable_tree = True
         if layer.source_group != '':
             parent_tree = get_source_tree(layer)
         else: parent_tree = get_tree(layer)
-        is_layer=True
 
     else:
         parent_tree = group_tree
-
-    if len(parent.warps) == 0:
-        enable_tree = False
 
     mod_group = None
     if hasattr(parent, 'mod_group'):
         mod_group = parent_tree.nodes.get(parent.mod_group)
 
-    # print("mod_group=", mod_group, "enable_tree=", enable_tree, "is_layer=", 
-    #       is_layer, "parent_tree=", parent_tree, "parent=", parent, "name=", name)
-    
-    if enable_tree:
-        if mod_group:
-            for mod in parent.warps:
-                check_vectorwarp_nodes(mod, mod_group.node_tree)
-        else:
-            # enable_modifiers_tree(parent, parent_tree, name, is_layer)
-            pass
+    if mod_group:
+        for mod in parent.warps:
+            check_vectorwarp_nodes(mod, mod_group.node_tree)
     else:
-        if not mod_group:
-            for mod in parent.warps:
-                check_vectorwarp_nodes(mod, parent_tree)
-        else:
-            # disable_modifiers_tree(parent, parent_tree)
-            pass
-
-    # if rearrange:
-    #     reconnect_layer_nodes(layer)
-    #     rearrange_layer_nodes(layer)
+        for mod in parent.warps:
+            check_vectorwarp_nodes(mod, parent_tree)
 
 def delete_vectorwarp_nodes(tree, vw):
     # Delete the mix node
@@ -1076,6 +1041,8 @@ def replace_vector_warp_type(vw, new_type, all_warps, image_name=''):
     if new_type == 'IMAGE': 
         vw.image_name = image_name
         vw.expand_source = False
+    else:
+        vw.expand_source = True
 
     # check cache
     cache_index = -1
