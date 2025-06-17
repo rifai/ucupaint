@@ -786,7 +786,7 @@ def draw_mask_modifier_stack(layer, mask, layout, ui):
             box.active = m.enable
             MaskModifier.draw_modifier_properties(tree, m, box)
 
-def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, extra_blank=False, use_modifier_1=False, layout_active=True):
+def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, extra_blank=False, use_modifier_1=False, layout_active=True, is_root_ch=False):
 
     ypui = context.window_manager.ypui
 
@@ -896,7 +896,7 @@ def draw_modifier_stack(context, parent, channel_type, layout, ui, layer=None, e
             row.label(text='', icon='BLANK1')
             box = row.box()
             box.active = m.enable
-            Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, box, False)
+            Modifier.draw_modifier_properties(bpy.context, channel_type, mod_tree.nodes, m, parent, box, is_root_ch=is_root_ch)
 
             #row.label(text='', icon='BLANK1')
 
@@ -1362,7 +1362,7 @@ def draw_root_channels_ui(context, layout, node):
             baked = nodes.get(channel.baked)
             layout_active = not yp.use_baked or not baked
 
-            draw_modifier_stack(context, channel, channel.type, bcol, chui, layout_active=layout_active)
+            draw_modifier_stack(context, channel, channel.type, bcol, chui, layout_active=layout_active, is_root_ch=True)
 
             inp = node.inputs[channel.io_index]
 
@@ -1704,48 +1704,29 @@ def draw_layer_source(context, layout, layer, layer_tree, source, image, vcol, i
     label = ''
     #label += pgettext_iface('Layer') + ': '
     if image:
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_image')
-        #else: icon_value = lib.get_icon('collapsed_image')
         icon_value = lib.get_icon('image')
         if image.yia.is_image_atlas or image.yua.is_udim_atlas:
             label += layer.name
         else: label += image.name
     elif vcol:
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_vertex_color')
-        #else: icon_value = lib.get_icon('collapsed_vertex_color')
         icon_value = lib.get_icon('vertex_color')
         label += vcol.name
     elif layer.type == 'BACKGROUND':
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_background')
-        #else: icon_value = lib.get_icon('collapsed_background')
         icon_value = lib.get_icon('background')
         label += layer.name
     elif layer.type == 'COLOR':
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_color')
-        #else: icon_value = lib.get_icon('collapsed_color')
         icon_value = lib.get_icon('color')
         label += layer.name
     elif layer.type == 'GROUP':
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_group')
-        #else: icon_value = lib.get_icon('collapsed_group')
         icon_value = lib.get_icon('group')
         label += layer.name
     elif layer.type == 'HEMI':
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_hemi')
-        #else: icon_value = lib.get_icon('collapsed_hemi')
         icon_value = lib.get_icon('hemi')
         label += layer.name
+    elif layer.type in {'EDGE_DETECT', 'AO'}:
+        icon_value = lib.get_icon('edge_detect')
+        label += layer.name
     else:
-        title = source.bl_idname.replace('ShaderNodeTex', '')
-        #if lui.expand_content:
-        #    icon_value = lib.get_icon('uncollapsed_texture')
-        #else: icon_value = lib.get_icon('collapsed_texture')
         icon_value = lib.get_icon('texture')
         label += layer.name
 
@@ -3322,6 +3303,7 @@ def draw_layer_masks(context, layout, layer, specific_mask=None):
                     rrrow.prop_search(mask, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
 
                     icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
+                    rrow.context_pointer_set('entity', mask)
                     rrow.menu("NODE_MT_y_uv_special_menu", icon=icon, text='')
 
                 if mask.texcoord_type == 'Decal':
@@ -3601,13 +3583,13 @@ def draw_layers_ui(context, layout, node):
             channel_mismatch = True
             break
             
-            for mask in layer.masks:
-                if len(mask.channels) != num_channels:
-                    channel_mismatch = True
-                    break
-
-            if channel_mismatch:
+        for mask in layer.masks:
+            if len(mask.channels) != num_channels:
+                channel_mismatch = True
                 break
+
+        if channel_mismatch:
+            break
 
     if channel_mismatch:
         row = box.row(align=True)
@@ -4059,7 +4041,7 @@ def draw_layers_ui(context, layout, node):
 
             if is_bl_newer_than(4, 3) and in_texture_paint_mode:
                 brush = context.tool_settings.image_paint.brush
-                if brush and brush.image_tool != 'MASK':
+                if brush and get_brush_image_tool(brush) != 'MASK':
                     bbox = col.box()
                     row = bbox.row(align=True)
                     label = 'Toggle Eraser'
@@ -4986,6 +4968,8 @@ def layer_listing(layout, layer, show_expand=False):
             row.prop(layer, 'name', text='', emboss=False, icon_value=lib.get_icon('vertex_color'))
         elif layer.type == 'HEMI': 
             row.prop(layer, 'name', text='', emboss=False, icon_value=lib.get_icon('hemi'))
+        elif layer.type in {'EDGE_DETECT', 'AO'}:
+            row.prop(layer, 'name', text='', emboss=False, icon_value=lib.get_icon('edge_detect'))
         elif layer.type == 'COLOR': 
             row.prop(layer, 'name', text='', emboss=False, icon='COLOR')
         elif layer.type == 'BACKGROUND': row.prop(layer, 'name', text='', emboss=False, icon_value=lib.get_icon('background'))
@@ -5010,6 +4994,8 @@ def layer_listing(layout, layer, show_expand=False):
                 row.prop(active_override, ae_prop, text='', emboss=False, icon='COLOR')
             elif layer.type == 'HEMI': 
                 row.prop(active_override, ae_prop, text='', emboss=False, icon_value=lib.get_icon('hemi'))
+            elif layer.type in {'EDGE_DETECT', 'AO'}:
+                row.prop(active_override, ae_prop, text='', emboss=False, icon_value=lib.get_icon('edge_detect'))
             elif layer.type == 'BACKGROUND': 
                 row.prop(active_override, ae_prop, text='', emboss=False, icon_value=lib.get_icon('background'))
             elif layer.type == 'GROUP': 
@@ -5028,6 +5014,8 @@ def layer_listing(layout, layer, show_expand=False):
                 row.label(text='', icon='COLOR')
             elif layer.type == 'HEMI': 
                 row.label(text='', icon_value=lib.get_icon('hemi'))
+            elif layer.type in {'EDGE_DETECT', 'AO'}:
+                row.label(text='', icon_value=lib.get_icon('edge_detect'))
             elif layer.type == 'BACKGROUND': 
                 row.label(text='', icon_value=lib.get_icon('background'))
             elif layer.type == 'GROUP': 
@@ -6006,7 +5994,7 @@ class YNewLayerMenu(bpy.types.Menu):
         if is_bl_newer_than(2, 77):
             col.separator()
 
-            c = col.operator("wm.y_bake_to_layer", text='Other Objects Emission')
+            c = col.operator("wm.y_bake_to_layer", text='Other Objects Color')
             c.type = 'OTHER_OBJECT_EMISSION'
             c.target_type = 'LAYER'
             c.overwrite_current = False

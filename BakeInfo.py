@@ -128,6 +128,12 @@ class YBakeInfoProps(bpy.types.PropertyGroup):
         default = 'CPU'
     )
 
+    use_cage : BoolProperty(
+        name = 'Cage Object',
+        description = 'Cast rays to active material objects from a cage',
+        default = False
+    )
+
     cage_object_name : StringProperty(
         name = 'Cage Object',
         description = 'Object to use as cage instead of calculating the cage from the active object with cage extrusion',
@@ -201,6 +207,12 @@ class YBakeInfoProps(bpy.types.PropertyGroup):
         default = False
     )
 
+    normalize : BoolProperty(
+        name = 'Normalize Bake Result',
+        description = 'Normalize the bake result',
+        default = False,
+    )
+    
     # To store other objects info
     other_objects : CollectionProperty(type=YBakeInfoOtherObject)
     

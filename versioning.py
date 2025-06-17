@@ -205,6 +205,17 @@ def update_bake_info_baked_entity_props(yp):
             bi.bake_type = 'BEVEL_MASK'
             bi.bevel_radius = get_entity_prop_value(entity, 'edge_detect_radius')
 
+def update_bake_info_use_cages(yp):
+
+    images = get_yp_images(yp)
+
+    for i, image in enumerate(images):
+        bi = image.y_bake_info
+
+        if bi.is_baked and bi.bake_type.startswith('OTHER_OBJECT_'):
+            if bi.cage_object_name != '':
+                bi.use_cage = True
+
 def update_yp_tree(tree):
     cur_version = get_current_version_str()
     yp = tree.yp
@@ -919,6 +930,36 @@ def update_yp_tree(tree):
 
         # Update linear nodes since it gets refactored
         check_yp_linear_nodes(yp, reconnect=True)
+
+    # Version 2.3.2 has bake cage option and ramp modifier affect option
+    if version_tuple(yp.version) < (2, 3, 2):
+
+        # Mark use cage object for older bake info
+        update_bake_info_use_cages(yp)
+
+        # Update color ramp modifier affect option
+        yp.halt_update = True
+
+        for ch in yp.channels:
+            for mod in ch.modifiers:
+                if mod.type == 'COLOR_RAMP':
+                    mod.affect_alpha = True
+
+        for layer in yp.layers:
+            for mod in layer.modifiers:
+                if mod.type == 'COLOR_RAMP':
+                    mod.affect_alpha = True
+
+            for ch in layer.channels:
+                for mod in ch.modifiers:
+                    if mod.type == 'COLOR_RAMP':
+                        mod.affect_alpha = True
+
+                for mod in ch.modifiers_1:
+                    if mod.type == 'COLOR_RAMP':
+                        mod.affect_alpha = True
+
+        yp.halt_update = False
 
     # SECTION II: Updates based on the blender version
 

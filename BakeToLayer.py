@@ -160,9 +160,11 @@ def get_bake_properties_from_self(self):
         'uv_map_1',
         'interpolation',
         'type',
+        'use_cage',
         'cage_object_name',
         'cage_extrusion',
         'max_ray_distance',
+        'normalize',
         'ao_distance',
         'bevel_samples',
         'bevel_radius',
@@ -237,6 +239,13 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
     )
 
     # Other objects props
+
+    use_cage : BoolProperty(
+        name = 'Cage Object',
+        description = 'Cast rays to active material objects from a cage',
+        default = False
+    )
+
     cage_object_name : StringProperty(
         name = 'Cage Object',
         description = 'Object to use as cage instead of calculating the cage from the active object with cage extrusion',
@@ -255,6 +264,12 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
         name = 'Max Ray Distance',
         description = 'The maximum ray distance for matching points between the active and selected objects. If zero, there is no limit',
         default=0.2, min=0.0, max=1.0
+    )
+
+    normalize : BoolProperty(
+        name = 'Normalize Bake Result',
+        description = 'Normalize the bake result',
+        default = True,
     )
     
     # AO Props
@@ -678,10 +693,14 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             col.label(text='Name:')
 
         if self.type.startswith('OTHER_OBJECT_'):
-            col.label(text='Cage Object:')
-            col.label(text='Cage Extrusion:')
-            if hasattr(bpy.context.scene.render.bake, 'max_ray_distance'):
-                col.label(text='Max Ray Distance:')
+            col.label(text='')
+            if self.use_cage:
+                col.label(text='Cage Object:')
+                col.label(text='Cage Extrusion:')
+                if hasattr(bpy.context.scene.render.bake, 'max_ray_distance'):
+                    col.label(text='Max Ray Distance:')
+        elif self.type == 'POINTINESS' and is_bl_newer_than(2, 83):
+            col.label(text='')
         elif self.type == 'AO':
             col.label(text='AO Distance:')
             col.label(text='')
@@ -756,12 +775,14 @@ class YBakeToLayer(bpy.types.Operator, BaseBakeOperator):
             col.label(text=self.overwrite_name)
 
         if self.type.startswith('OTHER_OBJECT_'):
-            col.prop_search(self, "cage_object_name", self, "cage_object_coll", text='', icon='OBJECT_DATA')
-            rrow = col.row(align=True)
-            rrow.active = self.cage_object_name == ''
-            rrow.prop(self, 'cage_extrusion', text='')
-            if hasattr(bpy.context.scene.render.bake, 'max_ray_distance'):
-                col.prop(self, 'max_ray_distance', text='')
+            col.prop(self, 'use_cage')
+            if self.use_cage:
+                col.prop_search(self, "cage_object_name", self, "cage_object_coll", text='', icon='OBJECT_DATA')
+                col.prop(self, 'cage_extrusion', text='')
+                if hasattr(bpy.context.scene.render.bake, 'max_ray_distance'):
+                    col.prop(self, 'max_ray_distance', text='')
+        elif self.type == 'POINTINESS' and is_bl_newer_than(2, 83):
+            col.prop(self, 'normalize', text='Normalize Pointiness')
         elif self.type == 'AO':
             col.prop(self, 'ao_distance', text='')
             col.prop(self, 'only_local')
@@ -1213,7 +1234,7 @@ class YBakeEntityToImage(bpy.types.Operator, BaseBakeOperator):
                 new_entity_name = get_unique_name(self.name, self.entities) if self.use_image_atlas else image.name
 
                 # Create new mask
-                mask = Mask.add_new_mask(self.layer, new_entity_name, 'IMAGE', 'UV', self.uv_map, image, None, segment)
+                mask = Mask.add_new_mask(self.layer, new_entity_name, 'IMAGE', 'UV', self.uv_map, image, '', segment)
 
                 # Set mask properties
                 mask.intensity_value = self.mask.intensity_value

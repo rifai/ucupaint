@@ -1,4 +1,4 @@
-import bpy, time, os, numpy, tempfile
+import bpy, time, os, numpy, tempfile, bmesh
 from bpy.props import *
 from .common import *
 from .input_outputs import *
@@ -126,6 +126,25 @@ def is_join_objects_problematic(yp, mat=None):
                 return True
 
     return False
+
+def get_pointiness_image_minmax_value(image):
+    
+    if is_bl_newer_than(2, 83):
+        pxs = numpy.empty(shape=image.size[0] * image.size[1] * 4, dtype=numpy.float32)
+        image.pixels.foreach_get(pxs)
+
+        pxs.shape = (-1, image.size[0], 4)
+
+        # Set alpha to half
+        pxs *= (1, 1, 1, 0.5)
+
+        min_val = pxs.min()
+        max_val = pxs.max()
+
+        return min_val, max_val
+    else:
+        # TODO: Get minimum and maximum pixel on legacy blenders
+        return 0.4, 0.6
 
 def bake_object_op(bake_type='EMIT'):
     try:
@@ -304,6 +323,88 @@ def add_active_render_uv_node(tree, active_render_uv_name):
         if n.type == 'GROUP' and n.node_tree and not n.node_tree.yp.is_ypaint_node:
             add_active_render_uv_node(n.node_tree, active_render_uv_name)
 
+def prepare_other_objs_colors(yp, other_objs):
+
+    other_mats = []
+    other_sockets = []
+    other_defaults = []
+    other_alpha_sockets = []
+    other_alpha_defaults = []
+
+    ori_mat_no_nodes = []
+
+    valid_bsdf_types = ['BSDF_PRINCIPLED', 'BSDF_DIFFUSE', 'EMISSION']
+
+    for o in other_objs:
+        # Set new material if there's no material
+        if len(o.data.materials) == 0:
+            temp_mat = get_temp_default_material()
+            o.data.materials.append(temp_mat)
+        else:
+            for i, m in enumerate(o.data.materials):
+                if m == None:
+                    temp_mat = get_temp_default_material()
+                    o.data.materials[i] = temp_mat
+                elif not m.use_nodes:
+                    if m not in ori_mat_no_nodes:
+                        ori_mat_no_nodes.append(m)
+                    m.use_nodes = True
+
+        for mat in o.data.materials:
+            if mat == None: continue
+            if mat in other_mats: continue
+            if not mat.use_nodes: continue
+
+            # Get material output
+            output = get_material_output(mat)
+            if not output: continue
+
+            socket = None
+            default = None
+            alpha_socket = None
+            alpha_default = 1.0
+
+            if mat in ori_mat_no_nodes and hasattr(mat, 'diffuse_color'):
+                default = mat.diffuse_color
+
+            # Check for possible sockets available on the bsdf node
+            if not socket:
+                # Search for main bsdf
+                bsdf_node = get_closest_bsdf_backward(output, valid_bsdf_types)
+
+                if bsdf_node.type == 'BSDF_PRINCIPLED':
+                    socket = bsdf_node.inputs['Base Color']
+
+                elif 'Color' in bsdf_node.inputs:
+                    socket = bsdf_node.inputs['Color']
+
+                if socket:
+                    if len(socket.links) == 0:
+                        if default == None:
+                            default = socket.default_value
+                    else:
+                        socket = socket.links[0].from_socket
+
+                # Get alpha socket
+                alpha_socket = bsdf_node.inputs.get('Alpha')
+                if alpha_socket:
+
+                    if len(alpha_socket.links) == 0:
+                        alpha_default = alpha_socket.default_value
+                        alpha_socket = None
+                    else:
+                        alpha_socket = alpha_socket.links[0].from_socket
+
+            # Append objects and materials if socket is found
+            if socket or default:
+                other_mats.append(mat)
+                other_sockets.append(socket)
+                other_defaults.append(default)
+                other_alpha_sockets.append(alpha_socket)
+                other_alpha_defaults.append(alpha_default)
+
+    return other_mats, other_sockets, other_defaults, other_alpha_sockets, other_alpha_defaults, ori_mat_no_nodes
+
 def prepare_other_objs_channels(yp, other_objs):
     ch_other_objects = []
     ch_other_mats = []
@@ -447,7 +548,8 @@ def prepare_bake_settings(
         disable_problematic_modifiers=False, hide_other_objs=True, bake_from_multires=False, 
         tile_x=64, tile_y=64, use_selected_to_active=False, max_ray_distance=0.0, cage_extrusion=0.0,
         bake_target = 'IMAGE_TEXTURES',
-        source_objs=[], bake_device='CPU', use_denoising=False, margin_type='ADJACENT_FACES', cage_object_name='', 
+        source_objs=[], bake_device='CPU', use_denoising=False, margin_type='ADJACENT_FACES', 
+        use_cage=False, cage_object_name='', 
         normal_space='TANGENT', use_osl=False,
     ):
 
@@ -470,7 +572,8 @@ def prepare_bake_settings(
         scene.render.bake.max_ray_distance = max_ray_distance
     scene.render.bake.cage_extrusion = cage_extrusion
     cage_object = bpy.data.objects.get(cage_object_name) if cage_object_name != '' else None
-    scene.render.bake.use_cage = True if cage_object else False
+    #scene.render.bake.use_cage = True if cage_object else False
+    scene.render.bake.use_cage = use_cage
     if cage_object: 
         if is_bl_newer_than(2, 80): scene.render.bake.cage_object = cage_object
         else: scene.render.bake.cage_object = cage_object.name
@@ -1611,8 +1714,8 @@ def bake_channel(
     norm = None
     if root_ch.type == 'NORMAL':
         if is_bl_newer_than(2, 80):
-            # Use diffuse bsdf for Blender 2.80+
-            bsdf = mat.node_tree.nodes.new('ShaderNodeBsdfDiffuse')
+            # Use principled bsdf for Blender 2.80+
+            bsdf = mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
         else:
             # Use custom normal calculation for legacy blender
             norm = mat.node_tree.nodes.new('ShaderNodeGroup')
@@ -2389,7 +2492,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
 
     # Get cage object
     cage_object = None
-    if bprops.type.startswith('OTHER_OBJECT_') and bprops.cage_object_name != '':
+    if bprops.type.startswith('OTHER_OBJECT_') and bprops.use_cage and bprops.cage_object_name != '':
         cage_object = bpy.data.objects.get(bprops.cage_object_name)
         if cage_object:
 
@@ -2455,7 +2558,10 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
                         if o and o not in other_objs:
                             other_objs.append(o)
 
-        if bprops.type == 'OTHER_OBJECT_CHANNELS':
+        if bprops.type == 'OTHER_OBJECT_EMISSION':
+            other_mats, other_sockets, other_defaults, other_alpha_sockets, other_alpha_defaults, ori_mat_no_nodes = prepare_other_objs_colors(yp, other_objs)
+
+        elif bprops.type == 'OTHER_OBJECT_CHANNELS':
             ch_other_objects, ch_other_mats, ch_other_sockets, ch_other_defaults, ch_other_alpha_sockets, ch_other_alpha_defaults, ori_mat_no_nodes = prepare_other_objs_channels(yp, other_objs)
 
         if not other_objs:
@@ -2588,8 +2694,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
         bpy.ops.object.mode_set(mode = 'OBJECT')
         for ob in objs:
             try:
-                vcol = new_vertex_color(ob, TEMP_VCOL)
-                set_obj_vertex_colors(ob, vcol.name, (0.0, 0.0, 0.0, 1.0))
+                vcol = new_vertex_color(ob, TEMP_VCOL, color_fill=(0.0, 0.0, 0.0, 1.0))
                 set_active_vertex_color(ob, vcol)
             except: pass
         bpy.ops.object.mode_set(mode = 'EDIT')
@@ -2631,9 +2736,6 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
         tile_x = 256
         tile_y = 256
 
-    # Cage object only used for other object baking
-    cage_object_name = bprops.cage_object_name if bprops.type.startswith('OTHER_OBJECT_') else ''
-
     prepare_bake_settings(
         book, objs, yp, samples=bprops.samples, margin=bprops.margin, 
         uv_map=bprops.uv_map, bake_type=bake_type, #disable_problematic_modifiers=True, 
@@ -2642,7 +2744,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
         use_selected_to_active=bprops.type.startswith('OTHER_OBJECT_'),
         max_ray_distance=bprops.max_ray_distance, cage_extrusion=bprops.cage_extrusion,
         source_objs=other_objs, use_denoising=False, margin_type=bprops.margin_type,
-        cage_object_name = cage_object_name,
+        use_cage = bprops.use_cage, cage_object_name = bprops.cage_object_name,
         normal_space = 'TANGENT' if bprops.type != 'OBJECT_SPACE_NORMAL' else 'OBJECT'
     )
     # Set multires level
@@ -2696,8 +2798,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
 
             # Create new vertex color for dirt
             try:
-                vcol = new_vertex_color(ob, TEMP_VCOL)
-                set_obj_vertex_colors(ob, vcol.name, (1.0, 1.0, 1.0, 1.0))
+                vcol = new_vertex_color(ob, TEMP_VCOL, color_fill=(1.0, 1.0, 1.0, 1.0))
                 set_active_vertex_color(ob, vcol)
             except: pass
 
@@ -2806,6 +2907,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
     # Create bake nodes
     tex = mat.node_tree.nodes.new('ShaderNodeTexImage')
     bsdf = None
+    map_range = None
     geometry = None
     vector_math = None
     vector_math_1 = None
@@ -2853,8 +2955,16 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
     elif bprops.type == 'POINTINESS':
         src = mat.node_tree.nodes.new('ShaderNodeNewGeometry')
 
+        pointy = src.outputs['Pointiness']
+
+        # Map range node
+        if is_bl_newer_than(2, 83) and bprops.normalize:
+            map_range = mat.node_tree.nodes.new('ShaderNodeMapRange')
+            mat.node_tree.links.new(pointy, map_range.inputs[0])
+            pointy = map_range.outputs[0]
+
         # Links
-        mat.node_tree.links.new(src.outputs['Pointiness'], bsdf.inputs[0])
+        mat.node_tree.links.new(pointy, bsdf.inputs[0])
         mat.node_tree.links.new(bsdf.outputs[0], output.inputs[0])
 
     elif bprops.type == 'CAVITY':
@@ -2969,6 +3079,29 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
             ori_from_nodes[m.name] = from_node
             ori_from_sockets[m.name] = from_socket
 
+    elif bprops.type == 'OTHER_OBJECT_EMISSION':
+        # Remember original socket connected to outputs
+        for m in other_mats:
+            soc = None
+            from_node = ''
+            from_socket = ''
+            mout = get_material_output(m)
+            if mout: 
+                for l in mout.inputs[0].links:
+                    soc = l.from_socket
+                    from_node = l.from_node.name
+                    from_socket = l.from_socket.name
+
+                # Create temporary emission
+                temp_emi = m.node_tree.nodes.get(TEMP_EMISSION)
+                if not temp_emi:
+                    temp_emi = m.node_tree.nodes.new('ShaderNodeEmission')
+                    temp_emi.name = TEMP_EMISSION
+                    m.node_tree.links.new(temp_emi.outputs[0], mout.inputs[0])
+
+            ori_from_nodes[m.name] = from_node
+            ori_from_sockets[m.name] = from_socket
+
     # Newly created layer index and image
     active_id = None
     image = None
@@ -2979,7 +3112,26 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
         image_name = bprops.name
         colorspace = get_srgb_name()
 
-        if bprops.type == 'OTHER_OBJECT_CHANNELS':
+        if bprops.type == 'OTHER_OBJECT_EMISSION':
+
+            # Set emission connection
+            for i, m in enumerate(other_mats):
+                default = other_defaults[i]
+                socket = other_sockets[i]
+
+                temp_emi = m.node_tree.nodes.get(TEMP_EMISSION)
+                if not temp_emi: continue
+
+                if default != None:
+                    # Set default
+                    if type(default) == float:
+                        temp_emi.inputs[0].default_value = (default, default, default, 1.0)
+                    else: temp_emi.inputs[0].default_value = (default[0], default[1], default[2], 1.0)
+
+                elif socket:
+                    m.node_tree.links.new(socket, temp_emi.inputs[0])
+
+        elif bprops.type == 'OTHER_OBJECT_CHANNELS':
 
             root_ch = yp.channels[idx]
             image_name += ' ' + yp.channels[idx].name
@@ -3041,21 +3193,16 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
         # Base color of baked image
         if bprops.type == 'AO':
             color = [1.0, 1.0, 1.0, 1.0] 
-        elif bprops.type in {'BEVEL_NORMAL', 'MULTIRES_NORMAL', 'OTHER_OBJECT_NORMAL', 'OBJECT_SPACE_NORMAL'}:
-            if bprops.hdr:
-                color = [0.7354, 0.7354, 1.0, 1.0]
-            else:
-                color = [0.5, 0.5, 1.0, 1.0] 
+        elif bake_type in {'NORMAL', 'NORMALS'}:
+            color = [0.5, 0.5, 1.0, 1.0] 
         elif bprops.type == 'FLOW':
             color = [0.5, 0.5, 0.0, 1.0]
         else:
-            if bprops.hdr:
-                color = [0.7354, 0.7354, 0.7354, 1.0]
-            else: color = [0.5, 0.5, 0.5, 1.0]
+            color = [0.5, 0.5, 0.5, 1.0]
 
         # Make image transparent if its baked from other objects
         if bprops.type.startswith('OTHER_OBJECT_'):
-            color[3] = 0.0
+            color = [0.0, 0.0, 0.0, 0.0]
 
         # New target image
         if bprops.use_udim:
@@ -3131,8 +3278,19 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
 
         if use_fxaa: fxaa_image(image, False, bake_device=bprops.bake_device)
 
+        if bprops.type == 'POINTINESS' and bprops.normalize and is_bl_newer_than(2, 83):
+            # Check for highest and lowest value of the baked image
+            min_val, max_val = get_pointiness_image_minmax_value(image)
+
+            # Set map range
+            map_range.inputs[1].default_value = min_val
+            map_range.inputs[2].default_value = max_val
+
+            # Rebake the image again
+            bpy.ops.object.bake(type='EMIT')
+
         # Bake other object alpha
-        if bprops.type in {'OTHER_OBJECT_NORMAL', 'OTHER_OBJECT_CHANNELS'}:
+        if bprops.type in {'OTHER_OBJECT_NORMAL', 'OTHER_OBJECT_CHANNELS', 'OTHER_OBJECT_EMISSION'}:
             
             alpha_found = False
             if bprops.type == 'OTHER_OBJECT_CHANNELS':
@@ -3145,8 +3303,14 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
                     temp_emi = m.node_tree.nodes.get(TEMP_EMISSION)
                     if not temp_emi: continue
 
-                    if alpha_default != 1.0:
+                    if alpha_socket:
                         alpha_found = True
+                        m.node_tree.links.new(alpha_socket, temp_emi.inputs[0])
+
+                    else:
+                        if alpha_default != 1.0:
+                            alpha_found = True
+
                         # Set alpha_default
                         if type(alpha_default) == float:
                             temp_emi.inputs[0].default_value = (alpha_default, alpha_default, alpha_default, 1.0)
@@ -3155,9 +3319,30 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
                         # Break link
                         for l in temp_emi.inputs[0].links:
                             m.node_tree.links.remove(l)
-                    elif alpha_socket:
+
+            elif bprops.type == 'OTHER_OBJECT_EMISSION':
+
+                # Set emission connection
+                for i, m in enumerate(other_mats):
+                    alpha_default = other_alpha_defaults[i]
+                    alpha_socket = other_alpha_sockets[i]
+
+                    temp_emi = m.node_tree.nodes.get(TEMP_EMISSION)
+                    if not temp_emi: continue
+
+                    if alpha_socket:
                         alpha_found = True
                         m.node_tree.links.new(alpha_socket, temp_emi.inputs[0])
+
+                    else: 
+                        if alpha_default != 1.0:
+                            alpha_found = True
+
+                        # Set alpha_default
+                        if type(alpha_default) == float:
+                            temp_emi.inputs[0].default_value = (alpha_default, alpha_default, alpha_default, 1.0)
+                        else: temp_emi.inputs[0].default_value = (alpha_default[0], alpha_default[1], alpha_default[2], 1.0)
+
             else:
                 alpha_found = True
 
@@ -3204,7 +3389,11 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
                 # Remove temp image
                 remove_datablock(bpy.data.images, temp_img, user=tex, user_prop='image')
 
-        # Back to original size if using SSA
+        # HACK: On Blender 4.5, tex node can be mistakenly use previous index image as current one when resize_image is called
+        # Set the tex node image to None before resize_image can resolve this
+        tex.image = None
+
+        # Back to original size if using SSAA
         if use_ssaa:
             image, temp_segment = resize_image(
                 image, bprops.width, bprops.height, image.colorspace_settings.name,
@@ -3358,7 +3547,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
 
                 mask = Mask.add_new_mask(
                     active_layer, mask_name, 'IMAGE', 'UV', bprops.uv_map,
-                    image, None, segment
+                    image, '', segment
                 )
                 mask.active_edit = True
 
@@ -3470,8 +3659,10 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
                     bvi.index = vi
 
     # Recover other yps
-    if bprops.type == 'OTHER_OBJECT_CHANNELS':
-        for m in all_other_mats:
+    if bprops.type in {'OTHER_OBJECT_CHANNELS', 'OTHER_OBJECT_EMISSION'}:
+
+        mats = all_other_mats if bprops.type == 'OTHER_OBJECT_CHANNELS' else other_mats
+        for m in mats:
             # Set back original socket
             mout = get_material_output(m)
             if mout: 
@@ -3493,6 +3684,7 @@ def bake_to_entity(bprops, overwrite_img=None, segment=None):
     simple_remove_node(mat.node_tree, bsdf)
     if src: simple_remove_node(mat.node_tree, src)
     if geometry: simple_remove_node(mat.node_tree, geometry)
+    if map_range: simple_remove_node(mat.node_tree, map_range)
     if vector_math: simple_remove_node(mat.node_tree, vector_math)
     if vector_math_1: simple_remove_node(mat.node_tree, vector_math_1)
 
