@@ -986,8 +986,10 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             rowb.context_pointer_set('vector_warp', m)
             rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
 
-            icon = 'image' if m.type == 'IMAGE' else 'texture'
-            rowb.prop(m, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(icon))
+            if m.type not in VectorWarp.special_vector_warps:
+                icon = 'image' if m.type == 'IMAGE' else 'texture'
+                rowb.prop(m, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(icon))
+
             rowb.alignment = 'RIGHT'
 
             if m.expand_source:
@@ -4940,7 +4942,7 @@ def layer_listing(layout, layer, show_expand=False):
                 if c.active_edit_1:
                     override_idx = 1
         for vw in layer.warps:
-            if vw.enable:
+            if vw.enable and vw.type not in VectorWarp.special_vector_warps:
                 all_warps.append(vw)
                 if vw.active_edit:
                     active_override = vw
@@ -4955,7 +4957,7 @@ def layer_listing(layout, layer, show_expand=False):
             if m.enable: 
                 selectable_masks.append(m)
                 for vw in m.warps:
-                    if vw.enable:
+                    if vw.enable and vw.type not in VectorWarp.special_vector_warps:
                         all_warps.append(vw)
                         if vw.active_edit:
                             active_override = vw
