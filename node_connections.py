@@ -257,7 +257,14 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     create_link(tree, node_output, mix_node.inputs['B'])
 
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
-    create_link(tree, intensity_value, mix_node.inputs['Factor'])
+    multiply = tree.nodes.get(vw.node_multiply_intensity)
+    if vw.type == 'IMAGE' and multiply:
+        alpha_img = current_node.outputs['Alpha']
+        create_link(tree, intensity_value, multiply.inputs[0])
+        create_link(tree, alpha_img, multiply.inputs[1])
+        create_link(tree, multiply.outputs[0], mix_node.inputs['Factor'])
+    else:
+        create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
 
     if is_rangeable:

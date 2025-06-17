@@ -330,6 +330,8 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
 
         if wp.map_range:
             check_set_node_loc(tree, wp.map_range, loc + Vector((200, 0)))
+        if wp.node_multiply_intensity:
+            check_set_node_loc(tree, wp.node_multiply_intensity, loc + Vector((300, 0)))
         check_set_node_loc(tree, wp.mix, loc + Vector((400, 0)))
         check_set_node_loc(tree, wp.node, loc)
 

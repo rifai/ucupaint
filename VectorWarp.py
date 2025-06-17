@@ -305,6 +305,7 @@ class YVectorWarp(bpy.types.PropertyGroup):
     )
 
     node : StringProperty(default='')
+    node_multiply_intensity : StringProperty(default='')
 
     image_name : StringProperty(default='')
 
@@ -354,33 +355,31 @@ def delete_vectorwarp_nodes(tree, vw):
     remove_node(tree, vw, 'texcoord')
     remove_node(tree, vw, 'decal_process')
     remove_node(tree, vw, 'node')
+    remove_node(tree, vw, 'node_multiply_intensity')
 
     for cache in vw.cache_nodes:
         remove_node(tree, cache, "node")
 
-def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
+def check_vectorwarp_extra_nodes(vw, tree):
     if not vw.enable:
         remove_node(tree, vw, 'mix')
         remove_node(tree, vw, 'map_range')
+        remove_node(tree, vw, 'node_multiply_intensity')
     else:
         is_rangeable = vw.type not in special_vector_warps
-        if ref_tree:
-            node_ref = ref_tree.nodes.get(vw.mix)
-            if node_ref: ref_tree.nodes.remove(node_ref)
-            mp = new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
+        
+        mp = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
 
-            node_ref = ref_tree.nodes.get(vw.map_range)
-            if node_ref: ref_tree.nodes.remove(node_ref)
-            if is_rangeable:
-                mr = new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
-            else:
-                remove_node(tree, vw, 'map_range')
+        if vw.type == 'IMAGE':
+            multiply = check_new_node(tree, vw, 'node_multiply_intensity', 'ShaderNodeMath', 'Multiply Intensity')
+            multiply.operation = 'MULTIPLY'
         else:
-            mp = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
-            if is_rangeable:
-                mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
-            else:
-                remove_node(tree, vw, 'map_range')
+            remove_node(tree, vw, 'node_multiply_intensity')
+
+        if is_rangeable:
+            mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
+        else:
+            remove_node(tree, vw, 'map_range')
 
         mp.blend_type = vw.blend_type
         mp.inputs[0].default_value = vw.intensity_value
@@ -391,11 +390,11 @@ def check_vectorwarp_extra_nodes(vw, tree, ref_tree):
             mr.inputs["To Min"].default_value = (-0.5, -0.5, -0.5)
             mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
 
-def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
+def check_vectorwarp_nodes(vw:YVectorWarp, tree):
 
     node_type = 'ShaderNodeMapping'
     
-    check_vectorwarp_extra_nodes(vw, tree, ref_tree)
+    check_vectorwarp_extra_nodes(vw, tree)
 
     if vw.type in layer_node_bl_idnames:
         node_type = layer_node_bl_idnames[vw.type]
@@ -404,13 +403,7 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree, ref_tree=None):
     elif vw.type == 'BLUR':
         node_type = 'ShaderNodeGroup'
 
-    if ref_tree:
-        node_ref = ref_tree.nodes.get(vw.node)
-        if node_ref: ref_tree.nodes.remove(node_ref)
-        current_node = new_node(tree, vw, 'node', node_type)
-        dirty = True
-    else:
-        current_node, dirty = check_new_node(tree, vw, 'node', node_type, '', True)
+    current_node, dirty = check_new_node(tree, vw, 'node', node_type, '', True)
 
     if dirty:
         match vw.type:
