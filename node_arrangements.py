@@ -333,6 +333,12 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
         check_set_node_loc(tree, wp.mix, loc + Vector((400, 0)))
         check_set_node_loc(tree, wp.node, loc)
 
+        if wp.texcoord:
+            check_set_node_loc(tree, wp.texcoord, loc - Vector((400, 0)))
+
+        if wp.decal_process:
+            check_set_node_loc(tree, wp.decal_process, loc - Vector((200, 0)))
+
         match wp.type:
             case 'MAPPING':
                 loc.y -= 400.0

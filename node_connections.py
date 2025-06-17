@@ -265,7 +265,19 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
             uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
             if uv_target:
                 create_link(tree, uv_target, current_node.inputs['Vector'])
-        elif vw.texcoord_type != 'DECAL':
+        elif vw.texcoord_type == 'Decal':
+            texcoord = tree.nodes.get(vw.texcoord)
+            if texcoord:
+                vector = texcoord.outputs['Object']
+                decal_process = tree.nodes.get(vw.decal_process)
+                if decal_process: 
+                    layer_decal_distance = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'decal_distance_value'))
+                    vector = create_link(tree, vector, decal_process.inputs[0])[0]
+                    if layer_decal_distance: 
+                        create_link(tree, layer_decal_distance, decal_process.inputs[1])
+
+                    create_link(tree, vector, current_node.inputs['Vector'])
+        else:
             name = io_names[vw.texcoord_type]
             target = get_essential_node(tree, TREE_START).get(name)
             if target:

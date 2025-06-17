@@ -5647,9 +5647,13 @@ class YSelectDecalObject(bpy.types.Operator):
 
         m1 = re.match(r'^yp\.layers\[(\d+)\]$', entity.path_from_id())
         m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', entity.path_from_id())
+        m3 = re.match(r'^yp\.layers\[(\d+)\]\.warps\[(\d+)\]$', entity.path_from_id())
+        m4 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]$', entity.path_from_id())
+
 
         if m1: tree = get_tree(entity)
         elif m2: tree = get_mask_tree(entity)
+        elif m3 or m4: tree = get_vw_tree(entity)
         else: return {'CANCELLED'}
 
         texcoord = tree.nodes.get(entity.texcoord)
@@ -5685,9 +5689,13 @@ class YSetDecalObjectPositionToCursor(bpy.types.Operator):
 
         m1 = re.match(r'^yp\.layers\[(\d+)\]$', entity.path_from_id())
         m2 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]$', entity.path_from_id())
+        m3 = re.match(r'^yp\.layers\[(\d+)\]\.warps\[(\d+)\]$', entity.path_from_id())
+        m4 = re.match(r'^yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]$', entity.path_from_id())
+
 
         if m1: tree = get_tree(entity)
         elif m2: tree = get_mask_tree(entity)
+        elif m3 or m4: tree = get_vw_tree(entity)
         else: return {'CANCELLED'}
 
         texcoord = tree.nodes.get(entity.texcoord)

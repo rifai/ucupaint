@@ -253,6 +253,15 @@ class YVectorWarp(bpy.types.PropertyGroup):
         update = update_texcoord_type
     )
 
+    texcoord: StringProperty(default='')
+    decal_process : StringProperty(default='')
+
+    decal_distance_value : FloatProperty(
+        name = 'Decal Distance',
+        description = 'Distance between surface and the decal object',
+        min=0.0, max=100.0, default=0.5, precision=3
+    )
+
     uv_name : StringProperty(
         name = 'UV Name',
         description = 'UV Name to use for layer coordinate',
@@ -338,13 +347,12 @@ def check_vectorwarp_trees(parent):
             check_vectorwarp_nodes(mod, parent_tree)
 
 def delete_vectorwarp_nodes(tree, vw):
-    # Delete the mix node
-    remove_node(tree, vw, 'mix')
-    # Delete the map range node
-    remove_node(tree, vw, 'map_range')
-    # Delete the nodes
-    remove_node(tree, vw, 'frame')
 
+    remove_node(tree, vw, 'mix')
+    remove_node(tree, vw, 'map_range')
+    remove_node(tree, vw, 'frame')
+    remove_node(tree, vw, 'texcoord')
+    remove_node(tree, vw, 'decal_process')
     remove_node(tree, vw, 'node')
 
     for cache in vw.cache_nodes:

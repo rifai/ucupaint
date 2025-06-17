@@ -650,6 +650,34 @@ def check_layer_texcoord_nodes(layer, tree=None):
     if layer.original_texcoord != layer.texcoord_type:
         layer.original_texcoord = layer.texcoord_type
 
+    for vw in layer.warps:
+        texcoord = tree.nodes.get(vw.texcoord)
+
+        if vw.enable and vw.texcoord_type == 'Decal' and is_mapping_possible(vw.type):
+            image = None
+            source = tree.nodes.get(vw.node)
+            if vw.type == 'IMAGE' and source:
+                image = source.image
+
+            if not texcoord:
+                empty = create_decal_empty()
+                texcoord = new_node(tree, vw, 'texcoord', 'ShaderNodeTexCoord', 'TexCoord')
+                texcoord.object = empty
+
+            decal_process = tree.nodes.get(vw.decal_process)
+            if not decal_process:
+                decal_process = new_node(tree, vw, 'decal_process', 'ShaderNodeGroup', 'Decal Process')
+                decal_process.node_tree = get_node_tree_lib(lib.DECAL_PROCESS)
+
+                if image and source:
+                    source.extension = 'CLIP'
+
+            if image:
+                if image.size[0] > image.size[1]:
+                    decal_process.inputs['Scale'].default_value = (image.size[1] / image.size[0], 1.0, 1.0)
+                else: decal_process.inputs['Scale'].default_value = (1.0, image.size[0] / image.size[1], 1.0)
+
+
 def check_all_layer_channel_io_and_nodes(layer, tree=None, specific_ch=None, do_recursive=True, remove_props=False, hard_reset=False): #, check_uvs=False): #, has_parent=False):
 
     #print("Checking layer IO. Layer: " + layer.name + ' Specific Channel: ' + str(specific_ch))
@@ -824,6 +852,9 @@ def check_warps_ios(parent, valid_inputs, input_index, dirty):
 
         # Create intensity socket
         dirty = create_prop_input(warp, 'intensity_value', valid_inputs, input_index, dirty)
+        input_index += 1
+
+        dirty = create_prop_input(warp, 'decal_distance_value', valid_inputs, input_index, dirty)
         input_index += 1
 
         if warp.type == 'MAPPING':

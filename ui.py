@@ -1060,6 +1060,32 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                         rrow.label(text='', icon='BLANK1')
                         rrow.label(text='UV Map:')
                         rrow.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                    elif m.texcoord_type == 'Decal':
+                        texcoord = mod_tree.nodes.get(m.texcoord)
+
+                        if texcoord:
+                            rrow = bcol.row(align=True)
+                            rrow.label(text='', icon='BLANK1')
+                            splits = split_layout(rrow, 0.45, align=True)
+                            splits.label(text='Decal Object:')
+                            splits.prop(texcoord, 'object', text='')
+
+                        rrow = bcol.row(align=True)
+                        rrow.label(text='', icon='BLANK1')
+                        splits = split_layout(rrow, 0.5, align=True)
+                        splits.label(text='Decal Distance:')
+                        draw_input_prop(splits, m, 'decal_distance_value')
+
+                        bcol.context_pointer_set('entity', m)
+                        rrow = bcol.row(align=True)
+                        rrow.label(text='', icon='BLANK1')
+                        if is_bl_newer_than(2, 80):
+                            rrow.operator('wm.y_select_decal_object', icon='EMPTY_SINGLE_ARROW')
+                        else: rrow.operator('wm.y_select_decal_object', icon='EMPTY_DATA')
+
+                        rrow = bcol.row(align=True)
+                        rrow.label(text='', icon='BLANK1')
+                        rrow.operator('wm.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
                 else:
                     if obj.type == 'MESH' and m.texcoord_type == 'UV':
                         split = split_layout(rowb, 0.5, align=True)
