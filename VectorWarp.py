@@ -466,6 +466,10 @@ class YNewVectorWarp(bpy.types.Operator):
         if self.type in {'MAPPING', 'BLUR'}:
             new_warp.blend_type = 'MIX'
 
+        # insert at the beginning
+        last_idx = len(parent.warps) - 1
+        parent.warps.move(last_idx, 0)
+
         check_vectorwarp_trees(parent)
 
         if m1:

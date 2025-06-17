@@ -2235,19 +2235,21 @@ def get_vw_tree(entity):
 
         return tree
     
-    m = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]\.warps\[(\d+)\]', entity.path_from_id())
+    m = re.match(r'^yp\.layers\[(\d+)\].*', entity.path_from_id())
     if m:
         layer = yp.layers[int(m.group(1))]
-        layer_tree = get_tree(layer)
+        tree = get_tree(layer)
 
-        if layer_tree:
-            group_node = layer_tree.nodes.get(entity.group_node)
-        else: return None
+        source_group = tree.nodes.get(layer.source_group)
+        if source_group and source_group.type == 'GROUP': 
+            tree = source_group.node_tree
 
-        if not group_node or group_node.type != 'GROUP': return layer_tree
+        mod_group = tree.nodes.get(layer.mod_group)
+        if mod_group and mod_group.type == 'GROUP':
+            return mod_group.node_tree
 
-        return group_node.node_tree
-
+        return tree
+    
 def get_mask_tree(mask, ignore_group=False):
 
     m = re.match(r'yp\.layers\[(\d+)\]\.masks\[(\d+)\]', mask.path_from_id())

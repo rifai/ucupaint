@@ -1091,6 +1091,13 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                         split = split_layout(rowb, 0.5, align=True)
                         split.prop(m, 'texcoord_type', text='')
                         split.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+                    elif m.texcoord_type == 'Decal':
+                        texcoord = mod_tree.nodes.get(m.texcoord)
+                        if texcoord:
+                            rrow.scale_x = 0.5
+                            split = split_layout(rowb, 0.4, align=True)
+                            split.prop(m, 'texcoord_type', text='')
+                            split.prop(texcoord, 'object', text='')
                     else:
                         rowb.prop(m, 'texcoord_type', text='')
 
