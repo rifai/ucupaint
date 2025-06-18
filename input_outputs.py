@@ -848,14 +848,15 @@ def create_prop_input(entity, prop_name, valid_inputs, input_index, dirty):
 
 def check_warps_ios(parent, valid_inputs, input_index, dirty):
     for warp in parent.warps:
-        if not warp.enable: continue
+        # if not warp.enable: continue
 
         # Create intensity socket
         dirty = create_prop_input(warp, 'intensity_value', valid_inputs, input_index, dirty)
         input_index += 1
 
-        dirty = create_prop_input(warp, 'decal_distance_value', valid_inputs, input_index, dirty)
-        input_index += 1
+        if warp.texcoord_type == 'Decal' and is_mapping_possible(warp.type):
+            dirty = create_prop_input(warp, 'decal_distance_value', valid_inputs, input_index, dirty)
+            input_index += 1
 
         if warp.type == 'MAPPING':
             # Create image socket
