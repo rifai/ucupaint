@@ -192,11 +192,11 @@ def reconnect_all_vectorwarp_nodes(tree, parent, start_vector):
     vector = start_vector
     # Connect all the nodes
     for vw in parent.warps:
-        vector = reconnect_vectorwarp_node(tree, vw, vector)
+        vector = reconnect_vectorwarp_node(tree, vw, vector, start_vector)
 
     return vector
 
-def reconnect_vectorwarp_node(tree, vw, start_vector):
+def reconnect_vectorwarp_node(tree, vw, start_vector, original_vector):
 
     if not vw.enable:
         return start_vector
@@ -229,9 +229,9 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
 
     from .VectorWarp import special_vector_warps
 
-    is_rangeable = vw.type not in special_vector_warps
+    use_texcoord = vw.type not in special_vector_warps
 
-    if vw.map_range and is_rangeable:
+    if vw.map_range and use_texcoord:
         range_node = tree.nodes.get(vw.map_range)
         create_link(tree, node_output, range_node.inputs['Vector'])
         node_output = range_node.outputs['Vector']
@@ -239,17 +239,24 @@ def reconnect_vectorwarp_node(tree, vw, start_vector):
     create_link(tree, node_output, mix_node.inputs['B'])
 
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
+    multiply = tree.nodes.get(vw.node_multiply_intensity)
+    multiply_warp = tree.nodes.get(vw.node_multiply_mask)
     if vw.type == 'IMAGE' and multiply:
-        multiply = tree.nodes.get(vw.node_multiply_intensity)
         alpha_img = current_node.outputs['Alpha']
         create_link(tree, intensity_value, multiply.inputs[0])
         create_link(tree, alpha_img, multiply.inputs[1])
         create_link(tree, multiply.outputs[0], mix_node.inputs['Factor'])
+    elif vw.type == 'WARP_MASK' and multiply_warp:
+        create_link(tree, node_output, multiply_warp.inputs[0])
+        create_link(tree, intensity_value, multiply_warp.inputs[1])
+        create_link(tree, multiply_warp.outputs[0], mix_node.inputs['Factor'])
+        create_link(tree, original_vector, mix_node.inputs['A'])
+        create_link(tree, vector, mix_node.inputs['B'])
     else:
         create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
 
-    if is_rangeable:
+    if use_texcoord:
         if vw.texcoord_type == 'UV':
             uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
             if uv_target:

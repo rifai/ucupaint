@@ -265,6 +265,7 @@ warp_type_items = (
     # ('VCOL', 'Vertex Color', ''),
     # ('HEMI', 'Fake Lighting', ''),
     ('GABOR', 'Gabor', ''),
+    ('WARP_MASK', 'Warp Mask', '')
     # ('EDGE_DETECT', 'Edge Detect', ''),
     # ('AO', 'Ambient Occlusion', ''),
 )
@@ -4926,7 +4927,7 @@ def set_active_paint_slot_entity(yp):
                 image = baked.image
 
     elif len(yp.layers) > 0:
-        
+        editable_warp = ['IMAGE', 'WARP_MASK']
         # Get layer tree
         layer = yp.layers[yp.active_layer_index]
         tree = get_tree(layer)
@@ -4962,7 +4963,7 @@ def set_active_paint_slot_entity(yp):
                     image = source.image
             for vw in mask.warps:
                 if vw.active_edit:
-                    if vw.type == 'IMAGE':
+                    if vw.type in editable_warp:
                         source = tree.nodes.get(vw.node)
                         if source:
                             source.select = True
@@ -4972,7 +4973,7 @@ def set_active_paint_slot_entity(yp):
 
         for vw in layer.warps:
             if vw.active_edit:
-                if vw.type == 'IMAGE':
+                if vw.type in editable_warp:
                     source = tree.nodes.get(vw.node)
                     if source:
                         source.select = True

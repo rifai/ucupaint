@@ -987,7 +987,7 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
 
             if m.type not in VectorWarp.special_vector_warps:
-                icon = 'image' if m.type == 'IMAGE' else 'texture'
+                icon = 'image' if m.type == 'IMAGE' or m.type == 'WARP_MASK' else 'texture'
                 rowb.prop(m, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(icon))
 
             rowb.alignment = 'RIGHT'
@@ -7326,7 +7326,18 @@ class YVectorWarpTypeMenu(bpy.types.Menu):
         tree = get_vw_tree(vw)
         
         col = self.layout.column()
-        col.label(text='Vector Warp Source')
+        col.label(text='Vector Warp Source') 
+        
+        col.separator()
+        for mt in warp_type_items:
+            icon = 'RADIOBUT_ON' if vw.type == mt[0] else 'RADIOBUT_OFF'
+            if mt[0] == 'IMAGE':
+                pass
+            else:
+                col.operator('wm.y_replace_vector_warp_type', text=mt[1], icon=icon).type = mt[0]
+
+            if mt[0] == VectorWarp.special_vector_warps[-1]:
+                col.separator()
         col.separator()
 
         folder_emoji = '🗁  ' if is_bl_newer_than(3, 4) else '>  '
@@ -7364,14 +7375,7 @@ class YVectorWarpTypeMenu(bpy.types.Menu):
         op.type = 'IMAGE'
         op.load_item = True
 
-        col.separator()
-        for mt in warp_type_items:
-            icon = 'RADIOBUT_ON' if vw.type == mt[0] else 'RADIOBUT_OFF'
-            if mt[0] == 'IMAGE':
-                pass
-            else:
-                col.operator('wm.y_replace_vector_warp_type', text=mt[1], icon=icon).type = mt[0]
-
+       
 
 class YMaskTypeMenu(bpy.types.Menu):
     bl_idname = "NODE_MT_y_mask_type_menu"
@@ -7590,16 +7594,24 @@ class YWarpSpecialMenu(bpy.types.Menu):
         if context.parent.type != 'GROUP':
             col = row.column()
             col.label(text='Add Warp Vector')
+            col.separator()
             for mt in warp_type_items:
                 if mt[0] == 'IMAGE':
                     pass
+                elif mt[0] == 'WARP_MASK':
+                    pass
                 else:
                     col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
+                
+                if mt[0] == VectorWarp.special_vector_warps[-1]:
+                    col.separator()
+
             col.separator()
             col.label(text='Add Image')
-            col.operator("wm.y_new_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image'))
-            col.operator("wm.y_open_available_image_to_vector_warp", text="Available Image")
-            col.operator("wm.y_open_image_to_vector_warp", text="Open Image")
+            col.operator("wm.y_new_image_to_vector_warp", text="New Warp Mask", icon_value=lib.get_icon('mask')).mask_type = True
+            col.operator("wm.y_new_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image')).mask_type = False
+            col.operator("wm.y_open_available_image_to_vector_warp", text="Available Image", icon_value=lib.get_icon('image'))
+            col.operator("wm.y_open_image_to_vector_warp", text="Open Image", icon_value=lib.get_icon('image'))
 
 def update_modifier_ui(self, context):
     ypui = context.window_manager.ypui

@@ -287,6 +287,7 @@ class YVectorWarp(bpy.types.PropertyGroup):
 
     mix: StringProperty(default='')
     map_range: StringProperty(default='')
+    node_multiply_mask: StringProperty(default='')
 
     mapping : StringProperty(default='')
     uniform_scale_value : FloatProperty(default=1)
@@ -356,6 +357,7 @@ def delete_vectorwarp_nodes(tree, vw):
     remove_node(tree, vw, 'decal_process')
     remove_node(tree, vw, 'node')
     remove_node(tree, vw, 'node_multiply_intensity')
+    remove_node(tree, vw, 'node_multiply_mask')
 
     for cache in vw.cache_nodes:
         remove_node(tree, cache, "node")
@@ -365,16 +367,21 @@ def check_vectorwarp_extra_nodes(vw, tree):
         remove_node(tree, vw, 'mix')
         remove_node(tree, vw, 'map_range')
         remove_node(tree, vw, 'node_multiply_intensity')
+        remove_node(tree, vw, 'node_multiply_mask')
     else:
-        is_rangeable = vw.type not in special_vector_warps
+        is_rangeable = vw.type not in special_vector_warps and vw.type != 'WARP_MASK'
         
         mp = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
 
         if vw.type == 'IMAGE':
             multiply = check_new_node(tree, vw, 'node_multiply_intensity', 'ShaderNodeMath', 'Multiply Intensity')
             multiply.operation = 'MULTIPLY'
+        elif vw.type == 'WARP_MASK':
+            multiply_mask = check_new_node(tree, vw, 'node_multiply_mask', 'ShaderNodeMath', 'Multiply Mask')
+            multiply_mask.operation = 'MULTIPLY'
         else:
             remove_node(tree, vw, 'node_multiply_intensity')
+            remove_node(tree, vw, 'node_multiply_mask')
 
         if is_rangeable:
             mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
@@ -402,6 +409,8 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree):
         node_type = 'ShaderNodeMapping'
     elif vw.type == 'BLUR':
         node_type = 'ShaderNodeGroup'
+    elif vw.type == 'WARP_MASK':
+        node_type = 'ShaderNodeTexImage'
 
     current_node, dirty = check_new_node(tree, vw, 'node', node_type, '', True)
 
@@ -412,6 +421,8 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree):
 
     match vw.type:
         case 'IMAGE':
+            current_node.image = bpy.data.images.get(vw.image_name)
+        case 'WARP_MASK':
             current_node.image = bpy.data.images.get(vw.image_name)
                 
 class YNewVectorWarp(bpy.types.Operator):
@@ -456,7 +467,7 @@ class YNewVectorWarp(bpy.types.Operator):
             new_warp.texcoord_type = layer.texcoord_type
             new_warp.uv_name = layer.uv_name
 
-        if self.type in {'MAPPING', 'BLUR'}:
+        if self.type in special_vector_warps or self.type == 'WARP_MASK':
             new_warp.blend_type = 'MIX'
 
         # insert at the beginning
@@ -608,16 +619,17 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
         return {'FINISHED'}
     
 
-def generate_image_warp_node(parent, layer, layer_ui, image_name):
+def generate_image_warp_node(parent, layer, layer_ui, image_name, type = 'IMAGE'):
     new_warp = parent.warps.add()
-
-    type = 'IMAGE'
 
     name = [mt[1] for mt in warp_type_items if mt[0] == type][0]
 
     new_warp.name = get_unique_name(name, parent.warps)
     new_warp.type = type
-    new_warp.blend_type = 'ADD'
+    if type == 'WARP_MASK':
+        new_warp.blend_type = 'MIX'
+    else:
+        new_warp.blend_type = 'ADD'
     new_warp.image_name = image_name
     new_warp.expand_source = False
 
@@ -826,12 +838,13 @@ class YNewImageToVectorWarp(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     name : StringProperty(default='')
+    mask_type : BoolProperty(default=False)
 
     # For image layer
     width : IntProperty(name='Width', default=1024, min=1, max=16384)
     height : IntProperty(name='Height', default=1024, min=1, max=16384)
-    #color : FloatVectorProperty(name='Color', size=4, subtype='COLOR', default=(0.0,0.0,0.0,0.0), min=0.0, max=1.0)
-    #alpha : BoolProperty(name='Alpha', default=True)
+
+
     hdr : BoolProperty(name='32 bit Float', default=False)
 
     image_resolution : EnumProperty(
@@ -845,16 +858,6 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         description = 'Use custom Resolution to adjust the width and height individually',
         default = False
     )
-
-    use_udim : BoolProperty(
-        name = 'Use UDIM Tiles',
-        description = 'Use UDIM Tiles',
-        default = False
-    )
-
-    uv_map : StringProperty(default='', update=update_new_uv_map)
-    uv_map_coll : CollectionProperty(type=bpy.types.PropertyGroup)
-
 
     @classmethod
     def poll(cls, context):
@@ -874,6 +877,9 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         name = obj.active_material.name
         items = bpy.data.images
 
+        if self.mask_type:
+            name = 'Mask(' + name + ')'
+
         # Use user preference default image size
         if ypup.default_image_resolution == 'CUSTOM':
             self.use_custom_resolution = True
@@ -884,23 +890,11 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         # Layer name
         self.name = get_unique_name(name, items)
 
-        if obj.type == 'MESH':
-            uv_name = get_default_uv_name(obj, yp)
-            self.uv_map = uv_name
-
-            # UV Map collections update
-            self.uv_map_coll.clear()
-            for uv in get_uv_layers(obj):
-                if not uv.name.startswith(TEMP_UV):
-                    self.uv_map_coll.add().name = uv.name
-
         if get_user_preferences().skip_property_popups and not event.shift:
             return self.execute(context)
         return context.window_manager.invoke_props_dialog(self, width=320)
     
     def check(self, context):
-        ypup = get_user_preferences()
-
         if not self.use_custom_resolution:
             self.width = int(self.image_resolution)
             self.height = int(self.image_resolution)
@@ -953,9 +947,6 @@ class YNewImageToVectorWarp(bpy.types.Operator):
     def execute(self, context):
         T = time.time()
 
-        node = get_active_ypaint_node()
-        yp = node.node_tree.yp
-
         same_name = [i for i in bpy.data.images if i.name == self.name]
 
         if same_name:
@@ -969,43 +960,29 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         img = None
 
         alpha = True
-        color = (0.5, 0.5, 0.5, 1.0)
-        
-        obj = context.object
-        mat = obj.active_material
 
-        if self.use_udim:
-            objs = get_all_objects_with_same_materials(mat)
-            tilenums = UDIM.get_tile_numbers(objs, self.uv_map)
-
-        if self.use_udim:
-            img = bpy.data.images.new(
-                name=self.name, width=self.width, height=self.height, 
-                alpha=alpha, float_buffer=self.hdr, tiled=True
-            )
-
-            # Fill tiles
-            for tilenum in tilenums:
-                UDIM.fill_tile(img, tilenum, color, self.width, self.height)
-            UDIM.initial_pack_udim(img, color)
-
+        if self.mask_type:
+            color = (0.0, 0.0, 0.0, 1.0)
+            img_type = 'WARP_MASK'
         else:
-            img = bpy.data.images.new(
-                name=self.name, width=self.width, height=self.height, 
-                alpha=alpha, float_buffer=self.hdr
-            )
+            color = (0.5, 0.5, 0.5, 1.0)
+            img_type = 'IMAGE'
+        
+        img = bpy.data.images.new(
+            name=self.name, width=self.width, height=self.height, 
+            alpha=alpha, float_buffer=self.hdr
+        )
 
-            #img.generated_type = self.generated_type
-            img.generated_type = 'BLANK'
-            img.generated_color = color
-            img.colorspace_settings.name = get_noncolor_name()
-            if hasattr(img, 'use_alpha'):
-                img.use_alpha = True
-
+        #img.generated_type = self.generated_type
+        img.generated_type = 'BLANK'
+        img.generated_color = color
+        img.colorspace_settings.name = get_noncolor_name()
+        if hasattr(img, 'use_alpha'):
+            img.use_alpha = True
 
         update_image_editor_image(context, img)
 
-        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.name)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.name, img_type)
 
         wm = context.window_manager
 
