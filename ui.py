@@ -942,6 +942,9 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
         row.context_pointer_set('parent', parent)
         row.context_pointer_set('vector_warp', m)
 
+        if m.type not in VectorWarp.special_vector_warps:
+            icon_value = lib.get_icon('mask')
+            row.prop(m, 'use_as_mask', icon_value=icon_value, text='')
         row.menu("NODE_MT_y_vector_warp_menu", text='', icon=icon)
         row.prop(m, 'enable', text='')
 
@@ -956,98 +959,69 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
             col = box.column()
             col.active = m.enable
 
-            srow = split_layout(col, 0.35, align=False)
-            rowb = srow.row(align=True)
-            inbox_dropdown_button(rowb, m, 'expand_blend', "Blend:")
-            rowb = srow.row(align=True)
-            # rowb.label(text='Blend:')
-            rowb.prop(m, 'blend_type', text='')
-            if m.expand_blend:
-                bcol = col.column() #align=True)
-                rrow = bcol.row(align=True)
-                rrow.label(text='', icon='BLANK1')
-                rrow.label(text='Opacity:')
-                draw_input_prop(rrow, m, 'intensity_value')
-            else:
-                draw_input_prop(rowb, m, 'intensity_value')
 
-            srow = split_layout(col, 0.35, align=False)
-            rowb = srow.row(align=True)
-            inbox_dropdown_button(rowb, m, 'expand_source', "Source:")
-            rowb = srow.row(align=True)
-
-            label_dropdown = [mt[1] for mt in warp_type_items if mt[0] == m.type][0]
-            
-            if m.type == 'IMAGE':
-                current_node = mod_tree.nodes.get(m.node)
-                if current_node and current_node.image:
-                    label_dropdown = current_node.image.name
-
-            rowb.context_pointer_set('vector_warp', m)
-            rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
+            src = mod_tree.nodes.get(m.node)
 
             if m.type not in VectorWarp.special_vector_warps:
-                icon = 'image' if m.type == 'IMAGE' or m.type == 'WARP_MASK' else 'texture'
+                srow = split_layout(col, 0.35, align=False)
+                rowb = srow.row(align=True)
+                inbox_dropdown_button(rowb, m, 'expand_blend', "Blend:")
+                rowb = srow.row(align=True)
+                # rowb.label(text='Blend:')
+
+                rowb.prop(m, 'blend_type', text='')
+                if m.expand_blend:
+                    bcol = col.column() #align=True)
+                    rrow = bcol.row(align=True)
+                    rrow.label(text='', icon='BLANK1')
+                    rrow.label(text='Opacity:')
+                    draw_input_prop(rrow, m, 'intensity_value')
+                else:
+                    draw_input_prop(rowb, m, 'intensity_value')
+
+                srow = split_layout(col, 0.35, align=False)
+                rowb = srow.row(align=True)
+                inbox_dropdown_button(rowb, m, 'expand_source', "Source:")
+                rowb = srow.row(align=True)
+
+                label_dropdown = [mt[1] for mt in warp_type_items if mt[0] == m.type][0]
+                
+                if m.type == 'IMAGE':
+                    current_node = mod_tree.nodes.get(m.node)
+                    if current_node and current_node.image:
+                        label_dropdown = current_node.image.name
+
+                rowb.context_pointer_set('vector_warp', m)
+                rowb.menu("NODE_MT_y_vector_warp_type_menu", text=label_dropdown)
+
+                icon = 'image' if m.type == 'IMAGE' else 'texture'
                 rowb.prop(m, 'active_edit', text='', toggle=True, icon_value=lib.get_icon(icon))
 
-            rowb.alignment = 'RIGHT'
+                rowb.alignment = 'RIGHT'
 
-            if m.expand_source:
-                src = mod_tree.nodes.get(m.node)
+                if m.expand_source:
 
-                rrow = col.row(align=True)
-                rrow.label(text='', icon='BLANK1')
-                rbcol = rrow.column()
+                    rrow = col.row(align=True)
+                    rrow.label(text='', icon='BLANK1')
+                    rbcol = rrow.column()
 
-                if m.type == 'IMAGE':
-                    # print('Image node:', src)
-                    if src.image:
-                        draw_image_props(context, src, rbcol, m, show_datablock=False)
-                elif m.type == 'BLUR':
-                    rowb = rbcol.row(align=True)
-                    roww = rowb.row(align=True)
-                    roww.label(text='Factor:')
-                    draw_input_prop(roww, m, 'blur_vector_factor')
-                elif m.type == 'MAPPING':
-                    rrow = rbcol.row(align=True)
-                    rrow.label(text='Transform:')
-                    rrow.prop(src, 'vector_type', text='')
-
-                    rrow = rbcol.row(align=True)
-                    rrow = rrow.row()
-                    if is_bl_newer_than(2, 81):
-                        mcol = rrow.column()
-                        mcol.prop(src.inputs[1], 'default_value', text='Offset')
-                        mcol = rrow.column()
-                        mcol.prop(src.inputs[2], 'default_value', text='Rotation')
-                        if m.uniform_scale_enable:
-                            mcol = rrow.column(align=True)
-                            mrow = mcol.row()
-                            mrow.label(text='Scale:')
-                            mrow.prop(m, 'uniform_scale_enable', text='', icon='LOCKED')
-                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'X')
-                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Y')
-                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Z')
+                    if m.type == 'IMAGE':
+                        # print('Image node:', src)
+                        if src.image:
+                            draw_image_props(context, src, rbcol, m, show_datablock=False)
                         else:
-                            mcol = rrow.column(align=True)
-                            mrow = mcol.row()
-                            mrow.label(text='Scale:')
-                            mrow.prop(m, 'uniform_scale_enable', text='', icon='UNLOCKED')
-                            mcol.prop(src.inputs[3], 'default_value', text='')
-                    else:
-                        mcol = rrow.column()
-                        mcol.prop(src, 'translation')
-                        mcol = rrow.column()
-                        mcol.prop(src, 'rotation')
-                        mcol = rrow.column()
-                        mcol.prop(src, 'scale')
-                elif src:
-                    draw_tex_props(src, rbcol, m)
+                            mcol = rrow.column()
+                            mcol.prop(src, 'translation')
+                            mcol = rrow.column()
+                            mcol.prop(src, 'rotation')
+                            mcol = rrow.column()
+                            mcol.prop(src, 'scale')
+                    elif src:
+                        draw_tex_props(src, rbcol, m)
 
-            srow = split_layout(col, 0.35, align=False)
-            rowb = srow.row(align=True)
+                srow = split_layout(col, 0.35, align=False)
+                rowb = srow.row(align=True)
 
-            if m.type not in VectorWarp.special_vector_warps:
                 inbox_dropdown_button(rowb, m, 'expand_vector', "Vector:")
                 rowb = srow.row(align=True)
 
@@ -1102,6 +1076,39 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                             split.prop(texcoord, 'object', text='')
                     else:
                         rowb.prop(m, 'texcoord_type', text='')
+            else:
+                rbcol = col.column() 
+                if m.type == 'BLUR':
+                    rowb = rbcol.row(align=True)
+                    roww = rowb.row(align=True)
+                    roww.label(text='Factor:')
+                    draw_input_prop(roww, m, 'blur_vector_factor')
+                elif m.type == 'MAPPING':
+                    rrow = rbcol.row(align=True)
+                    rrow.label(text='Transform:')
+                    rrow.prop(src, 'vector_type', text='')
+
+                    rrow = rbcol.row(align=True)
+                    rrow = rrow.row()
+                    if is_bl_newer_than(2, 81):
+                        mcol = rrow.column()
+                        mcol.prop(src.inputs[1], 'default_value', text='Offset')
+                        mcol = rrow.column()
+                        mcol.prop(src.inputs[2], 'default_value', text='Rotation')
+                        if m.uniform_scale_enable:
+                            mcol = rrow.column(align=True)
+                            mrow = mcol.row()
+                            mrow.label(text='Scale:')
+                            mrow.prop(m, 'uniform_scale_enable', text='', icon='LOCKED')
+                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'X')
+                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Y')
+                            draw_input_prop(mcol, m, 'uniform_scale_value', None, 'Z')
+                        else:
+                            mcol = rrow.column(align=True)
+                            mrow = mcol.row()
+                            mrow.label(text='Scale:')
+                            mrow.prop(m, 'uniform_scale_enable', text='', icon='UNLOCKED')
+                            mcol.prop(src.inputs[3], 'default_value', text='')
 
 def draw_bake_target_channel(context, layout, bt, letter='r'):
     yp = bt.id_data.yp
@@ -7598,8 +7605,6 @@ class YWarpSpecialMenu(bpy.types.Menu):
             for mt in warp_type_items:
                 if mt[0] == 'IMAGE':
                     pass
-                elif mt[0] == 'WARP_MASK':
-                    pass
                 else:
                     col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('modifier')).type = mt[0]
                 
@@ -7608,10 +7613,29 @@ class YWarpSpecialMenu(bpy.types.Menu):
 
             col.separator()
             col.label(text='Add Image')
-            col.operator("wm.y_new_image_to_vector_warp", text="New Warp Mask", icon_value=lib.get_icon('mask')).mask_type = True
-            col.operator("wm.y_new_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image')).mask_type = False
-            col.operator("wm.y_open_available_image_to_vector_warp", text="Available Image", icon_value=lib.get_icon('image'))
+            col.operator("wm.y_new_image_to_vector_warp", text="New Image", icon_value=lib.get_icon('image'))
+            col.operator("wm.y_open_available_image_to_vector_warp", text="Open Available Image", icon_value=lib.get_icon('image'))
             col.operator("wm.y_open_image_to_vector_warp", text="Open Image", icon_value=lib.get_icon('image'))
+
+            col = row.column()
+            col.label(text='Add Warp Mask')
+            col.separator()
+            for mt in warp_type_items:
+                if mt[0] == 'IMAGE' or mt[0] in VectorWarp.special_vector_warps:
+                    pass
+                else:
+                    vwop = col.operator('wm.y_new_vector_warp', text=mt[1], icon_value=lib.get_icon('mask'))
+                    vwop.type = mt[0]
+                    vwop.use_as_mask = True
+                
+                if mt[0] == VectorWarp.special_vector_warps[-1]:
+                    col.separator()
+
+            col.separator()
+            col.label(text='Add Image Mask')
+            col.operator("wm.y_new_image_to_vector_warp", text="New Image Mask", icon_value=lib.get_icon('image')).use_as_mask = True
+            col.operator("wm.y_open_available_image_to_vector_warp", text="Open Available Image as Mask", icon_value=lib.get_icon('image')).use_as_mask = True
+            col.operator("wm.y_open_image_to_vector_warp", text="Open Image Mask", icon_value=lib.get_icon('image')).use_as_mask = True
 
 def update_modifier_ui(self, context):
     ypui = context.window_manager.ypui

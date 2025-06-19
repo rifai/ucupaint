@@ -240,21 +240,21 @@ def reconnect_vectorwarp_node(tree, vw, start_vector, original_vector):
 
     intensity_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(vw, 'intensity_value'))
     multiply = tree.nodes.get(vw.node_multiply_intensity)
-    multiply_warp = tree.nodes.get(vw.node_multiply_mask)
     if vw.type == 'IMAGE' and multiply:
         alpha_img = current_node.outputs['Alpha']
         create_link(tree, intensity_value, multiply.inputs[0])
         create_link(tree, alpha_img, multiply.inputs[1])
         create_link(tree, multiply.outputs[0], mix_node.inputs['Factor'])
-    elif vw.type == 'WARP_MASK' and multiply_warp:
+    else:
+        create_link(tree, intensity_value, mix_node.inputs['Factor'])
+
+    multiply_warp = tree.nodes.get(vw.node_multiply_mask)
+    if vw.use_as_mask and multiply_warp:
         create_link(tree, node_output, multiply_warp.inputs[0])
         create_link(tree, intensity_value, multiply_warp.inputs[1])
         create_link(tree, multiply_warp.outputs[0], mix_node.inputs['Factor'])
         create_link(tree, original_vector, mix_node.inputs['A'])
         create_link(tree, vector, mix_node.inputs['B'])
-    else:
-        create_link(tree, intensity_value, mix_node.inputs['Factor'])
-
 
     if use_texcoord:
         if vw.texcoord_type == 'UV':

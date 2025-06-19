@@ -285,6 +285,8 @@ class YVectorWarp(bpy.types.PropertyGroup):
 
     intensity_value: FloatProperty(name = 'Opacity', default=1.0, min=0.0, max=1.0, subtype='FACTOR', precision=3)
 
+    use_as_mask: BoolProperty(default=False, name='Use as Mask', update=update_warp_nodes_enable)
+
     mix: StringProperty(default='')
     map_range: StringProperty(default='')
     node_multiply_mask: StringProperty(default='')
@@ -369,33 +371,40 @@ def check_vectorwarp_extra_nodes(vw, tree):
         remove_node(tree, vw, 'node_multiply_intensity')
         remove_node(tree, vw, 'node_multiply_mask')
     else:
-        is_rangeable = vw.type not in special_vector_warps and vw.type != 'WARP_MASK'
+        is_rangeable = vw.type not in special_vector_warps
         
         mp = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
-
-        if vw.type == 'IMAGE':
-            multiply = check_new_node(tree, vw, 'node_multiply_intensity', 'ShaderNodeMath', 'Multiply Intensity')
-            multiply.operation = 'MULTIPLY'
-        elif vw.type == 'WARP_MASK':
+        
+        if vw.use_as_mask:
             multiply_mask = check_new_node(tree, vw, 'node_multiply_mask', 'ShaderNodeMath', 'Multiply Mask')
             multiply_mask.operation = 'MULTIPLY'
-        else:
+
             remove_node(tree, vw, 'node_multiply_intensity')
+            remove_node(tree, vw, 'map_range')
+
+        else:
             remove_node(tree, vw, 'node_multiply_mask')
 
-        if is_rangeable:
-            mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
-        else:
-            remove_node(tree, vw, 'map_range')
+            if vw.type == 'IMAGE':
+                multiply = check_new_node(tree, vw, 'node_multiply_intensity', 'ShaderNodeMath', 'Multiply Intensity')
+                multiply.operation = 'MULTIPLY'
+            else:
+                remove_node(tree, vw, 'node_multiply_intensity')
+
+            if is_rangeable:
+                mr = check_new_node(tree, vw, 'map_range', 'ShaderNodeMapRange', 'Map Range')
+            else:
+                remove_node(tree, vw, 'map_range')
+
+
+            if is_rangeable and mr:
+                mr.data_type = 'FLOAT_VECTOR'
+                mr.inputs["To Min"].default_value = (-0.5, -0.5, -0.5)
+                mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
 
         mp.blend_type = vw.blend_type
         mp.inputs[0].default_value = vw.intensity_value
         mp.data_type = 'RGBA'
-
-        if is_rangeable:
-            mr.data_type = 'FLOAT_VECTOR'
-            mr.inputs["To Min"].default_value = (-0.5, -0.5, -0.5)
-            mr.inputs["To Max"].default_value = (0.5, 0.5, 0.5)
 
 def check_vectorwarp_nodes(vw:YVectorWarp, tree):
 
@@ -409,8 +418,6 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree):
         node_type = 'ShaderNodeMapping'
     elif vw.type == 'BLUR':
         node_type = 'ShaderNodeGroup'
-    elif vw.type == 'WARP_MASK':
-        node_type = 'ShaderNodeTexImage'
 
     current_node, dirty = check_new_node(tree, vw, 'node', node_type, '', True)
 
@@ -421,8 +428,6 @@ def check_vectorwarp_nodes(vw:YVectorWarp, tree):
 
     match vw.type:
         case 'IMAGE':
-            current_node.image = bpy.data.images.get(vw.image_name)
-        case 'WARP_MASK':
             current_node.image = bpy.data.images.get(vw.image_name)
                 
 class YNewVectorWarp(bpy.types.Operator):
@@ -436,6 +441,8 @@ class YNewVectorWarp(bpy.types.Operator):
         items = warp_type_items,
         default = 'IMAGE',
     )
+
+    use_as_mask : BoolProperty(default=False, name='Use as Mask',)
 
     @classmethod
     def poll(cls, context):
@@ -462,12 +469,13 @@ class YNewVectorWarp(bpy.types.Operator):
         new_warp.name = get_unique_name(name, parent.warps)
         new_warp.type = self.type
         new_warp.blend_type = 'ADD'
+        new_warp.use_as_mask = self.use_as_mask
 
         if layer:
             new_warp.texcoord_type = layer.texcoord_type
             new_warp.uv_name = layer.uv_name
 
-        if self.type in special_vector_warps or self.type == 'WARP_MASK':
+        if self.type in special_vector_warps or self.use_as_mask:
             new_warp.blend_type = 'MIX'
 
         # insert at the beginning
@@ -618,18 +626,20 @@ class YRemoveYPaintVectorWarp(bpy.types.Operator):
 
         return {'FINISHED'}
     
-
-def generate_image_warp_node(parent, layer, layer_ui, image_name, type = 'IMAGE'):
+def generate_image_warp_node(parent, layer, layer_ui, image_name, as_mask = False):
     new_warp = parent.warps.add()
+    new_warp.type = 'IMAGE'
 
-    name = [mt[1] for mt in warp_type_items if mt[0] == type][0]
+    name = [mt[1] for mt in warp_type_items if mt[0] == new_warp.type][0]
 
     new_warp.name = get_unique_name(name, parent.warps)
-    new_warp.type = type
-    if type == 'WARP_MASK':
+
+    if as_mask:
         new_warp.blend_type = 'MIX'
     else:
         new_warp.blend_type = 'ADD'
+
+    new_warp.use_as_mask = as_mask
     new_warp.image_name = image_name
     new_warp.expand_source = False
 
@@ -650,8 +660,6 @@ def generate_image_warp_node(parent, layer, layer_ui, image_name, type = 'IMAGE'
     reconnect_layer_nodes(layer)
     rearrange_layer_nodes(layer)
 
-
-
 class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
     """Open Available Image to Vector Warp"""
     bl_idname = "wm.y_open_available_image_to_vector_warp"
@@ -667,7 +675,9 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
 
     image_name : StringProperty(name="Image")
     image_coll : CollectionProperty(type=bpy.types.PropertyGroup)
-    
+
+    use_as_mask : BoolProperty(default=False, name='Use as Mask',)
+
     @classmethod
     def poll(cls, context):
         return get_active_ypaint_node() 
@@ -716,7 +726,7 @@ class YOpenAvailableImageToVectorWarp(bpy.types.Operator):
             self.report({'ERROR'}, "No image selected!")
             return {'CANCELLED'}
 
-        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name, self.use_as_mask)
         # Update UI
         wm.ypui.need_update = True
         print('INFO: Image', self.image_name, 'is opened in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
@@ -750,6 +760,8 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
         description = 'Detect selected UDIM files and load all matching tiles.',
         default = True
     )
+
+    use_as_mask : BoolProperty(default=False, name='Use as Mask',)
     
     @classmethod
     def poll(cls, context):
@@ -813,7 +825,7 @@ class YOpenImageToVectorWarp(bpy.types.Operator):
         
         wm = context.window_manager
 
-        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.image_name, self.use_as_mask)
 
         # Update UI
         wm.ypui.need_update = True
@@ -838,7 +850,6 @@ class YNewImageToVectorWarp(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     name : StringProperty(default='')
-    mask_type : BoolProperty(default=False)
 
     # For image layer
     width : IntProperty(name='Width', default=1024, min=1, max=16384)
@@ -859,6 +870,8 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         default = False
     )
 
+    use_as_mask : BoolProperty(default=False, name='Use as Mask',)
+
     @classmethod
     def poll(cls, context):
         return get_active_ypaint_node()
@@ -877,7 +890,7 @@ class YNewImageToVectorWarp(bpy.types.Operator):
         name = obj.active_material.name
         items = bpy.data.images
 
-        if self.mask_type:
+        if self.use_as_mask:
             name = 'Mask(' + name + ')'
 
         # Use user preference default image size
@@ -961,12 +974,10 @@ class YNewImageToVectorWarp(bpy.types.Operator):
 
         alpha = True
 
-        if self.mask_type:
+        if self.use_as_mask:
             color = (0.0, 0.0, 0.0, 1.0)
-            img_type = 'WARP_MASK'
         else:
             color = (0.5, 0.5, 0.5, 1.0)
-            img_type = 'IMAGE'
         
         img = bpy.data.images.new(
             name=self.name, width=self.width, height=self.height, 
@@ -982,7 +993,7 @@ class YNewImageToVectorWarp(bpy.types.Operator):
 
         update_image_editor_image(context, img)
 
-        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.name, img_type)
+        generate_image_warp_node(self.parent, self.layer, self.layer_ui, self.name, self.use_as_mask)
 
         wm = context.window_manager
 

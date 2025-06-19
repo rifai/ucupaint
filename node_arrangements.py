@@ -369,9 +369,6 @@ def arrange_vectorwarp_nodes(tree, parent, loc, is_value=False, return_y_offset=
                 loc.y -= 300.0
             case 'GABOR':
                 loc.y -= 240.0
-            case 'WARP_MASK':
-                loc.y -= 300.0
-
     return loc
 
 def arrange_modifier_nodes(tree, parent, loc, is_value=False, return_y_offset=False, use_modifier_1=False):
