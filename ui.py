@@ -942,9 +942,9 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
         row.context_pointer_set('parent', parent)
         row.context_pointer_set('vector_warp', m)
 
-        if m.type not in VectorWarp.special_vector_warps:
-            icon_value = lib.get_icon('mask')
-            row.prop(m, 'use_as_mask', icon_value=icon_value, text='')
+        # if not modui.expand_content and m.type not in VectorWarp.special_vector_warps:
+        #     icon_value = lib.get_icon('mask')
+        #     row.prop(m, 'use_as_mask', icon_value=icon_value, text='')
         row.menu("NODE_MT_y_vector_warp_menu", text='', icon=icon)
         row.prop(m, 'enable', text='')
 
@@ -1076,6 +1076,13 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                             split.prop(texcoord, 'object', text='')
                     else:
                         rowb.prop(m, 'texcoord_type', text='')
+
+                rrow = col.row(align=True)
+                rrow.label(text='', icon='BLANK1')
+                splits = split_layout(rrow, 0.5)
+                splits.label(text='Use as mask:')
+                rrow.prop(m, 'use_as_mask', text='')
+                
             else:
                 rbcol = col.column() 
                 if m.type == 'BLUR':
