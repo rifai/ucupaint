@@ -260,7 +260,13 @@ def reconnect_vectorwarp_node(tree, vw, start_vector, original_vector):
         if vw.texcoord_type == 'UV':
             uv_target = get_essential_node(tree, TREE_START).get(vw.uv_name + io_suffix['UV'])
             if uv_target:
-                create_link(tree, uv_target, current_node.inputs['Vector'])
+                if vw.type == 'IMAGE':
+                    mapping = tree.nodes.get(vw.mapping)
+                    create_link(tree, uv_target, mapping.inputs['Vector'])
+
+                    create_link(tree, mapping.outputs['Vector'], current_node.inputs['Vector'])
+                else:
+                    create_link(tree, uv_target, current_node.inputs['Vector'])
         elif vw.texcoord_type == 'Decal':
             texcoord = tree.nodes.get(vw.texcoord)
             if texcoord:

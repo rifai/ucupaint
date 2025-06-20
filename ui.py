@@ -976,6 +976,11 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                     rrow.label(text='', icon='BLANK1')
                     rrow.label(text='Opacity:')
                     draw_input_prop(rrow, m, 'intensity_value')
+                    rrow = col.row(align=True)
+                    rrow.label(text='', icon='BLANK1')
+                    splits = split_layout(rrow, 0.5)
+                    splits.label(text='Use as mask:')
+                    rrow.prop(m, 'use_as_mask', text='')
                 else:
                     draw_input_prop(rowb, m, 'intensity_value')
 
@@ -1036,6 +1041,30 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                         rrow.label(text='', icon='BLANK1')
                         rrow.label(text='UV Map:')
                         rrow.prop_search(m, "uv_name", obj.data, "uv_layers", text='', icon='GROUP_UVS')
+
+                        mapping = mod_tree.nodes.get(m.mapping)
+                        if m.type == 'IMAGE' and mapping:
+                            
+                            rrow = bcol.row(align=True)
+                            rrow.label(text='', icon='BLANK1')
+
+                            rrow.label(text='Transform:')
+                            rrow.prop(mapping, 'vector_type', text='')
+
+                            rrow = bcol.row(align=True)
+                            rrow.label(text='', icon='BLANK1')
+
+                            if is_bl_newer_than(2, 81):
+                                mcol = rrow.column()
+                                mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
+                                mcol = rrow.column()
+                                mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
+                                
+                                mcol = rrow.column(align=True)
+                                mrow = mcol.row()
+                                mrow.label(text='Scale:')
+                                mcol.prop(mapping.inputs[3], 'default_value', text='')
+
                     elif m.texcoord_type == 'Decal':
                         texcoord = mod_tree.nodes.get(m.texcoord)
 
@@ -1076,13 +1105,6 @@ def draw_warp_stack(context, parent, layout, ui, layer=None, extra_blank=False, 
                             split.prop(texcoord, 'object', text='')
                     else:
                         rowb.prop(m, 'texcoord_type', text='')
-
-                rrow = col.row(align=True)
-                rrow.label(text='', icon='BLANK1')
-                splits = split_layout(rrow, 0.5)
-                splits.label(text='Use as mask:')
-                rrow.prop(m, 'use_as_mask', text='')
-                
             else:
                 rbcol = col.column() 
                 if m.type == 'BLUR':

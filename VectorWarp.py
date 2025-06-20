@@ -354,6 +354,7 @@ def delete_vectorwarp_nodes(tree, vw):
 
     remove_node(tree, vw, 'mix')
     remove_node(tree, vw, 'map_range')
+    remove_node(tree, vw, 'mapping')
     remove_node(tree, vw, 'frame')
     remove_node(tree, vw, 'texcoord')
     remove_node(tree, vw, 'decal_process')
@@ -374,6 +375,8 @@ def check_vectorwarp_extra_nodes(vw, tree):
         is_rangeable = vw.type not in special_vector_warps
         
         mp = check_new_node(tree, vw, 'mix', 'ShaderNodeMix', 'Mix')
+        if vw.type == 'IMAGE':
+            check_new_node(tree, vw, 'mapping', 'ShaderNodeMapping', 'Mapping Image')
         
         if vw.use_as_mask:
             multiply_mask = check_new_node(tree, vw, 'node_multiply_mask', 'ShaderNodeMath', 'Multiply Mask')
