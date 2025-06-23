@@ -986,6 +986,8 @@ def update_yp_tree(tree):
                     new_warp.uv_name = layer.uv_name
                     new_warp.blend_type = 'MIX'
                     new_warp.node = layer.mapping
+                    new_warp.uniform_scale_value = layer.uniform_scale_value
+                    new_warp.uniform_scale_enable = layer.enable_uniform_scale
 
                     # insert at the beginning
                     last_idx = len(layer.warps) - 1
