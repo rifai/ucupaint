@@ -245,7 +245,9 @@ def reconnect_vectorwarp_node(tree, vw, start_vector, original_vector):
         create_link(tree, intensity_value, multiply.inputs[0])
         create_link(tree, alpha_img, multiply.inputs[1])
         create_link(tree, multiply.outputs[0], mix_node.inputs['Factor'])
-    else:
+    elif intensity_value:
+        # print("VectorWarp: No multiply node found for", vw.type, " mix=", vw.mix)
+        # print("Intensity value", intensity_value)
         create_link(tree, intensity_value, mix_node.inputs['Factor'])
 
     multiply_warp = tree.nodes.get(vw.node_multiply_mask)
@@ -1962,17 +1964,17 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
             layer_blur_factor = get_essential_node(tree, TREE_START).get(get_entity_input_name(layer, 'blur_vector_factor'))
             if layer_blur_factor: create_link(tree, layer_blur_factor, blur_vector.inputs[0])
 
-        if vector and mapping and layer.texcoord_type != 'Decal':
-            vector = create_link(tree, vector, mapping.inputs[0])[0]
+        # if vector and mapping and layer.texcoord_type != 'Decal':
+        #     vector = create_link(tree, vector, mapping.inputs[0])[0]
         
         # Layer UV uniform scale value
-        if is_bl_newer_than(2, 81):
-            uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(layer, 'uniform_scale_value'))
-            if uniform_scale_value:
-                if layer.enable_uniform_scale:
-                    create_link(tree, uniform_scale_value, mapping.inputs[3])
-                else:
-                    break_link(tree, uniform_scale_value, mapping.inputs[3])
+        # if is_bl_newer_than(2, 81):
+        #     uniform_scale_value = get_essential_node(tree, TREE_START).get(get_entity_input_name(layer, 'uniform_scale_value'))
+        #     if uniform_scale_value:
+        #         if layer.enable_uniform_scale:
+        #             create_link(tree, uniform_scale_value, mapping.inputs[3])
+        #         else:
+        #             break_link(tree, uniform_scale_value, mapping.inputs[3])
 
     if vector:
 

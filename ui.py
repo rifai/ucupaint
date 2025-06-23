@@ -2048,58 +2048,58 @@ def draw_layer_vector(context, layout, layer, layer_tree, source, image, vcol, i
                 rrow.label(text='', icon='BLANK1')
                 rrow.operator('wm.y_set_decal_object_position_to_sursor', text='Set Position to Cursor', icon='CURSOR')
                 
-            if layer.texcoord_type != 'Decal' and not is_using_image_atlas:
-                mapping = get_layer_mapping(layer)
+            # if layer.texcoord_type != 'Decal' and not is_using_image_atlas:
+            #     mapping = get_layer_mapping(layer)
 
-                rrow = boxcol.row(align=True)
-                rrow.label(text='', icon='BLANK1')
-                rrow.label(text='Transform:')
-                rrow.prop(mapping, 'vector_type', text='')
+            #     rrow = boxcol.row(align=True)
+            #     rrow.label(text='', icon='BLANK1')
+            #     rrow.label(text='Transform:')
+            #     rrow.prop(mapping, 'vector_type', text='')
 
-                rrow = boxcol.row(align=True)
-                rrow.label(text='', icon='BLANK1')
-                rrow = rrow.row()
-                if is_bl_newer_than(2, 81):
-                    mcol = rrow.column()
-                    mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
-                    mcol = rrow.column()
-                    mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
-                    if layer.enable_uniform_scale:
-                        mcol = rrow.column(align=True)
-                        mrow = mcol.row()
-                        mrow.label(text='Scale:')
-                        mrow.prop(layer, 'enable_uniform_scale', text='', icon='LOCKED')
-                        draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'X')
-                        draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Y')
-                        draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Z')
-                    else:
-                        mcol = rrow.column(align=True)
-                        mrow = mcol.row()
-                        mrow.label(text='Scale:')
-                        mrow.prop(layer, 'enable_uniform_scale', text='', icon='UNLOCKED')
-                        mcol.prop(mapping.inputs[3], 'default_value', text='')
-                else:
-                    mcol = rrow.column()
-                    mcol.prop(mapping, 'translation')
-                    mcol = rrow.column()
-                    mcol.prop(mapping, 'rotation')
-                    mcol = rrow.column()
-                    mcol.prop(mapping, 'scale')
+            #     rrow = boxcol.row(align=True)
+            #     rrow.label(text='', icon='BLANK1')
+            #     rrow = rrow.row()
+            #     if is_bl_newer_than(2, 81):
+            #         mcol = rrow.column()
+            #         mcol.prop(mapping.inputs[1], 'default_value', text='Offset')
+            #         mcol = rrow.column()
+            #         mcol.prop(mapping.inputs[2], 'default_value', text='Rotation')
+            #         if layer.enable_uniform_scale:
+            #             mcol = rrow.column(align=True)
+            #             mrow = mcol.row()
+            #             mrow.label(text='Scale:')
+            #             mrow.prop(layer, 'enable_uniform_scale', text='', icon='LOCKED')
+            #             draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'X')
+            #             draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Y')
+            #             draw_input_prop(mcol, layer, 'uniform_scale_value', None, 'Z')
+            #         else:
+            #             mcol = rrow.column(align=True)
+            #             mrow = mcol.row()
+            #             mrow.label(text='Scale:')
+            #             mrow.prop(layer, 'enable_uniform_scale', text='', icon='UNLOCKED')
+            #             mcol.prop(mapping.inputs[3], 'default_value', text='')
+            #     else:
+            #         mcol = rrow.column()
+            #         mcol.prop(mapping, 'translation')
+            #         mcol = rrow.column()
+            #         mcol.prop(mapping, 'rotation')
+            #         mcol = rrow.column()
+            #         mcol.prop(mapping, 'scale')
             
-                if yp.need_temp_uv_refresh:
-                    rrow = boxcol.row(align=True)
-                    rrow.label(text='', icon='BLANK1')
-                    rrow.alert = True
-                    rrow.operator('wm.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
+            #     if yp.need_temp_uv_refresh:
+            #         rrow = boxcol.row(align=True)
+            #         rrow.label(text='', icon='BLANK1')
+            #         rrow.alert = True
+            #         rrow.operator('wm.y_refresh_transformed_uv', icon='FILE_REFRESH', text='Refresh UV')
 
-            # Blur row
-            rrow = boxcol.row(align=True)
-            rrow.label(text='', icon='BLANK1')
-            splits = split_layout(rrow, 0.5)
-            splits.label(text='Blur:')
-            if layer.enable_blur_vector:
-                draw_input_prop(splits, layer, 'blur_vector_factor')
-            rrow.prop(layer, 'enable_blur_vector', text='')
+            # # Blur row
+            # rrow = boxcol.row(align=True)
+            # rrow.label(text='', icon='BLANK1')
+            # splits = split_layout(rrow, 0.5)
+            # splits.label(text='Blur:')
+            # if layer.enable_blur_vector:
+            #     draw_input_prop(splits, layer, 'blur_vector_factor')
+            # rrow.prop(layer, 'enable_blur_vector', text='')
 
             layout.separator()
 
