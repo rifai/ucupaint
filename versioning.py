@@ -964,9 +964,11 @@ def update_yp_tree(tree):
     print("file version =", version_tuple(yp.version))
     if version_tuple(yp.version) < (2, 4, 0):
         yp.halt_update = True
+
+        mapping_type = 'MAPPING'
+        blur_type = 'BLUR'
         for layer in yp.layers:
             ltree = get_tree(layer)
-            print("remove mapping node from layer", layer.mapping)
             mapping_node = ltree.nodes.get(layer.mapping)
             blur_node = ltree.nodes.get(layer.blur_vector)
 
@@ -975,10 +977,10 @@ def update_yp_tree(tree):
                 if is_transformed(mapping_node, layer):
                     new_warp = layer.warps.add()
 
-                    name = [mt[1] for mt in warp_type_items if mt[0] == 'MAPPING'][0]
+                    name = [mt[1] for mt in warp_type_items if mt[0] == mapping_type][0]
 
                     new_warp.name = get_unique_name(name, layer.warps)
-                    new_warp.type = 'MAPPING'
+                    new_warp.type = mapping_type
                     new_warp.use_as_mask = False
                     new_warp.texcoord_type = layer.texcoord_type
                     new_warp.uv_name = layer.uv_name
@@ -997,15 +999,20 @@ def update_yp_tree(tree):
             if blur_node:
                 new_warp = layer.warps.add()
 
-                name = [mt[1] for mt in warp_type_items if mt[0] == 'MAPPING'][0]
+                name = [mt[1] for mt in warp_type_items if mt[0] == blur_type][0]
 
                 new_warp.name = get_unique_name(name, layer.warps)
-                new_warp.type = 'BLUR'
+                new_warp.type = blur_type
                 new_warp.use_as_mask = False
                 new_warp.texcoord_type = layer.texcoord_type
                 new_warp.uv_name = layer.uv_name
                 new_warp.blend_type = 'MIX'
                 new_warp.node = layer.blur_vector
+                new_warp.blur_vector_factor = layer.blur_vector_factor
+
+                # insert at the beginning
+                last_idx = len(layer.warps) - 1
+                layer.warps.move(last_idx, 0)
 
                 layer.blur_vector = ''
                 refresh_warp = True
