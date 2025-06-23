@@ -968,33 +968,53 @@ def update_yp_tree(tree):
             ltree = get_tree(layer)
             print("remove mapping node from layer", layer.mapping)
             mapping_node = ltree.nodes.get(layer.mapping)
-            
-            if mapping_node:
+            blur_node = ltree.nodes.get(layer.blur_vector)
 
+            refresh_warp = False
+            if mapping_node:
+                if is_transformed(mapping_node, layer):
+                    new_warp = layer.warps.add()
+
+                    name = [mt[1] for mt in warp_type_items if mt[0] == 'MAPPING'][0]
+
+                    new_warp.name = get_unique_name(name, layer.warps)
+                    new_warp.type = 'MAPPING'
+                    new_warp.use_as_mask = False
+                    new_warp.texcoord_type = layer.texcoord_type
+                    new_warp.uv_name = layer.uv_name
+                    new_warp.blend_type = 'MIX'
+                    new_warp.node = layer.mapping
+
+                    # insert at the beginning
+                    last_idx = len(layer.warps) - 1
+                    layer.warps.move(last_idx, 0)
+                else:
+                    remove_node(ltree, layer, 'mapping')
+                
+                layer.mapping = ''
+                refresh_warp = True
+
+            if blur_node:
                 new_warp = layer.warps.add()
 
                 name = [mt[1] for mt in warp_type_items if mt[0] == 'MAPPING'][0]
 
                 new_warp.name = get_unique_name(name, layer.warps)
-                new_warp.type = 'MAPPING'
+                new_warp.type = 'BLUR'
                 new_warp.use_as_mask = False
                 new_warp.texcoord_type = layer.texcoord_type
                 new_warp.uv_name = layer.uv_name
                 new_warp.blend_type = 'MIX'
-                new_warp.node = layer.mapping
+                new_warp.node = layer.blur_vector
 
-                # insert at the beginning
-                last_idx = len(layer.warps) - 1
-                layer.warps.move(last_idx, 0)
-            # else:
-            #     remove_node(ltree, mapping_node, 'mapping')
-            
-            layer.mapping = ''
-            
-            VectorWarp.check_vectorwarp_trees(layer)
-            VectorWarp.check_layer_tree_ios(layer)
-            VectorWarp.rearrange_layer_nodes(layer)
-            VectorWarp.reconnect_layer_nodes(layer)
+                layer.blur_vector = ''
+                refresh_warp = True
+
+            if refresh_warp:
+                VectorWarp.check_vectorwarp_trees(layer)
+                VectorWarp.check_layer_tree_ios(layer)
+                VectorWarp.rearrange_layer_nodes(layer)
+                VectorWarp.reconnect_layer_nodes(layer)
 
         yp.halt_update = False
 
