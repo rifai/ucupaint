@@ -961,7 +961,6 @@ def update_yp_tree(tree):
 
         yp.halt_update = False
 
-    print("file version =", version_tuple(yp.version))
     if version_tuple(yp.version) < (2, 4, 0):
         yp.halt_update = True
 
@@ -986,7 +985,7 @@ def update_yp_tree(tree):
                     new_warp.uv_name = layer.uv_name
                     new_warp.blend_type = 'MIX'
                     new_warp.node = layer.mapping
-                    new_warp.uniform_scale_value = layer.uniform_scale_value
+                    new_warp.uniform_scale_value = get_entity_prop_input(layer, "uniform_scale_value").default_value 
                     new_warp.uniform_scale_enable = layer.enable_uniform_scale
 
                     # insert at the beginning
@@ -1010,7 +1009,7 @@ def update_yp_tree(tree):
                 new_warp.uv_name = layer.uv_name
                 new_warp.blend_type = 'MIX'
                 new_warp.node = layer.blur_vector
-                new_warp.blur_vector_factor = layer.blur_vector_factor
+                new_warp.blur_vector_factor = get_entity_prop_input(layer, "blur_vector_factor").default_value
 
                 # insert at the beginning
                 last_idx = len(layer.warps) - 1
