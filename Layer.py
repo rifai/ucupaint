@@ -101,6 +101,11 @@ def add_new_layer(
     layer = yp.layers.add()
     layer.type = layer_type
     layer.name = get_unique_name(layer_name, yp.layers)
+
+    # Set default uv name if it's an empty string
+    if uv_name == '':
+        uv_name = get_default_uv_name()
+
     layer.uv_name = uv_name
     check_uvmap_on_other_objects_with_same_mat(mat, uv_name)
 
@@ -1139,6 +1144,7 @@ class YNewLayer(bpy.types.Operator):
         # Make sure decal is off when adding non mappable layer
         if not is_mapping_possible(self.type) and self.texcoord_type == 'Decal':
             self.texcoord_type = 'UV'
+            self.mask_texcoord_type = 'UV'
 
         # Check if color id already being used
         while True:
@@ -1146,19 +1152,20 @@ class YNewLayer(bpy.types.Operator):
             self.mask_color_id = (random.uniform(COLORID_TOLERANCE, 1.0), random.uniform(COLORID_TOLERANCE, 1.0), random.uniform(COLORID_TOLERANCE, 1.0))
             if not is_colorid_already_being_used(yp, self.mask_color_id): break
 
-        if obj.type != 'MESH':
+        if not is_object_work_with_uv(obj):
             self.texcoord_type = 'Generated'
-        else:
-            if obj.type == 'MESH':
-                uv_name = get_default_uv_name(obj, yp)
-                self.uv_map = uv_name
-                if self.add_mask: self.mask_uv_name = uv_name
+            self.mask_texcoord_type = 'Generated'
 
-                # UV Map collections update
-                self.uv_map_coll.clear()
-                for uv in get_uv_layers(obj):
-                    if not uv.name.startswith(TEMP_UV):
-                        self.uv_map_coll.add().name = uv.name
+        if obj.type == 'MESH':
+            uv_name = get_default_uv_name(obj, yp)
+            self.uv_map = uv_name
+            if self.add_mask: self.mask_uv_name = uv_name
+
+            # UV Map collections update
+            self.uv_map_coll.clear()
+            for uv in get_uv_layers(obj):
+                if not uv.name.startswith(TEMP_UV):
+                    self.uv_map_coll.add().name = uv.name
 
         if get_user_preferences().skip_property_popups and not event.shift:
             return self.execute(context)
@@ -1418,7 +1425,7 @@ class YNewLayer(bpy.types.Operator):
 
                         crow = col.row(align=True)
                         crow.prop(self, 'mask_texcoord_type', text='')
-                        if self.mask_texcoord_type == 'UV':
+                        if self.mask_texcoord_type == 'UV' and obj.type == 'MESH':
                             crow.prop_search(self, "mask_uv_name", self, "uv_map_coll", text='', icon='GROUP_UVS')
 
                         if not self.mask_image_filepath:
@@ -2392,8 +2399,8 @@ class BaseMultipleImagesLayer():
         elif ypup.default_image_resolution != 'DEFAULT':
             self.mask_image_resolution = ypup.default_image_resolution
 
-        if obj.type != 'MESH':
-            self.texcoord_type = 'Object'
+        if not is_object_work_with_uv(obj):
+            self.texcoord_type = 'Generated'
 
         # Use active uv layer name by default
         if obj.type == 'MESH':
@@ -2900,8 +2907,8 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
         node = get_active_ypaint_node()
         yp = self.yp = node.node_tree.yp
 
-        if obj.type != 'MESH':
-            self.texcoord_type = 'Object'
+        if not is_object_work_with_uv(obj):
+            self.texcoord_type = 'Generated'
 
         # Use active uv layer name by default
         if obj.type == 'MESH':
@@ -3416,8 +3423,8 @@ class YOpenAvailableDataToLayer(bpy.types.Operator):
         node = get_active_ypaint_node()
         yp = node.node_tree.yp
 
-        if obj.type != 'MESH':
-            self.texcoord_type = 'Object'
+        if not is_object_work_with_uv(obj):
+            self.texcoord_type = 'Generated'
 
         # Use active uv layer name by default
         if obj.type == 'MESH':
@@ -4438,6 +4445,7 @@ class YReplaceLayerChannelOverride(bpy.types.Operator):
         ch = context.parent
         ch.override_type = self.type
         ch.override = True
+        if not ch.enable: ch.enable = True
 
         # Update list items
         ListItem.refresh_list_items(ch.id_data.yp, repoint_active=True)
@@ -4465,6 +4473,7 @@ class YReplaceLayerChannelOverride1(bpy.types.Operator):
         ch = context.parent
         ch.override_1_type = self.type
         ch.override_1 = True
+        if not ch.enable: ch.enable = True
 
         # Update list items
         ListItem.refresh_list_items(ch.id_data.yp, repoint_active=True)
@@ -6848,15 +6857,15 @@ class YLayerChannel(bpy.types.PropertyGroup):
     tao : StringProperty(default='')
 
     active_edit : BoolProperty(
-        name = 'Active override channel for editing or preview', 
-        description = 'Active override channel for editing or preview', 
+        name = 'Active Custom Data', 
+        description = 'Active custom data for editing or preview', 
         default = False,
         update = update_channel_active_edit
     )
 
     active_edit_1 : BoolProperty(
-        name = 'Active override channel for editing or preview', 
-        description = 'Active override channel for editing or preview', 
+        name = 'Active Custom Normal Data', 
+        description = 'Active custom normal data for editing or preview', 
         default = False,
         update = update_channel_active_edit
     )
@@ -7046,7 +7055,7 @@ class YLayer(bpy.types.PropertyGroup):
     edge_detect_radius : FloatProperty(
         name = 'Edge Detect Radius',
         description = 'Edge detect radius',
-        default=0.05, min=0.0, max=10.0,
+        default=0.05, min=0.0, max=10.0, precision=3,
         update = update_layer_edge_detect_radius
     )
 
