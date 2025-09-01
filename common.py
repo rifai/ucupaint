@@ -605,6 +605,14 @@ tex_eraser_asset_names = [
     'Erase Soft'
 ]
 
+tex_default_brushes = [
+    'Airbrush',
+    'Paint Hard',
+    'Paint Hard Pressure',
+    'Paint Soft',
+    'Paint Soft Pressure',
+]
+
 rgba_letters = ['r', 'g', 'b', 'a']
 nsew_letters = ['n', 's', 'e', 'w']
 
@@ -892,12 +900,6 @@ def get_active_material(obj=None):
         return None
 
     return mat
-
-def get_material_output(mat):
-    if mat != None and mat.node_tree:
-        output = [n for n in mat.node_tree.nodes if n.type == 'OUTPUT_MATERIAL' and n.is_active_output]
-        if output: return output[0]
-    return None
 
 def get_list_of_ypaint_nodes(mat):
 
@@ -1597,6 +1599,12 @@ def get_active_mat_output_node(tree):
         if node.bl_idname == 'ShaderNodeOutputMaterial' and node.is_active_output:
             return node
 
+    return None
+
+def get_material_output(mat):
+    if mat != None and mat.node_tree:
+        output = [n for n in mat.node_tree.nodes if n.type == 'OUTPUT_MATERIAL' and n.is_active_output]
+        if output: return output[0]
     return None
 
 def get_all_image_users(image):
@@ -4945,28 +4953,33 @@ def set_active_paint_slot_entity(yp):
     if yp.use_baked and len(yp.channels) > 0:
 
         ch = yp.channels[yp.active_channel_index]
-        baked = root_tree.nodes.get(ch.baked)
-        if baked and baked.image:
-            if ch.type == 'NORMAL':
-                baked_disp = root_tree.nodes.get(ch.baked_disp)
-                baked_normal_overlay = root_tree.nodes.get(ch.baked_normal_overlay)
+        if ch.type == 'NORMAL':
+            cur_image = get_active_paint_slot_image()
 
-                cur_image = get_active_paint_slot_image()
+            # Cycle through all baked normal images
+            orders = ['baked', 'baked_normal_overlay', 'baked_disp', 'baked_vdisp']
+            for i, prop in enumerate(orders):
+                cur_baked = root_tree.nodes.get(getattr(ch, prop))
+                if cur_baked and cur_baked.image == cur_image:
+                    next_i = i
+                    for j in range(len(orders)):
+                        if next_i == len(orders)-1:
+                            next_i = 0
+                        else: next_i += 1
 
-                if cur_image == baked.image and baked_disp:
-                    baked_disp.select = True
-                    root_tree.nodes.active = baked_disp
-                    image = baked_disp.image
-                elif baked_disp and cur_image == baked_disp.image and baked_normal_overlay:
-                    baked_normal_overlay.select = True
-                    root_tree.nodes.active = baked_normal_overlay
-                    image = baked_normal_overlay.image
-                else:
-                    baked.select = True
-                    root_tree.nodes.active = baked
-                    image = baked.image
+                        next_prop = orders[next_i]
+                        next_baked = root_tree.nodes.get(getattr(ch, next_prop))
 
-            else:
+                        if next_baked:
+                            next_baked.select = True
+                            image = next_baked.image
+                            root_tree.nodes.active = next_baked
+                            break
+                    break
+
+        if not image:
+            baked = root_tree.nodes.get(ch.baked)
+            if baked and baked.image:
                 baked.select = True
                 root_tree.nodes.active = baked
                 image = baked.image
@@ -5352,6 +5365,24 @@ def is_height_process_needed(layer):
 
     return False
 
+def is_vdisp_process_needed(layer):
+    yp = layer.id_data.yp
+    height_root_ch = get_root_height_channel(yp)
+    if not height_root_ch: return False
+
+    height_ch = get_height_channel(layer)
+    if not height_ch or not height_ch.enable: return False
+
+    #if yp.layer_preview_mode and height_ch.normal_map_type != 'VECTOR_DISPLACEMENT_MAP': return True
+
+    if layer.type == 'GROUP': 
+        if is_layer_using_vdisp_map(layer, height_root_ch):
+            return True
+    elif height_ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP': # or height_ch.enable_transition_bump:
+        return True
+
+    return False
+
 def is_normal_process_needed(layer):
     yp = layer.id_data.yp
     height_root_ch = get_root_height_channel(yp)
@@ -5471,7 +5502,26 @@ def is_layer_using_bump_map(layer, root_ch=None):
             for child in children:
                 if is_layer_using_bump_map(child):
                     return True
-        elif ch.write_height and  (ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} or ch.enable_transition_bump):
+        elif ch.write_height and (ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} or ch.enable_transition_bump):
+            return True
+
+    return False
+
+def is_layer_using_vdisp_map(layer, root_ch=None):
+    yp = layer.id_data.yp
+    if not root_ch: root_ch = get_root_height_channel(yp)
+    if not root_ch: return False
+
+    channel_idx = get_channel_index(root_ch)
+    try: ch = layer.channels[channel_idx]
+    except: return False
+    if get_channel_enabled(ch, layer, root_ch):
+        if layer.type == 'GROUP':
+            children = get_list_of_direct_children(layer)
+            for child in children:
+                if is_layer_using_vdisp_map(child):
+                    return True
+        elif ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP': # or ch.enable_transition_bump:
             return True
 
     return False
@@ -5552,12 +5602,17 @@ def is_any_layer_using_channel(root_ch, node=None):
         inp = node.inputs.get(root_ch.name + io_suffix['ALPHA'])
         if inp and len(inp.links):
             return True
-        inp = node.inputs.get(root_ch.name + io_suffix['HEIGHT'])
-        if inp and len(inp.links):
-            return True
+        if root_ch.type == 'NORMAL':
+            inp = node.inputs.get(root_ch.name + io_suffix['HEIGHT'])
+            if inp and len(inp.links):
+                return True
+            inp = node.inputs.get(root_ch.name + io_suffix['VDISP'])
+            if inp and len(inp.links):
+                return True
 
     for layer in yp.layers:
-        if layer.channels[ch_idx].enable:
+        if layer.type in {'GROUP', 'BACKGROUND'}: continue
+        if get_channel_enabled(layer.channels[ch_idx], layer):
             return True
 
     return False
@@ -5776,7 +5831,7 @@ def get_yp_images(yp, udim_only=False, get_baked_channels=False, check_overlay_n
                 if baked_vdisp and baked_vdisp.image and baked_vdisp.image not in images:
                     images.append(baked_vdisp.image)
 
-                if not check_overlay_normal or not is_overlay_normal_empty(yp):
+                if not check_overlay_normal or not is_overlay_normal_empty(ch):
                     baked_normal_overlay = tree.nodes.get(ch.baked_normal_overlay)
                     if baked_normal_overlay and baked_normal_overlay.image and baked_normal_overlay.image not in images:
                         images.append(baked_normal_overlay.image)
@@ -5983,6 +6038,15 @@ def get_node(tree, name, parent=None):
 
     return node
 
+def is_normal_vdisp_input_connected(root_normal_ch):
+    # NOTE: Assuming that the active node is using the input tree
+    node = get_active_ypaint_node()
+    if not node: return False
+
+    io_vdisp_name = root_normal_ch.name + io_suffix['VDISP']
+    vdisp_inp = node.inputs.get(io_vdisp_name)
+    return vdisp_inp and len(vdisp_inp.links) > 0
+
 def is_normal_height_input_connected(root_normal_ch):
     # NOTE: Assuming that the active node is using the input tree
     node = get_active_ypaint_node()
@@ -6000,26 +6064,53 @@ def is_normal_input_connected(root_normal_ch):
     normal_inp = node.inputs.get(root_normal_ch.name)
     return normal_inp and len(normal_inp.links) > 0
 
-def is_overlay_normal_empty(yp):
+def is_overlay_normal_empty(root_ch):
+    yp = root_ch.id_data.yp
+    channel_index = get_channel_index(root_ch)
 
-    root_ch = get_root_height_channel(yp)
-    if root_ch and is_normal_input_connected(root_ch):
+    if is_normal_input_connected(root_ch):
         return False
 
     for l in yp.layers:
-        c = get_height_channel(l)
-        if not c or not l.enable or not c.enable: continue
+        if l.type in {'GROUP', 'BACKGROUND'}: continue
+        if channel_index >= len(l.channels): continue
+        c = l.channels[channel_index]
+        if not get_channel_enabled(c, l): continue
         if c.normal_map_type == 'NORMAL_MAP' or (c.normal_map_type == 'BUMP_MAP' and not c.write_height):
             return False
 
     return True
 
-def any_layers_using_vdisp(yp):
+def any_layers_using_vdisp(root_ch):
+    yp = root_ch.id_data.yp
+    channel_index = get_channel_index(root_ch)
+
+    if is_normal_vdisp_input_connected(root_ch):
+        return True
 
     for l in yp.layers:
-        c = get_height_channel(l)
-        if not c or not l.enable or not c.enable: continue
+        if l.type in {'GROUP', 'BACKGROUND'}: continue
+        if channel_index >= len(l.channels): continue
+        c = l.channels[channel_index]
+        if not get_channel_enabled(c, l): continue
         if c.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
+            return True
+
+    return False
+
+def any_layers_using_disp(root_ch):
+    yp = root_ch.id_data.yp
+    channel_index = get_channel_index(root_ch)
+
+    if is_normal_height_input_connected(root_ch):
+        return True
+
+    for l in yp.layers:
+        if l.type in {'GROUP', 'BACKGROUND'}: continue
+        if channel_index >= len(l.channels): continue
+        c = l.channels[channel_index]
+        if not get_channel_enabled(c, l): continue
+        if c.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} and c.write_height:
             return True
 
     return False
@@ -6620,9 +6711,9 @@ def get_material_drivers(mat):
 
     return drivers
 
-def get_material_fcurves_and_drivers(yp):
-    fcurves = get_material_fcurves(yp)
-    fcurves.extend(get_material_drivers(yp))
+def get_material_fcurves_and_drivers(mat):
+    fcurves = get_material_fcurves(mat)
+    fcurves.extend(get_material_drivers(mat))
     return fcurves
 
 def get_yp_fcurves(yp):
@@ -6693,11 +6784,6 @@ def swap_channel_fcurves(yp, idx0, idx1):
             elif index == idx1:
                 fc.data_path = fc.data_path.replace('yp.channels[' + str(idx1) + ']', 'yp.channels[' + str(idx0) + ']')
 
-    # Material fcurves 
-    node = get_active_ypaint_node()
-    mat = get_active_material()
-    fcurves = get_material_fcurves_and_drivers(mat)
-
     ch0 = yp.channels[idx0]
     ch1 = yp.channels[idx1]
 
@@ -6713,15 +6799,29 @@ def swap_channel_fcurves(yp, idx0, idx1):
     if idx0 < idx1 and ch0.enable_alpha:
         ch0_idx += 1
 
-    for fc in fcurves:
-        m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
-        if m:
-            index = int(m.group(1))
-            if index == ch0_idx:
-                fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(ch1_idx) + '].default_value'
+    for mat in bpy.data.materials:
+        if not mat.node_tree: continue
 
-            elif index == ch1_idx:
-                fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(ch0_idx) + '].default_value'
+        # Get yp nodes
+        yp_nodes = []
+        for node in mat.node_tree.nodes:
+            if node.type == 'GROUP' and node.node_tree and node.node_tree.yp == yp:
+                if node not in yp_nodes:
+                    yp_nodes.append(node)
+
+        # Check for animation data
+        if len(yp_nodes) > 0:
+            fcurves = get_material_fcurves_and_drivers(mat)
+            for node in yp_nodes:
+                for fc in fcurves:
+                    m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[(\d+)\]\.default_value$', fc.data_path)
+                    if m:
+                        index = int(m.group(1))
+                        if index == ch0_idx:
+                            fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(ch1_idx) + '].default_value'
+
+                        elif index == ch1_idx:
+                            fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(ch0_idx) + '].default_value'
 
 def swap_layer_channel_fcurves(layer, idx0, idx1):
     if idx0 >= len(layer.channels) or idx1 >= len(layer.channels): return
@@ -7048,30 +7148,41 @@ def shift_channel_fcurves(yp, start_index=1, direction='UP', remove_ch_mode=True
                     if m:
                         fc.data_path = fc.data_path.replace('.channels[' + str(i) + ']', '.channels[' + str(i+shifter) + ']')
 
-    # Material fcurves
-    node = get_active_ypaint_node()
-    mat = get_active_material()
-    fcurves = get_material_fcurves_and_drivers(mat)
-
     if remove_ch_mode and start_index < len(yp.channels) and yp.channels[start_index].enable_alpha and shifter < 0:
         shifter -= 1
 
-    if shifter > 0:
+    for mat in bpy.data.materials:
+        if not mat.node_tree: continue
 
-        for i, root_ch in reversed(list(enumerate(yp.channels))):
-            if i <= start_index: continue
-            io_index = root_ch.io_index
-            for fc in fcurves:
-                m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(io_index) + '\]\.default_value$', fc.data_path)
-                if m: fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(io_index+shifter) + '].default_value'
-    else:
+        # Get yp nodes
+        yp_nodes = []
+        for node in mat.node_tree.nodes:
+            if node.type == 'GROUP' and node.node_tree and node.node_tree.yp == yp:
+                if node not in yp_nodes:
+                    yp_nodes.append(node)
 
-        for i, root_ch in enumerate(yp.channels):
-            if i <= start_index: continue
-            io_index = root_ch.io_index
-            for fc in fcurves:
-                m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(io_index) + '\]\.default_value$', fc.data_path)
-                if m: fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(io_index+shifter) + '].default_value'
+        # Check for animation data
+        if len(yp_nodes) > 0:
+            fcurves = get_material_fcurves_and_drivers(mat)
+
+            for node in yp_nodes:
+
+                if shifter > 0:
+
+                    for i, root_ch in reversed(list(enumerate(yp.channels))):
+                        if i <= start_index: continue
+                        io_index = root_ch.io_index
+                        for fc in fcurves:
+                            m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(io_index) + '\]\.default_value$', fc.data_path)
+                            if m: fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(io_index+shifter) + '].default_value'
+                else:
+
+                    for i, root_ch in enumerate(yp.channels):
+                        if i <= start_index: continue
+                        io_index = root_ch.io_index
+                        for fc in fcurves:
+                            m = re.match(r'^nodes\["' + node.name + '"\]\.inputs\[' + str(io_index) + '\]\.default_value$', fc.data_path)
+                            if m: fc.data_path = 'nodes["' + node.name + '"].inputs[' + str(io_index+shifter) + '].default_value'
 
 
 def shift_mask_fcurves_up(layer, start_index=1):

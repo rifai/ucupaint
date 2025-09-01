@@ -333,6 +333,10 @@ def remove_all_prev_inputs(tree, layer, node): #, height_only=False):
             if io_name in node.inputs:
                 break_input_link(tree, node.inputs[io_name])
 
+            io_name = root_ch.name + io_suffix['VDISP'] + io_suffix['ALPHA']
+            if io_name in node.inputs:
+                break_input_link(tree, node.inputs[io_name])
+
         #if height_only: continue
 
         io_name = root_ch.name
@@ -2355,11 +2359,13 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
             mix_pure = nodes.get(c.mix_pure)
             mix_remains = nodes.get(c.mix_remains)
             mix_normal = nodes.get(c.mix_normal)
+            mix_vdisp = nodes.get(c.mix_vdisp)
 
             mmixcol0, mmixcol1, mmixout = get_mix_color_indices(mask_mix)
             mp_mixcol0, mp_mixcol1, mp_mixout = get_mix_color_indices(mix_pure)
             mr_mixcol0, mr_mixcol1, mr_mixout = get_mix_color_indices(mix_remains)
             mn_mixcol0, mn_mixcol1, mn_mixout = get_mix_color_indices(mix_normal)
+            mv_mixcol0, mv_mixcol1, mv_mixout = get_mix_color_indices(mix_vdisp)
 
             if mix_pure:
                 create_link(tree, mask_val, mix_pure.inputs[mp_mixcol1])
@@ -2372,6 +2378,10 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
             if mix_normal:
                 create_link(tree, mask_val, mix_normal.inputs[mn_mixcol1])
                 if mask_intensity: create_link(tree, mask_intensity, mix_normal.inputs[0])
+
+            if mix_vdisp:
+                create_link(tree, mask_val, mix_vdisp.inputs[mv_mixcol1])
+                if mask_intensity: create_link(tree, mask_intensity, mix_vdisp.inputs[0])
 
             if mask_mix:
 
@@ -2452,6 +2462,11 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
         prev_vdisp = None
         next_vdisp = None
+        prev_vdisp_alpha = None
+        next_vdisp_alpha = None
+
+        group_vdisp = None
+        vdisp_alpha = None
 
         height_alpha = None
         normal_alpha = None
@@ -2483,6 +2498,10 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
             else:
                 group_channel_alpha = source.outputs.get(root_ch.name + io_suffix['ALPHA'] + io_suffix['GROUP'])
                 if group_channel_alpha: alpha = group_channel_alpha
+
+            # Vector displacement from group
+            group_vdisp = source.outputs.get(root_ch.name + io_suffix['VDISP'] + io_suffix['GROUP'])
+            vdisp_alpha = source.outputs.get(root_ch.name + io_suffix['VDISP'] + io_suffix['ALPHA'] + io_suffix['GROUP'])
 
             group_alpha = alpha
 
@@ -2719,6 +2738,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
         normal_proc = nodes.get(ch.normal_proc)
         normal_map_proc = nodes.get(ch.normal_map_proc)
         vdisp_proc = nodes.get(ch.vdisp_proc)
+        vdisp_blend = None
 
         if root_ch.type == 'NORMAL':
 
@@ -2736,13 +2756,15 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 if normal_proc and 'Intensity' in normal_proc.inputs:
                     create_link(tree, ch_intensity, normal_proc.inputs['Intensity'])
 
-            # Set normal strength
-            if normal_proc and ch_normal_strength and 'Strength' in normal_proc.inputs:
-                create_link(tree, ch_normal_strength, normal_proc.inputs['Strength'])
+            if normal_proc:
+                # Set normal strength
+                if ch_normal_strength and 'Strength' in normal_proc.inputs:
+                    create_link(tree, ch_normal_strength, normal_proc.inputs['Strength'])
 
-            if normal_map_proc:
+            if ch_normal_strength and normal_map_proc:
                 create_link(tree, ch_normal_strength, normal_map_proc.inputs['Strength'])
 
+            vdisp_blend = nodes.get(ch.vdisp_blend)
             height_blend = nodes.get(ch.height_blend)
             hbcol0, hbcol1, hbout = get_mix_color_indices(height_blend)
 
@@ -2781,6 +2803,9 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
 
             prev_vdisp = get_essential_node(tree, TREE_START).get(root_ch.name + io_suffix['VDISP'])
             next_vdisp = get_essential_node(tree, TREE_END).get(root_ch.name + io_suffix['VDISP'])
+
+            prev_vdisp_alpha = get_essential_node(tree, TREE_START).get(root_ch.name + io_suffix['VDISP'] + io_suffix['ALPHA'])
+            next_vdisp_alpha = get_essential_node(tree, TREE_END).get(root_ch.name + io_suffix['VDISP'] + io_suffix['ALPHA'])
 
             # Get neighbor rgb
             alpha_n = alpha_after_mod
@@ -2986,12 +3011,14 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 mix_pure = nodes.get(c.mix_pure)
                 mix_remains = nodes.get(c.mix_remains)
                 mix_normal = nodes.get(c.mix_normal)
+                mix_vdisp = nodes.get(c.mix_vdisp)
                 mix_limit_normal = nodes.get(c.mix_limit_normal)
 
                 mmixcol0, mmixcol1, mmixout = get_mix_color_indices(mask_mix)
                 mp_mixcol0, mp_mixcol1, mp_mixout = get_mix_color_indices(mix_pure)
                 mr_mixcol0, mr_mixcol1, mr_mixout = get_mix_color_indices(mix_remains)
                 mn_mixcol0, mn_mixcol1, mn_mixout = get_mix_color_indices(mix_normal)
+                mv_mixcol0, mv_mixcol1, mv_mixout = get_mix_color_indices(mix_vdisp)
 
                 if mask.type == 'MODIFIER' and root_ch.enable_smooth_bump:
                     mask_source_n = nodes.get(mask.source_n)
@@ -3020,6 +3047,9 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                     if mix_limit_normal and group_alpha:
                         normal_alpha = create_link(tree, normal_alpha, mix_limit_normal.inputs[0])[0]
                         create_link(tree, group_alpha, mix_limit_normal.inputs[1])
+
+                if vdisp_alpha and mix_vdisp:
+                    vdisp_alpha = create_link(tree, vdisp_alpha, mix_vdisp.inputs[mv_mixcol0])[mv_mixout]
 
                 if root_ch.enable_smooth_bump and mask_mix:
                     if j == chain and trans_bump_ch == ch and trans_bump_crease:
@@ -3143,7 +3173,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 if normal_proc: create_link(tree, normal, normal_proc.inputs['Normal'])
 
                 height_group = source.outputs.get(root_ch.name + io_suffix['HEIGHT'] + io_suffix['GROUP'])
-                if height_proc and height_group: create_link(tree, height_group, height_proc.inputs['Height'])
+                if height_proc and height_group and 'Height' in height_proc.inputs: create_link(tree, height_group, height_proc.inputs['Height'])
 
                 if height_proc and root_ch.enable_smooth_bump:
                     if rgb_n and 'Height n' in height_proc.inputs: create_link(tree, rgb_n, height_proc.inputs['Height n'])
@@ -3153,9 +3183,10 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
             elif normal_map_proc and normal_proc and 'Normal' in normal_proc.inputs:
                 create_link(tree, normal_map_proc.outputs[0], normal_proc.inputs['Normal'])
             else:
-                prev_normal = get_essential_node(tree, TREE_START).get(root_ch.name)
-                if prev_normal and normal_proc and 'Normal' in normal_proc.inputs: 
-                    create_link(tree, prev_normal, normal_proc.inputs['Normal'])
+                # NOTE: Using previous normal doesn't really has actual use cases, so use geometry normal instead
+                #prev_normal = get_essential_node(tree, TREE_START).get(root_ch.name)
+                if normal_proc and 'Normal' in normal_proc.inputs: 
+                    create_link(tree, get_essential_node(tree, GEOMETRY).get('Normal'), normal_proc.inputs['Normal'])
 
             height_alpha = alpha
             #alpha_ns = None
@@ -3298,7 +3329,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                             create_link(tree, end_chain, height_proc.inputs['Alpha'])
                         else: create_link(tree, alpha_before_intensity, height_proc.inputs['Alpha'])
 
-                    if ch.normal_map_type == 'NORMAL_MAP':
+                    if ch.normal_map_type == 'NORMAL_MAP' and 'Transition' in height_proc.inputs:
                         if not write_height and not root_ch.enable_smooth_bump:
                             create_link(tree, end_chain, height_proc.inputs['Transition'])
                         else: create_link(tree, alpha_before_intensity, height_proc.inputs['Transition'])
@@ -3475,7 +3506,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 rgb = normal_map_proc.outputs[0]
 
             # Bump turned normal map when 'Write Height' is disabled
-            if normal_proc and ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} and not ch.write_height:
+            if normal_proc and (ch.normal_map_type in {'BUMP_MAP', 'BUMP_NORMAL_MAP'} or layer.type == 'GROUP') and not ch.write_height:
                 rgb = normal_proc.outputs[0]
 
             # Default normal
@@ -3491,7 +3522,7 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                 ch_vdisp_strength = get_essential_node(tree, TREE_START).get(get_entity_input_name(ch, 'vdisp_strength'))
                 
                 rgb = create_link(tree, rgb, vdisp_proc.inputs[inp0])[outp0]
-                create_link(tree, ch_vdisp_strength, vdisp_proc.inputs[inp1])
+                if ch_vdisp_strength: create_link(tree, ch_vdisp_strength, vdisp_proc.inputs[inp1])
 
             if not root_ch.enable_smooth_bump and not write_height:
                 normal_flip = nodes.get(ch.normal_flip)
@@ -3772,25 +3803,59 @@ def reconnect_layer_nodes(layer, ch_idx=-1, merge_mask=False):
                     create_link(tree, normal_alpha, blend.inputs[0])
                 else: create_link(tree, alpha, blend.inputs[0])
 
-                if root_ch.type == 'NORMAL' and ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
-                    if prev_vdisp: create_link(tree, prev_vdisp, blend.inputs[bcol0])
-                else:
-                    if prev_rgb: create_link(tree, prev_rgb, blend.inputs[bcol0])
+                if prev_rgb: create_link(tree, prev_rgb, blend.inputs[bcol0])
 
             # Armory can't recognize mute node, so reconnect input to output directly
             #if layer.enable and ch.enable:
             #    create_link(tree, blend.outputs[0], next_rgb)
             #else: create_link(tree, prev_rgb, next_rgb)
 
-            if root_ch.type == 'NORMAL' and ch.normal_map_type == 'VECTOR_DISPLACEMENT_MAP':
-                if next_vdisp: create_link(tree, blend.outputs[bout], next_vdisp)
-                if prev_rgb and next_rgb: create_link(tree, prev_rgb, next_rgb)
-            else:
-                if next_rgb: create_link(tree, blend.outputs[bout], next_rgb)
+            if next_rgb: create_link(tree, blend.outputs[bout], next_rgb)
         elif prev_rgb and next_rgb: 
             create_link(tree, prev_rgb, next_rgb)
 
-        if root_ch.type == 'NORMAL' and ch.normal_map_type != 'VECTOR_DISPLACEMENT_MAP' and prev_vdisp and next_vdisp: 
+        if prev_vdisp_alpha and next_vdisp_alpha:
+            create_link(tree, prev_vdisp_alpha, next_vdisp_alpha)
+
+        if vdisp_blend:
+            bcol0, bcol1, bout = get_mix_color_indices(vdisp_blend)
+
+            if prev_vdisp: create_link(tree, prev_vdisp, vdisp_blend.inputs[bcol0])
+
+            vdisp = rgb
+            if vdisp_alpha == None:
+                vdisp_alpha = alpha
+
+            if layer.type == 'GROUP':
+                if group_vdisp: vdisp = group_vdisp
+
+                vdisp_intensity = tree.nodes.get(ch.vdisp_intensity)
+
+                # Dedicated vector displacement channel intensity connection only works with group layer for now
+                if vdisp_intensity and ch_intensity:
+                    vdisp_alpha = create_link(tree, vdisp_alpha, vdisp_intensity.inputs[0])[0]
+                    create_link(tree, ch_intensity, vdisp_intensity.inputs[1])
+
+            if vdisp:
+                create_link(tree, vdisp, vdisp_blend.inputs[bcol1])
+
+            if next_vdisp: create_link(tree, vdisp_blend.outputs[bout], next_vdisp)
+
+            if vdisp_alpha:
+                if 'Alpha2' in vdisp_blend.inputs:
+                    create_link(tree, vdisp_alpha, vdisp_blend.inputs['Alpha2'])
+                else: create_link(tree, vdisp_alpha, vdisp_blend.inputs[0])
+
+            if prev_vdisp_alpha and 'Alpha1' in vdisp_blend.inputs:
+                create_link(tree, prev_vdisp_alpha, vdisp_blend.inputs['Alpha1'])
+
+            if next_vdisp_alpha:
+                if 'Value' in vdisp_blend.outputs:
+                    create_link(tree, vdisp_blend.outputs['Value'], next_vdisp_alpha)
+                elif 'Alpha' in vdisp_blend.outputs:
+                    create_link(tree, vdisp_blend.outputs['Alpha'], next_vdisp_alpha)
+
+        elif prev_vdisp and next_vdisp:
             create_link(tree, prev_vdisp, next_vdisp)
 
         if next_alpha:

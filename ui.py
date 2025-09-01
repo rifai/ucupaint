@@ -2658,7 +2658,7 @@ def draw_layer_channels(context, layout, layer, layer_tree, image, specific_ch):
                     #row.label(text='', icon='BLANK1')
 
             # Write height
-            if ch.normal_map_type not in {'NORMAL_MAP', 'VECTOR_DISPLACEMENT_MAP'} or ch.enable_transition_bump:
+            if ch.normal_map_type not in {'NORMAL_MAP', 'VECTOR_DISPLACEMENT_MAP'} or ch.enable_transition_bump or layer.type == 'GROUP':
                 row = mcol.row(align=True)
                 row.label(text='', icon='BLANK1')
                 row.label(text='Write Height:')
@@ -3552,11 +3552,11 @@ def draw_layers_ui(context, layout, node):
                 baked_normal_overlay = nodes.get(root_ch.baked_normal_overlay)
                 if baked_normal_overlay and baked_normal_overlay.image:
                     row = bcol.row(align=True)
-                    row.active = not root_ch.disable_global_baked
+                    row.active = not root_ch.disable_global_baked or yp.enable_baked_outside
                     if baked_normal_overlay.image.is_dirty:
                         title = baked_normal_overlay.image.name + ' *'
                     else: title = baked_normal_overlay.image.name
-                    if root_ch.disable_global_baked:
+                    if root_ch.disable_global_baked and not yp.enable_baked_outside:
                         title += ' (Disabled)'
                     row.label(text=title, icon_value=lib.get_icon('image'))
 
@@ -3566,15 +3566,29 @@ def draw_layers_ui(context, layout, node):
                 baked_disp = nodes.get(root_ch.baked_disp)
                 if baked_disp and baked_disp.image:
                     row = bcol.row(align=True)
-                    row.active = not root_ch.disable_global_baked
+                    row.active = not root_ch.disable_global_baked or yp.enable_baked_outside
                     if baked_disp.image.is_dirty:
                         title = baked_disp.image.name + ' *'
                     else: title = baked_disp.image.name
-                    if root_ch.disable_global_baked:
+                    if root_ch.disable_global_baked and not yp.enable_baked_outside:
                         title += ' (Disabled)'
                     row.label(text=title, icon_value=lib.get_icon('image'))
 
                     if baked_disp.image.packed_file:
+                        row.label(text='', icon='PACKAGE')
+
+                baked_vdisp = nodes.get(root_ch.baked_vdisp)
+                if baked_vdisp and baked_vdisp.image:
+                    row = bcol.row(align=True)
+                    row.active = not root_ch.disable_global_baked or yp.enable_baked_outside
+                    if baked_vdisp.image.is_dirty:
+                        title = baked_vdisp.image.name + ' *'
+                    else: title = baked_vdisp.image.name
+                    if root_ch.disable_global_baked and not yp.enable_baked_outside:
+                        title += ' (Disabled)'
+                    row.label(text=title, icon_value=lib.get_icon('image'))
+
+                    if baked_vdisp.image.packed_file:
                         row.label(text='', icon='PACKAGE')
 
             btimages = []
@@ -4085,7 +4099,7 @@ def draw_layers_ui(context, layout, node):
                     bbox = col.box()
                     row = bbox.row(align=True)
                     label = 'Toggle Eraser'
-                    if brush.name in tex_eraser_asset_names:
+                    if brush.name in tex_eraser_asset_names or (brush not in tex_default_brushes and brush.blend == 'ERASE_ALPHA'):
                         row.alert = True
                         label = 'Disable Eraser'
                     row.operator('paint.y_toggle_eraser', text=label)
@@ -4434,6 +4448,22 @@ def main_draw(self, context):
         col.label(text=group_tree.name + ' (' + yp.version + ')', icon_value=lib.get_icon('nodetree'))
         col.operator("wm.y_update_yp_trees", text='Update node to version ' + get_current_version_str(), icon='ERROR')
         return
+
+    # Message will appear when opening file with newer node version
+    if version_tuple(yp.version) > version_tuple(get_current_version_str()):
+        col = layout.column()
+        col.alert = True
+        col.label(text='This node uses newer version!', icon='ERROR')
+        if 'addon_updater_ops' not in dir():
+            # Extension platform releases link
+            col.operator('wm.url_open', text='Update '+get_addon_title(), icon='ERROR').url = 'https://extensions.blender.org/add-ons/ucupaint/'
+        else: 
+            if is_online():
+                # Blender with online access already has the update button
+                col.label(text='Please update the addon!', icon='BLANK1')
+            else:
+                # Github releases link
+                col.operator('wm.url_open', text='Update '+get_addon_title(), icon='ERROR').url = 'https://github.com/ucupumar/ucupaint/releases'
 
     if ypup.developer_mode:
         height_root_ch = get_root_height_channel(yp)
@@ -4814,7 +4844,7 @@ class NODE_UL_YPaint_channels(bpy.types.UIList):
         icon_value = lib.get_icon(lib.channel_custom_icon_dict[item.type])
         row.prop(item, 'name', text='', emboss=False, icon_value=icon_value)
 
-        if not yp.use_baked or item.no_layer_using:
+        if not yp.use_baked or (item.no_layer_using and not (yp.use_baked and yp.enable_baked_outside)):
             if item.type == 'RGB':
                 row = row.row(align=True)
 
@@ -7282,8 +7312,12 @@ class YLayerTypeMenu(bpy.types.Menu):
             icon = 'RADIOBUT_ON' if layer.type == 'IMAGE' else 'RADIOBUT_OFF'
             col.label(text='Image' + suffix, icon=icon)
 
-        label = 'Open Available Image' if layer.type != 'IMAGE' else 'Replace Image'
-        op = col.operator('wm.y_replace_layer_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
+        label = 'Open Image' if layer.type != 'IMAGE' else 'Replace Image'
+        op = col.operator('wm.y_open_image_to_replace_layer', text=folder_emoji+label)
+
+        label = 'Open Available Image' if layer.type != 'IMAGE' else 'Replace with Available Image'
+        #label = 'Open Available Image'
+        op = col.operator('wm.y_replace_layer_type', text=folder_emoji+label)
         op.type = 'IMAGE'
         op.load_item = True
 
@@ -7463,8 +7497,11 @@ class YMaskTypeMenu(bpy.types.Menu):
             icon = 'RADIOBUT_ON' if mask.type == 'IMAGE' else 'RADIOBUT_OFF'
             col.label(text='Image' + suffix, icon=icon)
 
-        label = 'Open Available Image' if mask.type != 'IMAGE' else 'Replace Image'
-        op = col.operator('wm.y_replace_mask_type', text=folder_emoji+label) #, icon_value=lib.get_icon('open_image'))
+        label = 'Open Image' if mask.type != 'IMAGE' else 'Replace Image'
+        op = col.operator('wm.y_open_image_to_replace_mask', text=folder_emoji+label)
+
+        label = 'Open Available Image' if mask.type != 'IMAGE' else 'Replace with Available Image'
+        op = col.operator('wm.y_replace_mask_type', text=folder_emoji+label)
         op.type = 'IMAGE'
         op.load_item = True
 
@@ -8479,6 +8516,9 @@ def unregister():
 
     if is_bl_newer_than(3):
         bpy.types.ASSETBROWSER_MT_context_menu.remove(draw_yp_asset_browser_menu)
+
+    if is_bl_newer_than(2, 81):
+        bpy.types.FILEBROWSER_MT_context_menu.remove(draw_yp_file_browser_menu)
 
     # Remove Handlers
     bpy.app.handlers.load_post.remove(yp_load_ui_settings)

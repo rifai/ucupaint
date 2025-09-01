@@ -1,7 +1,7 @@
 import bpy, time, re, os, random, numpy
 from bpy.props import *
 from bpy_extras.io_utils import ImportHelper
-from . import Modifier, lib, Mask, transition, ImageAtlas, UDIM, NormalMapModifier, ListItem, VectorWarp
+from . import Modifier, lib, Mask, transition, ImageAtlas, UDIM, NormalMapModifier, ListItem, VectorWarp, BaseOperator
 from .common import *
 #from . import bake_common
 from .node_arrangements import *
@@ -1644,48 +1644,19 @@ class YNewLayer(bpy.types.Operator):
 
         return {'FINISHED'}
 
-class YOpenImageToOverrideChannel(bpy.types.Operator, ImportHelper):
+class YOpenImageToOverrideChannel(bpy.types.Operator, ImportHelper, BaseOperator.OpenImage):
     """Open Image to Override Channel"""
     bl_idname = "wm.y_open_image_to_override_layer_channel"
     bl_label = "Open Image to Override Channel Layer"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # File related
-    files : CollectionProperty(type=bpy.types.OperatorFileListElement, options={'HIDDEN', 'SKIP_SAVE'})
-    directory : StringProperty(maxlen=1024, subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'}) 
-
-    # File browser filter
-    filter_folder : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-    filter_image : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-
-    display_type : EnumProperty(
-        items = (
-            ('FILE_DEFAULTDISPLAY', 'Default', ''),
-            ('FILE_SHORTDISLPAY', 'Short List', ''),
-            ('FILE_LONGDISPLAY', 'Long List', ''),
-            ('FILE_IMGDISPLAY', 'Thumbnails', '')
-        ),
-        default = 'FILE_IMGDISPLAY',
-        options = {'HIDDEN', 'SKIP_SAVE'}
-    )
-
-    relative : BoolProperty(name="Relative Path", default=True, description="Apply relative paths")
-
-    def generate_paths(self):
-        return (fn.name for fn in self.files), self.directory
-
     @classmethod
     def poll(cls, context):
-        #return hasattr(context, 'group_node') and context.group_node
         return get_active_ypaint_node()
 
     def invoke(self, context, event):
         self.ch = context.parent
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def check(self, context):
-        return True
+        return self.running_fileselect_modal(context, event)
 
     def execute(self, context):
         ch = self.ch
@@ -1694,8 +1665,7 @@ class YOpenImageToOverrideChannel(bpy.types.Operator, ImportHelper):
         wm = context.window_manager
         node = get_active_ypaint_node()
 
-        import_list, directory = self.generate_paths()
-        loaded_images = tuple(load_image(path, directory) for path in import_list)
+        loaded_images = self.get_loaded_images()
 
         images = []
         for i, new_img in enumerate(loaded_images):
@@ -1822,48 +1792,19 @@ class YOpenImageToOverrideChannel(bpy.types.Operator, ImportHelper):
 
         return {'FINISHED'}
 
-class YOpenImageToOverride1Channel(bpy.types.Operator, ImportHelper):
+class YOpenImageToOverride1Channel(bpy.types.Operator, ImportHelper, BaseOperator.OpenImage):
     """Open Image to Override 1 Channel"""
     bl_idname = "wm.y_open_image_to_override_1_layer_channel"
     bl_label = "Open Image to Override 1 Channel Layer"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # File related
-    files : CollectionProperty(type=bpy.types.OperatorFileListElement, options={'HIDDEN', 'SKIP_SAVE'})
-    directory : StringProperty(maxlen=1024, subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'}) 
-
-    # File browser filter
-    filter_folder : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-    filter_image : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-
-    display_type : EnumProperty(
-        items = (
-            ('FILE_DEFAULTDISPLAY', 'Default', ''),
-            ('FILE_SHORTDISLPAY', 'Short List', ''),
-            ('FILE_LONGDISPLAY', 'Long List', ''),
-            ('FILE_IMGDISPLAY', 'Thumbnails', '')
-        ),
-        default = 'FILE_IMGDISPLAY',
-        options = {'HIDDEN', 'SKIP_SAVE'}
-    )
-
-    relative : BoolProperty(name="Relative Path", default=True, description="Apply relative paths")
-
-    def generate_paths(self):
-        return (fn.name for fn in self.files), self.directory
-
     @classmethod
     def poll(cls, context):
-        #return hasattr(context, 'group_node') and context.group_node
         return get_active_ypaint_node()
 
     def invoke(self, context, event):
         self.ch = context.parent
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def check(self, context):
-        return True
+        return self.running_fileselect_modal(context, event)
 
     def execute(self, context):
         ch = self.ch
@@ -1872,8 +1813,7 @@ class YOpenImageToOverride1Channel(bpy.types.Operator, ImportHelper):
         wm = context.window_manager
         node = get_active_ypaint_node()
 
-        import_list, directory = self.generate_paths()
-        loaded_images = tuple(load_image(path, directory) for path in import_list)
+        loaded_images = self.get_loaded_images()
 
         images = []
         for i, new_img in enumerate(loaded_images):
@@ -1995,27 +1935,7 @@ class YOpenImageToOverride1Channel(bpy.types.Operator, ImportHelper):
 
         return {'FINISHED'}
 
-class BaseMultipleImagesLayer():
-    # File related
-    files : CollectionProperty(type=bpy.types.OperatorFileListElement, options={'HIDDEN', 'SKIP_SAVE'})
-    directory : StringProperty(maxlen=1024, subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'}) 
-
-    # File browser filter
-    filter_folder : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-    filter_image : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-
-    display_type : EnumProperty(
-        items = (
-            ('FILE_DEFAULTDISPLAY', 'Default', ''),
-            ('FILE_SHORTDISLPAY', 'Short List', ''),
-            ('FILE_LONGDISPLAY', 'Long List', ''),
-            ('FILE_IMGDISPLAY', 'Thumbnails', '')
-        ),
-        default = 'FILE_IMGDISPLAY',
-        options = {'HIDDEN', 'SKIP_SAVE'}
-    )
-
-    relative : BoolProperty(name="Relative Path", default=True, description="Apply relative paths")
+class BaseMultipleImagesLayer(BaseOperator.OpenImage):
 
     texcoord_type : EnumProperty(
         name = 'Layer Coordinate Type',
@@ -2101,9 +2021,6 @@ class BaseMultipleImagesLayer():
         description = 'Invert G channel on loaded normal map (useful for DirectX normal maps)',
         default = False
     )
-
-    def generate_paths(self):
-        return (fn.name for fn in self.files), self.directory
 
     #def is_mask_using_udim(self):
     #    return self.use_udim_for_mask and UDIM.is_udim_supported()
@@ -2559,7 +2476,7 @@ def search_for_image_node(node, channel_name, channel_image_dict={}):
                 if channel_name in channel_image_dict:
                     break
                 
-class YOpenImagesFromMaterialToLayer(bpy.types.Operator, BaseMultipleImagesLayer):
+class YOpenImagesFromMaterialToLayer(bpy.types.Operator, ImportHelper, BaseMultipleImagesLayer):
     bl_idname = "wm.y_open_images_from_material_to_single_layer"
     bl_label = "Open Images from Material to single " + get_addon_title() + " Layer"
     bl_description = "Open images inside material node tree to single " + get_addon_title() + " layer"
@@ -2790,8 +2707,7 @@ class YOpenImagesToSingleLayer(bpy.types.Operator, ImportHelper, BaseMultipleIma
 
     def invoke(self, context, event):
         self.invoke_operator(context)
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
+        return self.running_fileselect_modal(context, event)
 
     def check(self, context):
         return self.check_operator(context)
@@ -2807,32 +2723,11 @@ class YOpenImagesToSingleLayer(bpy.types.Operator, ImportHelper, BaseMultipleIma
         
         return {'FINISHED'}
 
-class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
+class YOpenImageToLayer(bpy.types.Operator, ImportHelper, BaseOperator.OpenImage):
     """Open Image to Layer"""
     bl_idname = "wm.y_open_image_to_layer"
     bl_label = "Open Image to Layer"
     bl_options = {'REGISTER', 'UNDO'}
-
-    # File related
-    files : CollectionProperty(type=bpy.types.OperatorFileListElement, options={'HIDDEN', 'SKIP_SAVE'})
-    directory : StringProperty(maxlen=1024, subtype='FILE_PATH', options={'HIDDEN', 'SKIP_SAVE'}) 
-
-    # File browser filter
-    filter_folder : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-    filter_image : BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
-
-    display_type : EnumProperty(
-        items = (
-            ('FILE_DEFAULTDISPLAY', 'Default', ''),
-            ('FILE_SHORTDISLPAY', 'Short List', ''),
-            ('FILE_LONGDISPLAY', 'Long List', ''),
-            ('FILE_IMGDISPLAY', 'Thumbnails', '')
-        ),
-        default = 'FILE_IMGDISPLAY',
-        options = {'HIDDEN', 'SKIP_SAVE'}
-    )
-
-    relative : BoolProperty(name="Relative Path", default=True, description="Apply relative paths")
 
     interpolation : EnumProperty(
         name = 'Image Interpolation Type',
@@ -2890,9 +2785,6 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
 
     file_browser_filepath : StringProperty(default='')
 
-    def generate_paths(self):
-        return (fn.name for fn in self.files), self.directory
-
     @classmethod
     def poll(cls, context):
         #return hasattr(context, 'group_node') and context.group_node
@@ -2928,11 +2820,7 @@ class YOpenImageToLayer(bpy.types.Operator, ImportHelper):
                 return self.execute(context)
             return context.window_manager.invoke_props_dialog(self)
         
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def check(self, context):
-        return True
+        return self.running_fileselect_modal(context, event)
 
     def draw(self, context):
         node = get_active_ypaint_node()
@@ -4294,10 +4182,10 @@ def replace_layer_type(layer, new_type, item_name='', remove_data=False):
         if new_type == 'IMAGE':
             image = bpy.data.images.get(item_name)
             source.image = image
-            #if hasattr(source, 'color_space'):
-            #    source.color_space = 'NONE'
-            #if image.colorspace_settings.name != get_noncolor_name():
-            #    image.colorspace_settings.name = get_noncolor_name()
+
+            if layer.texcoord_type == 'Decal':
+                source.extension = 'CLIP'
+
         elif new_type == 'VCOL':
             set_source_vcol_name(source, item_name)
         elif new_type == 'HEMI':
@@ -4617,6 +4505,43 @@ class YSetLayerChannelInput(bpy.types.Operator):
 
         # Update list items
         ListItem.refresh_list_items(ch.id_data.yp, repoint_active=True)
+
+        return {'FINISHED'}
+
+class YOpenImageToReplaceLayer(bpy.types.Operator, ImportHelper, BaseOperator.OpenImage):
+    """Open Image to Replace Layer"""
+    bl_idname = "wm.y_open_image_to_replace_layer"
+    bl_label = "Open Image to Replace Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        group_node = get_active_ypaint_node()
+        return context.object and group_node and len(group_node.node_tree.yp.layers) > 0
+
+    def invoke(self, context, event):
+        self.layer = context.layer
+        return self.running_fileselect_modal(context, event)
+
+    def execute(self, context):
+        T = time.time()
+
+        wm = context.window_manager
+        layer = self.layer
+        yp = layer.id_data.yp
+
+        loaded_images = self.get_loaded_images()
+
+        if len(loaded_images) == 0 or loaded_images[0] == None:
+            self.report({'ERROR'}, "No image is selected!")
+            return {'CANCELLED'}
+
+        image = loaded_images[0]
+
+        replace_layer_type(layer, 'IMAGE', image.name)
+
+        print('INFO: Layer', layer.name, 'is updated in', '{:0.2f}'.format((time.time() - T) * 1000), 'ms!')
+        wm.yptimer.time = str(time.time())
 
         return {'FINISHED'}
 
@@ -5514,6 +5439,9 @@ class YPasteLayer(bpy.types.Operator):
             new_layer = yp.layers.add()
             new_layer.name = get_unique_name(ls.name, yp.layers)
 
+            # Get original source layer again to avoid pointer error after adding new layer
+            ls = yp_source.layers.get(lname)
+
             # Copy layer props
             copy_id_props(ls, new_layer, ['name'])
 
@@ -5631,6 +5559,8 @@ class YPasteLayer(bpy.types.Operator):
 
             pasted_layer_ids = [i for i, l in enumerate(yp.layers) if l.name in pasted_layer_names]
             bpy.ops.wm.y_rebake_specific_layers(layer_ids=str(pasted_layer_ids))
+
+            self.report({'INFO'}, 'Rebaking pasted layers is done in '+'{:0.2f}'.format(time.time() - T)+' seconds!')
 
             # TODO: Refactor common functions for adding new data (add_new_layer, add_new_mask, etc) to avoid cyclic imports
 
@@ -6532,6 +6462,8 @@ class YLayerChannel(bpy.types.PropertyGroup):
 
     # Vector Displacement related
     vdisp_proc : StringProperty(default='')
+    vdisp_blend : StringProperty(default='')
+    vdisp_intensity : StringProperty(default='')
 
     # For pack/unpack height io
     height_group_unpack : StringProperty(default='')
@@ -6651,7 +6583,7 @@ class YLayerChannel(bpy.types.PropertyGroup):
         #description= 'Distance of mask bump', 
         name = 'Transition Bump Height Range', 
         description = 'Transition bump height range.\n(White equals this value, black equals negative of this value)', 
-        default=0.05, min=0.0, max=1.0, precision=3
+        default=0.05, min=-1.0, max=1.0, precision=3
     )
 
     transition_bump_chain : IntProperty(
@@ -6858,14 +6790,14 @@ class YLayerChannel(bpy.types.PropertyGroup):
 
     active_edit : BoolProperty(
         name = 'Active Custom Data', 
-        description = 'Active custom data for editing or preview', 
+        description = 'Active custom data for Blender\'s paint mode and edit mode, or '+get_addon_title()+'\'s Custom Data preview mode',
         default = False,
         update = update_channel_active_edit
     )
 
     active_edit_1 : BoolProperty(
         name = 'Active Custom Normal Data', 
-        description = 'Active custom normal data for editing or preview', 
+        description = 'Active custom normal data for Blender\'s paint mode and edit mode, or '+get_addon_title()+'\'s Custom Data preview mode',
         default = False,
         update = update_channel_active_edit
     )
@@ -7316,6 +7248,7 @@ def register():
     bpy.utils.register_class(YOpenImageToLayer)
     bpy.utils.register_class(YOpenImagesToSingleLayer)
     bpy.utils.register_class(YOpenImagesFromMaterialToLayer)
+    bpy.utils.register_class(YOpenImageToReplaceLayer)
     bpy.utils.register_class(YOpenImageToOverrideChannel)
     bpy.utils.register_class(YOpenImageToOverride1Channel)
     bpy.utils.register_class(YOpenAvailableDataToLayer)
@@ -7351,6 +7284,7 @@ def unregister():
     bpy.utils.unregister_class(YOpenImageToLayer)
     bpy.utils.unregister_class(YOpenImagesToSingleLayer)
     bpy.utils.unregister_class(YOpenImagesFromMaterialToLayer)
+    bpy.utils.unregister_class(YOpenImageToReplaceLayer)
     bpy.utils.unregister_class(YOpenImageToOverrideChannel)
     bpy.utils.unregister_class(YOpenImageToOverride1Channel)
     bpy.utils.unregister_class(YOpenAvailableDataToLayer)
