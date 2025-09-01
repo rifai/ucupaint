@@ -71,8 +71,11 @@ def create_image_atlas(color='BLACK', size=8192, hdr=False, name=''):
     img.yia.is_image_atlas = True
     img.yia.color = color
     #img.yia.float_buffer = hdr
-    #if hdr:
-    #img.colorspace_settings.name = get_noncolor_name()
+
+    # Float image atlas always use premultiplied alpha
+    if hdr and is_bl_newer_than(2, 80):
+        #img.colorspace_settings.name = get_noncolor_name()
+        img.alpha_mode = 'PREMUL'
 
     return img
 
@@ -461,10 +464,10 @@ class YBackToOriginalUV(bpy.types.Operator):
             uv_layers = get_uv_layers(ob)
 
             for uv in uv_layers:
-                if uv.name == src_of_img.uv_name:
+                if uv.name == uv_name:
 
-                    if uv_layers.active != uv_layers.get(src_of_img.uv_name):
-                        uv_layers.active = uv_layers.get(src_of_img.uv_name)
+                    if uv_layers.active != uv_layers.get(uv_name):
+                        uv_layers.active = uv_layers.get(uv_name)
 
                 if uv.name == TEMP_UV:
                     uv_layers.remove(uv)
@@ -509,7 +512,7 @@ class YConvertToImageAtlas(bpy.types.Operator):
             entities, images, segment_names, segment_name_props = get_yp_entities_images_and_segments(yp)
         else:
             mapping = get_entity_mapping(context.entity)
-            if is_transformed(mapping) and not context.entity.use_baked:
+            if is_transformed(mapping, context.entity) and not context.entity.use_baked:
                 self.report({'ERROR'}, "Cannot convert transformed image!")
                 return {'CANCELLED'}
 
@@ -536,7 +539,7 @@ class YConvertToImageAtlas(bpy.types.Operator):
 
                 # Transformed mapping on entity is not valid for conversion
                 mapping = get_entity_mapping(entity)
-                if use_baked or not is_transformed(mapping):
+                if use_baked or not is_transformed(mapping, entity):
                     valid_entities.append(entity)
 
             if not any(valid_entities):
@@ -577,6 +580,10 @@ class YConvertToImageAtlas(bpy.types.Operator):
                 # Set segment name
                 #entity.segment_name = new_segment.name
                 setattr(entity, segment_name_props[i][j], new_segment.name)
+
+                # Make sure uniform scaling is not used
+                if entity.enable_uniform_scale:
+                    entity.enable_uniform_scale = False
 
                 # Set image to editor
                 if entity == context.entity:
@@ -649,6 +656,8 @@ class YConvertToStandardImage(bpy.types.Operator):
                     name=entities[i][0].name, width=segment.width, height=segment.height,
                     alpha=True, float_buffer=image.is_float
                 )
+                if image.is_float and is_bl_newer_than(2, 80):
+                    new_image.alpha_mode = 'PREMUL'
             else:
                 new_image = bpy.data.images.new(
                     name=entities[i][0].name, width=image.size[0], height=image.size[1],
