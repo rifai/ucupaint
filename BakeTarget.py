@@ -1,6 +1,12 @@
-import bpy
+import bpy, time
 from .common import *
 from bpy.props import *
+
+# todo : loop by bake target channels, 
+# setting resolution per bake target, setting resolution di bake all, di-hide.
+# setting bake info, dropdown bake target di bawah image 
+# global setting buat all target
+# bake per target
 
 rgba_items = (
     ('0', 'R', ''),
@@ -117,6 +123,48 @@ def update_new_bake_target_preset(self, context):
 
     #self.name = get_unique_name(tree_name + suffix, yp.bake_targets)
     self.name = get_unique_name(tree_name + suffix, bpy.data.images)
+
+def add_new_channel_bake_target(context, channel_name):
+    node = get_active_ypaint_node()
+    yp = node.node_tree.yp
+    bt = yp.bake_targets.add()
+    bt.name = "Channel Bake Target " + channel_name
+    bt.a.default_value = 1.0
+
+    bt.r.channel_name = channel_name
+    bt.g.channel_name = channel_name
+    bt.b.channel_name = channel_name
+
+    yp.active_bake_target_index = len(yp.bake_targets)-1
+
+    wm = context.window_manager
+    ypui = wm.ypui
+
+    ypui.bake_target_ui.expand_content = True
+    ypui.need_update = True
+
+class YNewChannelBakeTarget(bpy.types.Operator):
+    bl_idname = "wm.y_new_channel_bake_target"
+    bl_label = "New Channel Bake Target"
+    bl_description = "New bake target"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return get_active_ypaint_node()
+    
+    def execute(self, context):
+        node = get_active_ypaint_node()
+        yp = node.node_tree.yp
+
+        print("Creating new bake target from channels..."+str(yp.active_channel_index))
+        channel = yp.channels[yp.active_channel_index]
+
+        add_new_channel_bake_target(context, channel.name)
+        
+        # Update panel
+        context.area.tag_redraw()
+        return {'FINISHED'}
 
 class YNewBakeTarget(bpy.types.Operator):
     bl_idname = "wm.y_new_bake_target"
@@ -383,7 +431,8 @@ def register():
     bpy.utils.register_class(YBakeTarget)
     bpy.utils.register_class(YCopyBakeTarget)
     bpy.utils.register_class(YPasteBakeTarget)
-    
+    bpy.utils.register_class(YNewChannelBakeTarget)
+
 def unregister():
     bpy.utils.unregister_class(YNewBakeTarget)
     bpy.utils.unregister_class(YRemoveBakeTarget)
@@ -391,3 +440,4 @@ def unregister():
     bpy.utils.unregister_class(YBakeTarget)
     bpy.utils.unregister_class(YCopyBakeTarget)
     bpy.utils.unregister_class(YPasteBakeTarget)
+    bpy.utils.unregister_class(YNewChannelBakeTarget)

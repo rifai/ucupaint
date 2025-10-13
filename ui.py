@@ -969,6 +969,7 @@ def draw_bake_targets_ui(context, layout, node):
     rcol = row.column(align=True)
     #rcol.context_pointer_set('node', node)
 
+    rcol.operator("wm.y_bake_all_targets", text='', icon_value=lib.get_icon('bake'))
     if is_bl_newer_than(2, 80):
         rcol.operator("wm.y_new_bake_target", icon='ADD', text='')
         rcol.operator("wm.y_remove_bake_target", icon='REMOVE', text='')
