@@ -1986,7 +1986,7 @@ def bake_channel(
         use_float_for_displacement=False, use_float_for_normal=False, bprops=None
     ):
 
-    print('BAKE CHANNEL: Baking', root_ch.name + ' channel...')
+    print('BAKE CHANNEL: Baking', root_ch.name + ' channel...' + 'size=' + str(width) + 'x' + str(height))
 
     tree = node.node_tree
     yp = tree.yp

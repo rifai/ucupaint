@@ -1,6 +1,7 @@
 import bpy, time
 from .common import *
 from bpy.props import *
+from .bake_common import *
 
 # todo : loop by bake target channels, 
 # setting resolution per bake target, setting resolution di bake all, di-hide.
@@ -69,7 +70,7 @@ class YBakeTargetChannel(bpy.types.PropertyGroup):
         default = False
     )
 
-class YBakeTarget(bpy.types.PropertyGroup):
+class YBakeTarget(bpy.types.PropertyGroup, BaseBakeOperator):
     name : StringProperty(
         name = 'Bake Target Name',
         description = 'Name of bake target name',

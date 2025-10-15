@@ -1024,16 +1024,32 @@ def draw_bake_targets_ui(context, layout, node):
         row.label(text='', icon='BLANK1')
         image_name = image.name if image else '-'
 
-        row.label(text='Image: ' + image_name, icon_value=lib.get_icon('image'))
+        info_col = row.column()
+        row_image = info_col.row(align=True)
+
+        row_image.label(text='Image: ' + image_name, icon_value=lib.get_icon('image'))
 
         icon = 'PREFERENCES' if is_bl_newer_than(2, 80) else 'SCRIPTWIN'
-        row.context_pointer_set('image', image)
-        row.menu("NODE_MT_y_bake_target_menu", text='', icon=icon)
-        
+        row_image.context_pointer_set('image', image)
+        row_image.menu("NODE_MT_y_bake_target_menu", text='', icon=icon)
+
         if not image:
             row = col.row(align=True)
             row.label(text='', icon='BLANK1')
             row.label(text="Do 'Bake All Channels' to get the image!", icon='ERROR')
+        
+        rrow = info_col.row(align=True)
+        splits = split_layout(rrow, 0.5)
+        splits.label(text='Custom Resolution:')
+        rrow.prop(bt, 'use_custom_resolution', text='')
+
+        if bt.use_custom_resolution :
+            info_col.prop(bt, 'width', text='')
+            info_col.prop(bt, 'height', text='')
+        else:
+            info_col.prop(bt, 'image_resolution', expand= True,)
+
+        info_col.operator('wm.y_bake_single_target', text='Bake This Target', icon_value=lib.get_icon('bake'))
 
 def draw_root_channels_ui(context, layout, node):
     scene = bpy.context.scene
@@ -7491,6 +7507,13 @@ class YBakeTargetUI(bpy.types.PropertyGroup):
         description = 'Expand bake target A channel options',
         default = False,
         update = update_bake_target_ui
+    )
+
+    expand_options : BoolProperty(
+        name = 'Bake Options',
+        description = 'Expand bake target options',
+        default = True,
+        # update = update_bake_target_ui
     )
 
 class YModifierUI(bpy.types.PropertyGroup):
